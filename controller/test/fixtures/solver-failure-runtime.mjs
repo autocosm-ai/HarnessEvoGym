@@ -38,6 +38,10 @@ export async function startFixtureGateway(t, { modes = new Map() } = {}) {
         return
       }
       response.writeHead(200, { 'content-type': 'text/event-stream', 'x-request-id': `fixture-${observed.length}` })
+      if (mode === 'streamerror') {
+        response.end('data: {"error":{"code":"fixture_unavailable"}}\n\n')
+        return
+      }
       const delta = mode === 'reasoning' ? { reasoning_content: 'PRIVATE_REASONING_MUST_NOT_LEAK' }
         : mode === 'tools' ? { tool_calls: [{ index: 0, function: { name: 'bash', arguments: '{}' } }] }
           : { content: 'valid final content but not JSON' }

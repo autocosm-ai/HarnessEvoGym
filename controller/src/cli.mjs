@@ -37,7 +37,7 @@ const HELP = `HarnessEvoGym Controller
   harness-rsi experiment baseline-pack-export --run <run> --output <pack.json> --id <id> [--branch <branch-id>]
   harness-rsi experiment run --config <experiment.json> [--run-id <id>]
   harness-rsi experiment resume --run <population-run>
-  harness-rsi experiment finalize --run <single-run | population-run> [--recover-infrastructure]
+  harness-rsi experiment finalize --run <single-run | population-run> [--recover-infrastructure] [--final-only] [--infrastructure-retries 0..5]
   harness-rsi benchmark validate --config <benchmark.json> [--output <report.json>]
   harness-rsi evaluate compare \\
     --benchmark <benchmark.json> \\
@@ -71,6 +71,7 @@ const HELP = `HarnessEvoGym Controller
   - experiment resume 按执行内容、Runtime 和冻结配置摘要恢复暂停或稳定 Wave 边界的 Cowork Population；Git Revision 仅作审计。
   - experiment finalize 是唯一允许解锁 Cowork sealed final 的入口。
   - --recover-infrastructure 只能在 Population 上次失败且从未访问 sealed final 时使用，并且只能恢复一次。
+  - --final-only 只评测隐藏题，不重新回放训练题；OmegaUse Final 默认对接口故障最多追加重试 5 次。
   - Provider 密钥只从运行时环境变量读取，不写入 Experiment 或 .rsi 产物。
 `
 
@@ -271,13 +272,16 @@ async function evolveResumeCommand(args) {
 
 async function evolveFinalizeCommand(args) {
   const { options, flags } = parseOptions(args, {
-    valueOptions: new Set(['run', 'output']),
-    booleanFlags: new Set(['recover-infrastructure']),
+    valueOptions: new Set(['run', 'output', 'infrastructure-retries']),
+    booleanFlags: new Set(['recover-infrastructure', 'final-only']),
   })
   const result = await finalizeEvolution({
     repositoryRoot: REPOSITORY_ROOT,
     runDirectory: requiredPath(options, 'run'),
     recoverInfrastructure: flags.has('recover-infrastructure'),
+    finalOnly: flags.has('final-only'),
+    infrastructureRetries: options.has('infrastructure-retries')
+      ? Number(options.get('infrastructure-retries')) : 5,
     onEvent: progress,
   })
   await emit({

@@ -377,6 +377,17 @@ sealed-final 路径或结果后，允许显式的 `--recover-infrastructure` 恢
 与失败事件始终保留，未完成的 feedback 证据会归档到 `final-recovery/`；一旦已接触
 sealed final，或 Recovery 自身再失败，都会永久拒绝再次解封。
 
+只想比较隐藏测试分数时使用 `experiment finalize --run <run> --final-only`：
+它跳过 H0/Champion 的训练题回放，只跑冻结 H0 与冠军的 final，训练—测试提升差距
+留空，不重新训练或重新选择冠军。OmegaUse Final 默认对**尚未完成的题**最多追加
+5 次接口故障重试，等待 5/10/20/40/60 秒；可用 `--infrastructure-retries 0..5`
+调整。HTTP 200 响应内的 error、连接中断以及暂态 HTTP 错误可触发重试，明确的
+401/403、配置错误、Verifier 故障、正常空回答/拒答/工具协议问题和合法零分不会触发。
+重试先归档失败题的半成品与诊断，再从干净工作区重做该题；已提交的题不重跑。
+这是**同一次 Final Claim 内**的有界重试，不是跨进程 Final Resume；重试耗尽仍失败，
+不会生成伪造分数，也不会删除 Claim 或放开重复解封。只对声明按题断点能力的
+OmegaUse 生效，旧 Environment 保持原行为。详见 [Final 容错说明](docs/final-evaluation-retry.zh.md)。
+
 Reasoning 的 Synthetic Text 五 Mode 仍只是工程冒烟。HLE 正式实验必须先准备门控
 `cais/hle` 数据、sealed split、固定 MSA Source 与专用 Runtime；这些条件缺失时，
 不能把 Synthetic 结果替代为正式 Reasoning 成绩。
@@ -387,7 +398,7 @@ Reasoning 的 Synthetic Text 五 Mode 仍只是工程冒烟。HLE 正式实验�
 Bundle、Source、Candidate Digest 和 Mutation 边界，并把未完成轮次归档到 `recovery/`
 后重跑。OmegaUse 会进一步按题读取原子提交的 `committed-result.json`：已经完成的题目
 （包括合法 0 分）直接复用，只运行没有完成的题目；半成品会先移入 `recovery/trial-attempts/`
-保留审计证据。基础设施失败不会在同一命令里自动重跑整题，必须由用户显式执行 Resume，
+保留审计证据。进化阶段的基础设施失败不会在同一命令里自动重跑整题，必须由用户显式执行 Resume，
 失败尝试的 Token/时间仍计入 Ledger。普通进化恢复必须是同一 Controller
 Revision；只有上述“尚未访问 sealed final”的 Final Recovery 可以在显式参数下使用一个
 继承原 Revision 的新 Controller，并同时记录进化版本和 Finalizer 版本。修改冻结配置后仍必须

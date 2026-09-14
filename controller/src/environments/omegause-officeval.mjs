@@ -19,6 +19,7 @@ import { withGlobalPermit } from '../global-concurrency.mjs'
 import { ProtocolError, validateResultRecords } from '../protocol.mjs'
 import { runProcess } from '../process.mjs'
 import { SolverFailure, SOLVER_FAILURE_PROTOCOL } from '../solver-failure.mjs'
+import { validateInfrastructureRetries, withTrialInfrastructureRetries } from '../trial-infrastructure-retry.mjs'
 import {
   commitTrialCheckpoint,
   inspectTrialCheckpoint,
@@ -433,13 +434,15 @@ function recordForTask({ layout, partition, trials, runRoot, feedbackLimit }) {
 }
 
 export class OmegaUseOfficeValEnvironment {
-  constructor({ environment, benchmark, solverDriver, docker, runRoot, repositoryRoot }) {
+  constructor({ environment, benchmark, solverDriver, docker, runRoot, repositoryRoot, retrySleep }) {
     this.environment = environment
     this.benchmark = benchmark
     this.solverDriver = solverDriver
     this.docker = docker
     this.runRoot = runRoot
     this.repositoryRoot = repositoryRoot
+    this.retrySleep = retrySleep
+    this.supportsTaskInfrastructureRetries = true
     this.datasetRoot = null
     this.evaluatorRoot = null
     this.manifest = null
@@ -770,7 +773,10 @@ export class OmegaUseOfficeValEnvironment {
     partition,
     seeds,
     outputPath,
+    infrastructureRetries = 0,
+    onInfrastructureRetry = () => {},
   }) {
+    validateInfrastructureRetries(infrastructureRetries)
     if (!this.manifest) throw new ProtocolError('必须先执行 OmegaUse-OfficeVal preflight')
     const partitionSpec = this.benchmark.partitions[partition]
     if (!partitionSpec) throw new ProtocolError(`Benchmark 不存在 Partition：${partition}`)
@@ -799,6 +805,7 @@ export class OmegaUseOfficeValEnvironment {
         assertInside(this.runRoot, taskRoot, 'OmegaUse Task Trial')
         const identity = {
           executionId,
+          ...(infrastructureRetries > 0 ? { infrastructureRetries } : {}),
           environment: {
             id: this.environment.id,
             protocol: this.environment.protocol,
@@ -882,20 +889,38 @@ export class OmegaUseOfficeValEnvironment {
                   : 'task-attempt-incomplete',
               })
             }
-            const trials = []
-            for (const [trialIndex, seed] of seeds.entries()) {
-              trials.push(await this.runTrial({
-                candidateId,
-                candidateDigest,
-                candidateWorkspace: candidate,
-                layout,
-                model,
-                partition,
-                seed,
-                trialIndex,
-                executionId,
-              }))
-            }
+            const trials = await withTrialInfrastructureRetries(async () => {
+              const attempts = []
+              for (const [trialIndex, seed] of seeds.entries()) {
+                attempts.push(await this.runTrial({
+                  candidateId,
+                  candidateDigest,
+                  candidateWorkspace: candidate,
+                  layout,
+                  model,
+                  partition,
+                  seed,
+                  trialIndex,
+                  executionId,
+                }))
+              }
+              return attempts
+            }, {
+              maximumRetries: infrastructureRetries,
+              sleep: this.retrySleep,
+              beforeRetry: async ({ error, retry, maximumRetries, delayMs }) => {
+                await quarantineTrialTask({
+                  runRoot: this.runRoot,
+                  taskRoot,
+                  reason: {
+                    kind: 'final-infrastructure-retry',
+                    code: error.failure.code,
+                    retry, maximumRetries, delayMs,
+                  },
+                })
+                await onInfrastructureRetry({ retry, maximumRetries, delayMs })
+              },
+            })
             const record = recordForTask({
               layout,
               partition,

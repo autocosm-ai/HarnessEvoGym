@@ -32,6 +32,7 @@ import {
 import { assertPathKind, resolveInside } from './config.mjs'
 import { DockerClient } from './docker.mjs'
 import { evaluateBenchmark } from './evaluator.mjs'
+import { finalEvaluationPolicy, runFinalEvaluationPartitions } from './final-evaluation-partitions.mjs'
 import { createEnvironmentRunner, createSolverDriver, createUpdaterDriver } from './factories.mjs'
 import { buildFeedbackPacket } from './feedback.mjs'
 import {
@@ -811,7 +812,7 @@ export async function assertPopulationBundleMatches({
   return captured
 }
 
-export async function claimFinalAttempt(runRoot, { attemptId, startedAt }) {
+export async function claimFinalAttempt(runRoot, { attemptId, startedAt, evaluationPolicy }) {
   const claimPath = join(runRoot, 'final-attempt.json')
   let handle
   try {
@@ -827,6 +828,7 @@ export async function claimFinalAttempt(runRoot, { attemptId, startedAt }) {
       apiVersion: 'harness-rsi/v1alpha1',
       kind: 'FinalAttemptClaim',
       metadata: { attemptId, startedAt },
+      ...(evaluationPolicy ? { spec: { evaluationPolicy } } : {}),
     }, null, 2)}\n`, 'utf8')
     await handle.sync()
   } finally {
@@ -841,6 +843,7 @@ export async function claimFinalRecoveryAttempt(runRoot, {
   recoveredFromAttemptId,
   evolutionControllerRevision,
   finalizerControllerRevision,
+  evaluationPolicy,
 }) {
   const claimPath = join(runRoot, 'final-recovery-attempt.json')
   let handle
@@ -861,6 +864,7 @@ export async function claimFinalRecoveryAttempt(runRoot, {
         recoveredFromAttemptId,
         evolutionControllerRevision,
         finalizerControllerRevision,
+        ...(evaluationPolicy ? { evaluationPolicy } : {}),
       },
     }, null, 2)}\n`, 'utf8')
     await handle.sync()
@@ -2987,6 +2991,7 @@ async function finalizeCoworkRun({
   state,
   population = null,
   recovery = null,
+  evaluationPolicy = finalEvaluationPolicy(),
   onEvent = () => {},
 }) {
   assertEvolutionRunState(state)
@@ -3063,6 +3068,10 @@ async function finalizeCoworkRun({
     docker: context.docker,
     runRoot,
   })
+  // 旧 Environment 不声明按题断点能力时保持原执行方式，不能声称它支持安全重试。
+  if (environment.supportsTaskInfrastructureRetries !== true) {
+    evaluationPolicy = { ...evaluationPolicy, infrastructureRetries: 0, retryUnit: null }
+  }
   onEvent({ stage: 'final-preflight', message: '重新确认冻结 Source 与 Benchmark Revision' })
   const environmentStatus = await environment.preflight()
   if (environmentStatus.sourceRevision !== state.spec.benchmarkSourceRevision) {
@@ -3117,11 +3126,12 @@ async function finalizeCoworkRun({
   const finalStartedAt = new Date().toISOString()
   const generation = state.spec.generationsCompleted + 1
   let recoveryArchive = null
-  let finalAudit = {}
+  let finalAudit = { evaluationPolicy }
   if (recovery === null) {
     await claimFinalAttempt(population?.root ?? runRoot, {
       attemptId: finalAttemptId,
       startedAt: finalStartedAt,
+      evaluationPolicy,
     })
   } else {
     // 领取 Recovery 前先证明上次尝试没有任何 sealed-final 产物。原 Claim 不删除，
@@ -3139,6 +3149,7 @@ async function finalizeCoworkRun({
       recoveredFromAttemptId: recovery.recoveredFromAttemptId,
       evolutionControllerRevision: recovery.evolutionControllerRevision,
       finalizerControllerRevision: recovery.finalizerControllerRevision,
+      evaluationPolicy,
     })
     recoveryArchive = await archiveFailedFinalAttempt({
       runRoot,
@@ -3148,6 +3159,7 @@ async function finalizeCoworkRun({
       generationsCompleted: state.spec.generationsCompleted,
     })
     finalAudit = {
+      evaluationPolicy,
       recoveredFrom: recovery.failedFinal,
       recoveredFromAttemptId: recovery.recoveredFromAttemptId,
       evolutionControllerRevision: recovery.evolutionControllerRevision,
@@ -3164,6 +3176,7 @@ async function finalizeCoworkRun({
       startedAt: finalStartedAt,
       branchId: population.branchId,
       candidateId: championId,
+      evaluationPolicy,
       ...(recovery === null ? {} : {
         recoveredFromAttemptId: recovery.recoveredFromAttemptId,
         evolutionControllerRevision: recovery.evolutionControllerRevision,
@@ -3190,48 +3203,17 @@ async function finalizeCoworkRun({
 
   try {
     await writeJsonFile(join(runRoot, 'state.json'), state)
-    const baselineFeedbackRecords = await environment.runCandidatePartition({
-      candidateId: baselineId,
-      candidateDigest: h0State.digest,
-      candidateWorkspace: h0Workspace,
+    const { baselineRecords, candidateRecords } = await runFinalEvaluationPartitions({
+      environment,
+      baseline: { candidateId: baselineId, candidateDigest: h0State.digest, candidateWorkspace: h0Workspace },
+      candidate: { candidateId: championId, candidateDigest: championState.digest, candidateWorkspace: championWorkspace },
       model: context.bundle.experiment.models.solver,
-      partition: 'feedback',
       seeds: state.spec.seeds,
-      outputPath: resultPath(runRoot, generation, baselineId, `feedback-final-${finalAttemptId}`),
+      outputPath: (id, partition) => resultPath(runRoot, generation, id,
+        partition === 'feedback' ? `feedback-final-${finalAttemptId}` : `final-${finalAttemptId}`),
+      policy: evaluationPolicy,
+      onEvent,
     })
-    const candidateFeedbackRecords = championId === baselineId
-      ? baselineFeedbackRecords
-      : await environment.runCandidatePartition({
-          candidateId: championId,
-          candidateDigest: championState.digest,
-          candidateWorkspace: championWorkspace,
-          model: context.bundle.experiment.models.solver,
-          partition: 'feedback',
-          seeds: state.spec.seeds,
-          outputPath: resultPath(runRoot, generation, championId, `feedback-final-${finalAttemptId}`),
-        })
-    onEvent({ stage: 'final-feedback', message: 'H0 与锁定 Champion 已完成 Feedback 回放' })
-    const baselineRecords = await environment.runCandidatePartition({
-      candidateId: baselineId,
-      candidateDigest: h0State.digest,
-      candidateWorkspace: h0Workspace,
-      model: context.bundle.experiment.models.solver,
-      partition: 'final',
-      seeds: state.spec.seeds,
-      outputPath: resultPath(runRoot, generation, baselineId, `final-${finalAttemptId}`),
-    })
-    onEvent({ stage: 'final-baseline', message: `${baselineId} 已完成 Final Partition` })
-    const candidateRecords = championId === baselineId
-      ? baselineRecords
-      : await environment.runCandidatePartition({
-          candidateId: championId,
-          candidateDigest: championState.digest,
-          candidateWorkspace: championWorkspace,
-          model: context.bundle.experiment.models.solver,
-          partition: 'final',
-          seeds: state.spec.seeds,
-          outputPath: resultPath(runRoot, generation, championId, `final-${finalAttemptId}`),
-        })
     const report = evaluateBenchmark({
       benchmark: context.bundle.benchmark,
       policy: context.bundle.policy,
@@ -3240,12 +3222,13 @@ async function finalizeCoworkRun({
         baselineRevision: h0Manifest.spec.treeDigest,
         candidateRevision: championManifest.spec.treeDigest,
       },
-      baselineRecords: new Map([...baselineFeedbackRecords, ...baselineRecords]),
-      candidateRecords: new Map([...candidateFeedbackRecords, ...candidateRecords]),
-      partitions: ['feedback', 'final'],
+      baselineRecords,
+      candidateRecords,
+      partitions: evaluationPolicy.partitions,
       evolutionLedger: state.spec.ledger ?? null,
       allowSealed: true,
     })
+    report.finalEvaluationPolicy = evaluationPolicy
     const reportPath = population === null
       ? join(runRoot, 'final-evaluation.json')
       : await population.store.writeFinalReport(report)
@@ -3272,6 +3255,7 @@ async function finalizeCoworkRun({
         branchId: population.branchId,
         baselineId,
         candidateId: championId,
+        evaluationPolicy,
         ...(recovery === null ? {} : {
           recoveredFromAttemptId: recovery.recoveredFromAttemptId,
           evolutionControllerRevision: recovery.evolutionControllerRevision,
@@ -3335,8 +3319,11 @@ export async function finalizeEvolution({
   repositoryRoot,
   runDirectory,
   recoverInfrastructure = false,
+  finalOnly = false,
+  infrastructureRetries = 5,
   onEvent = () => {},
 }) {
+  const evaluationPolicy = finalEvaluationPolicy({ finalOnly, infrastructureRetries })
   const runRoot = await realpath(resolve(runDirectory))
   assertInside(resolve(repositoryRoot, '.rsi/runs'), runRoot, 'Evolution Run')
   if (await pathExists(join(runRoot, 'public', 'state.json'))) {
@@ -3351,6 +3338,7 @@ export async function finalizeEvolution({
       state: population.branchState,
       population,
       recovery: population.recovery,
+      evaluationPolicy,
       onEvent,
     })
   }
@@ -3358,5 +3346,5 @@ export async function finalizeEvolution({
     throw new ProtocolError('Final Recovery 只支持 Population Run')
   }
   const state = await readJsonFile(join(runRoot, 'state.json'))
-  return await finalizeCoworkRun({ repositoryRoot, runRoot, state, onEvent })
+  return await finalizeCoworkRun({ repositoryRoot, runRoot, state, evaluationPolicy, onEvent })
 }

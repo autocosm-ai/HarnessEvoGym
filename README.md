@@ -287,6 +287,18 @@ Population and legacy single-Champion Cowork paths use one-time
 `experiment finalize` after locking the best Candidate. The three-task smoke
 proves engineering connectivity, not statistical significance.
 
+For hidden-test scores only, use `experiment finalize --run <run> --final-only`.
+This skips feedback replay, keeps H0/the Champion frozen, and leaves the
+train–test generalization gap unset. OmegaUse Final retries an uncommitted task
+up to five additional times for observed upstream stream/transport errors or
+transient HTTP errors (5/10/20/40/60-second backoff; configurable with
+`--infrastructure-retries 0..5`). Failed workspaces are archived; committed
+results, including valid zero scores, are never rerun. Authentication errors,
+candidate errors, verifier failures and low scores do not trigger retries.
+This is bounded retry within the same Final claim, not cross-process Final
+resume. Exhaustion still fails without fabricating scores or unsealing Final
+again. Other environments retain their previous behavior.
+
 Infrastructure failures become `PAUSED_INFRASTRUCTURE` and fail the command
 instead of masquerading as a zero-score success. `experiment resume` continues
 the same Population after the fault is repaired. Gateway request limits are
