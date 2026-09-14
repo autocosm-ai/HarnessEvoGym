@@ -110,3 +110,34 @@ test('Final 401、tool_calls 与 Verifier 故障不盲目重做题', async (t) =
     })
   }
 })
+
+test('共享 Final 空正文兼容经过真实网关和 MSA；重启 Environment 仍复用已完成题', async (t) => {
+  const { fixture, environment, options, runRoot } = await finalFixture(t, ['valid', 'reasoning'])
+  const selected = { ...options, retryReasoningOnly: true, strictFinalCheckpoints: true,
+    onInfrastructureRetry: () => fixture.modes.set('reasoning', 'valid') }
+  const before = await readFile(join(fixture.candidate, 'model.py'))
+  const records = await environment.runCandidatePartition(selected)
+  assert.equal(records.size, 2)
+  // H0 model.py 对空正文已有三次请求尝试，Controller 再整题重试一次。
+  assert.equal(fixture.gateway.observed.length, 5)
+  const restored = fixture.environmentFactory({ repositoryRoot: fixture.root, runRoot, retrySleep: async () => {} })
+  await restored.preflight()
+  await restored.runCandidatePartition(selected)
+  assert.equal(fixture.gateway.observed.length, 5)
+  assert.deepEqual(await readFile(join(fixture.candidate, 'model.py')), before)
+  await assert.rejects(restored.runCandidatePartition({ ...selected, model: { ...selected.model, maxTokens: 1234 } }),
+    /身份发生变化/u)
+  assert.equal(fixture.gateway.observed.length, 5)
+})
+
+test('共享 Final 持久化重试预算防止 Resume 清零，已完成题不重新评分', async (t) => {
+  const { fixture, environment, options, runRoot } = await finalFixture(t, ['valid', 'streamerror'])
+  const selected = { ...options, strictFinalCheckpoints: true, retryReasoningOnly: true }
+  await assert.rejects(environment.runCandidatePartition(selected))
+  assert.equal(fixture.gateway.observed.length, 7)
+  const restored = fixture.environmentFactory({ repositoryRoot: fixture.root, runRoot, retrySleep: async () => {} })
+  await restored.preflight()
+  await assert.rejects(restored.runCandidatePartition(selected), /重试预算已耗尽/u)
+  assert.equal(fixture.gateway.observed.length, 7)
+  assert.equal(fixture.verifierCalls(), 1)
+})

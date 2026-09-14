@@ -288,6 +288,11 @@ Population and legacy single-Champion Cowork paths use one-time
 proves engineering connectivity, not statistical significance.
 
 For hidden-test scores only, use `experiment finalize --run <run> --final-only`.
+For cross-mode comparisons, `experiment finalize-suite --config <shared-final.json>`
+evaluates one shared H0 and each frozen champion without retraining. The new suite
+supports identity-locked task resume, persistent retry limits, and explicit reasoning-only
+response compatibility. Existing `finalize` rules are unchanged.
+See [shared final evaluation](docs/shared-final-suite.zh.md).
 This skips feedback replay, keeps H0/the Champion frozen, and leaves the
 train–test generalization gap unset. OmegaUse Final retries an uncommitted task
 up to five additional times for observed upstream stream/transport errors or

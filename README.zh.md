@@ -388,6 +388,11 @@ sealed final，或 Recovery 自身再失败，都会永久拒绝再次解封。
 不会生成伪造分数，也不会删除 Claim 或放开重复解封。只对声明按题断点能力的
 OmegaUse 生效，旧 Environment 保持原行为。详见 [Final 容错说明](docs/final-evaluation-retry.zh.md)。
 
+多 Mode 比较使用 `experiment finalize-suite --config <shared-final.json>`：只测一份共享
+H0 和每个 Mode 的冻结冠军，复用同一份 H0 分数；不重新训练。新 Suite 支持固定身份下
+按题 `--resume`、持久化重试预算和显式空正文兼容，旧 Final 入口规则不变。
+详见 [共享 H0 最终评测](docs/shared-final-suite.zh.md)。
+
 Reasoning 的 Synthetic Text 五 Mode 仍只是工程冒烟。HLE 正式实验必须先准备门控
 `cais/hle` 数据、sealed split、固定 MSA Source 与专用 Runtime；这些条件缺失时，
 不能把 Synthetic 结果替代为正式 Reasoning 成绩。

@@ -20,6 +20,7 @@ import { ProtocolError, validateResultRecords } from '../protocol.mjs'
 import { runProcess } from '../process.mjs'
 import { SolverFailure, SOLVER_FAILURE_PROTOCOL } from '../solver-failure.mjs'
 import { validateInfrastructureRetries, withTrialInfrastructureRetries } from '../trial-infrastructure-retry.mjs'
+import { reserveFinalTrialAttempt } from '../final-suite-store.mjs'
 import {
   commitTrialCheckpoint,
   inspectTrialCheckpoint,
@@ -774,9 +775,22 @@ export class OmegaUseOfficeValEnvironment {
     seeds,
     outputPath,
     infrastructureRetries = 0,
+    retryReasoningOnly = false,
+    strictFinalCheckpoints = false,
+    maximumConcurrentTrials = this.environment.task.maximumConcurrentTrials ?? 1,
     onInfrastructureRetry = () => {},
   }) {
     validateInfrastructureRetries(infrastructureRetries)
+    if (!Number.isSafeInteger(maximumConcurrentTrials) || maximumConcurrentTrials < 1
+        || maximumConcurrentTrials > (this.environment.task.maximumConcurrentTrials ?? 1)) {
+      throw new ProtocolError('评测并发只能降低，不能超过冻结 Environment 上限')
+    }
+    if (typeof retryReasoningOnly !== 'boolean' || typeof strictFinalCheckpoints !== 'boolean') {
+      throw new ProtocolError('Final 重试兼容选项必须是布尔值')
+    }
+    if ((retryReasoningOnly || strictFinalCheckpoints) && partition !== 'final') {
+      throw new ProtocolError('Final Suite 兼容选项不能用于训练题')
+    }
     if (!this.manifest) throw new ProtocolError('必须先执行 OmegaUse-OfficeVal preflight')
     const partitionSpec = this.benchmark.partitions[partition]
     if (!partitionSpec) throw new ProtocolError(`Benchmark 不存在 Partition：${partition}`)
@@ -791,7 +805,7 @@ export class OmegaUseOfficeValEnvironment {
     await this.ensureRuntime()
     const plans = await concurrentMap(
       partitionSpec.instanceIds,
-      this.environment.task.maximumConcurrentTrials ?? 1,
+      maximumConcurrentTrials,
       async (instanceId) => {
         const layout = await this.taskLayout(instanceId)
         const taskRoot = join(
@@ -806,6 +820,8 @@ export class OmegaUseOfficeValEnvironment {
         const identity = {
           executionId,
           ...(infrastructureRetries > 0 ? { infrastructureRetries } : {}),
+          ...(retryReasoningOnly ? { retryReasoningOnly: true } : {}),
+          ...(strictFinalCheckpoints ? { strictFinalCheckpoints: true } : {}),
           environment: {
             id: this.environment.id,
             protocol: this.environment.protocol,
@@ -867,6 +883,9 @@ export class OmegaUseOfficeValEnvironment {
           identity,
           validateRecord: validateCheckpointRecord,
         })
+        if (strictFinalCheckpoints && checkpoint.status === 'stale') {
+          throw new ProtocolError('Final 已提交题目的身份发生变化，禁止覆盖重测')
+        }
         return { layout, taskRoot, identity, validateCheckpointRecord, checkpoint }
       },
     )
@@ -878,7 +897,7 @@ export class OmegaUseOfficeValEnvironment {
       try {
         await concurrentMap(
           pending,
-          this.environment.task.maximumConcurrentTrials ?? 1,
+          maximumConcurrentTrials,
           async ({ layout, taskRoot, identity, validateCheckpointRecord, checkpoint }) => {
             if (checkpoint.status !== 'missing') {
               await quarantineTrialTask({
@@ -890,6 +909,11 @@ export class OmegaUseOfficeValEnvironment {
               })
             }
             const trials = await withTrialInfrastructureRetries(async () => {
+              if (strictFinalCheckpoints) {
+                await reserveFinalTrialAttempt(join(this.runRoot, 'final-retry-budgets', executionId,
+                  safeSegment(candidateId, 'Candidate ID'), `${layout.instanceId}.json`),
+                identity, infrastructureRetries + 1)
+              }
               const attempts = []
               for (const [trialIndex, seed] of seeds.entries()) {
                 attempts.push(await this.runTrial({
@@ -907,6 +931,7 @@ export class OmegaUseOfficeValEnvironment {
               return attempts
             }, {
               maximumRetries: infrastructureRetries,
+              retryReasoningOnly,
               sleep: this.retrySleep,
               beforeRetry: async ({ error, retry, maximumRetries, delayMs }) => {
                 await quarantineTrialTask({

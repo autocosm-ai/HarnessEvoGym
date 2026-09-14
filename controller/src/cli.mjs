@@ -25,6 +25,7 @@ import {
 } from './protocol.mjs'
 import { isCampaignCliCommand, runCampaignCliCommand } from './campaign-cli.mjs'
 import { exportBaselinePackFromRun } from './baseline-pack.mjs'
+import { runSharedFinalSuite } from './shared-final-suite.mjs'
 
 const HELP = `HarnessEvoGym Controller
 
@@ -38,6 +39,7 @@ const HELP = `HarnessEvoGym Controller
   harness-rsi experiment run --config <experiment.json> [--run-id <id>]
   harness-rsi experiment resume --run <population-run>
   harness-rsi experiment finalize --run <single-run | population-run> [--recover-infrastructure] [--final-only] [--infrastructure-retries 0..5]
+  harness-rsi experiment finalize-suite --config <shared-final.json> [--resume] [--validate-only]
   harness-rsi benchmark validate --config <benchmark.json> [--output <report.json>]
   harness-rsi evaluate compare \\
     --benchmark <benchmark.json> \\
@@ -69,7 +71,8 @@ const HELP = `HarnessEvoGym Controller
   - experiment baseline 只评测 H0 selection，不启动 Updater，不消耗进化预算。
   - experiment baseline-pack-export 从已有 Run 固化 H0 Selection 与第一轮 Feedback，不读取 final。
   - experiment resume 按执行内容、Runtime 和冻结配置摘要恢复暂停或稳定 Wave 边界的 Cowork Population；Git Revision 仅作审计。
-  - experiment finalize 是唯一允许解锁 Cowork sealed final 的入口。
+  - experiment finalize / finalize-suite 是允许解锁 Cowork sealed final 的受控入口。
+  - finalize-suite 只测一次共享 H0 和各 Population 冻结冠军；--resume 不重做已提交题。
   - --recover-infrastructure 只能在 Population 上次失败且从未访问 sealed final 时使用，并且只能恢复一次。
   - --final-only 只评测隐藏题，不重新回放训练题；OmegaUse Final 默认对接口故障最多追加重试 5 次。
   - Provider 密钥只从运行时环境变量读取，不写入 Experiment 或 .rsi 产物。
@@ -293,6 +296,17 @@ async function evolveFinalizeCommand(args) {
   }, options.get('output'))
 }
 
+async function finalizeSuiteCommand(args) {
+  const { options, flags } = parseOptions(args, {
+    valueOptions: new Set(['config', 'output']), booleanFlags: new Set(['resume', 'validate-only']),
+  })
+  const result = await runSharedFinalSuite({ repositoryRoot: REPOSITORY_ROOT,
+    configPath: requiredPath(options, 'config'), resume: flags.has('resume'),
+    validateOnly: flags.has('validate-only'), onEvent: progress })
+  await emit(result, options.get('output'))
+  if (!['completed', 'validated'].includes(result.status)) process.exitCode = 2
+}
+
 async function validateBenchmarkCommand(args) {
   const { options } = parseOptions(args, {
     valueOptions: new Set(['config', 'output']),
@@ -395,6 +409,7 @@ async function main() {
   if (group === 'experiment' && action === 'run') return await evolveRunCommand(args)
   if (group === 'experiment' && action === 'resume') return await evolveResumeCommand(args)
   if (group === 'experiment' && action === 'finalize') return await evolveFinalizeCommand(args)
+  if (group === 'experiment' && action === 'finalize-suite') return await finalizeSuiteCommand(args)
   if (group === 'runtime' && action === 'build') return await buildRuntimeCommand(args)
   if (group === 'benchmark' && action === 'validate') return await validateBenchmarkCommand(args)
   if (group === 'evaluate' && action === 'compare') return await compareCommand(args)

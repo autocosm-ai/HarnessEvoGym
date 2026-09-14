@@ -1,5 +1,8 @@
 # Final 评测容错
 
+本文描述旧 `experiment finalize` 入口。多 Mode 共用 H0 和按题跨进程恢复请使用
+新增的 [finalize-suite 入口](shared-final-suite.zh.md)，不通过删除旧 Claim 来恢复。
+
 ## 不改变什么
 
 修复只在 Controller 的评测执行层。Provider、模型、思考深度、题目、

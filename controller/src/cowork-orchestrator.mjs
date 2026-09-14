@@ -125,7 +125,7 @@ async function gitRevision(pathValue) {
   return revision.stdout.trim()
 }
 
-async function trustedControllerRevision(repositoryRoot) {
+export async function trustedControllerRevision(repositoryRoot) {
   const revision = await runProcess('git', ['-C', repositoryRoot, 'rev-parse', 'HEAD'], { timeoutMs: 30_000 })
   const value = revision.stdout.trim()
   if (!/^[0-9a-f]{40}$/u.test(value)) throw new ProtocolError('无法解析 Controller Git Revision')
@@ -347,7 +347,7 @@ function assertSecrets(names) {
   if (missing.length > 0) throw new ProtocolError('缺少模型 Provider 运行时凭据', missing)
 }
 
-async function stopContextModelGateways(context) {
+export async function stopContextModelGateways(context) {
   const gateways = [...new Set([
     context.modelGateway,
     context.updaterModelGateway,
@@ -358,7 +358,7 @@ async function stopContextModelGateways(context) {
   return failures
 }
 
-async function createContext({
+export async function createContext({
   repositoryRoot,
   experimentPath,
   runRootOverride = null,
@@ -698,7 +698,7 @@ async function runUpdaterGeneration({
   return { id, root, workspace, digest: treeDigest(after), report, policyReport }
 }
 
-function publicBundleSnapshot(bundle) {
+export function publicBundleSnapshot(bundle) {
   return {
     experiment: bundle.experiment,
     recipe: bundle.recipe,
@@ -721,7 +721,7 @@ function publicBundleSnapshot(bundle) {
   }
 }
 
-function jsonDigest(value) {
+export function jsonDigest(value) {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex')
 }
 
@@ -1013,7 +1013,7 @@ export async function archiveFailedFinalAttempt({
   return { root: archiveRoot, manifest }
 }
 
-async function assertCandidateIntegrity({
+export async function assertCandidateIntegrity({
   candidateId,
   workspace,
   manifest,
@@ -2838,11 +2838,15 @@ async function savePopulationFinalState(authorization, final, type, details = {}
   return next
 }
 
-async function loadPopulationFinalAuthorization({
+export async function loadPopulationFinalAuthorization({
   repositoryRoot,
   populationRoot,
   recoverInfrastructure = false,
+  sharedSuite = false,
 }) {
+  if (!sharedSuite && await pathExists(join(populationRoot, 'final-suite-adoption.json'))) {
+    throw new ProtocolError('该 Population 已归入共享 H0 Final Suite，请使用原 Suite 续跑')
+  }
   const state = await readJsonFile(join(populationRoot, 'public', 'state.json'))
   if (
     state?.apiVersion !== 'harness-rsi/v1alpha1' ||
@@ -2855,10 +2859,14 @@ async function loadPopulationFinalAuthorization({
   if (!['CLOSED', 'REPORTED'].includes(state.status)) {
     throw new ProtocolError('只有已关闭的 Population 可以执行 Final Evaluation')
   }
-  if (!recoverInfrastructure && state.final !== null && state.final !== undefined) {
+  if (sharedSuite && (state.final?.evaluated === true
+      || await pathExists(join(populationRoot, 'report/final-evaluation.json')))) {
+    throw new ProtocolError('已有完整 Final 报告，禁止换 Suite 重测')
+  }
+  if (!sharedSuite && !recoverInfrastructure && state.final !== null && state.final !== undefined) {
     throw new ProtocolError('Population Final Partition 已经解封过；禁止重复访问')
   }
-  if (recoverInfrastructure && (
+  if (!sharedSuite && recoverInfrastructure && (
     state.final?.evaluated !== false
     || typeof state.final?.attemptId !== 'string'
     || typeof state.final?.failedAt !== 'string'
@@ -2906,7 +2914,16 @@ async function loadPopulationFinalAuthorization({
   if (branchState.spec.branchId !== branchId) {
     throw new ProtocolError('Population Best Branch 与子 Run 身份不一致')
   }
-  if (recoverInfrastructure) {
+  if (sharedSuite) {
+    if (!['running', 'stopped', 'completed', 'finalizing', 'final-failed'].includes(branchState.metadata.status)
+        || branchState.spec.final?.evaluated === true) {
+      throw new ProtocolError('Best Branch 状态不允许加入共享 Final Suite')
+    }
+    if ((state.final?.attemptId ?? null) !== (branchState.spec.final?.attemptId ?? null)
+        || (state.final && (state.final.branchId !== branchId || state.final.candidateId !== state.best.candidateId))) {
+      throw new ProtocolError('Population 与 Branch 的旧 Final Attempt 身份不一致')
+    }
+  } else if (recoverInfrastructure) {
     if (branchState.metadata.status !== 'final-failed'
         || branchState.spec.final?.evaluated !== false
         || branchState.spec.final?.attemptId !== state.final.attemptId
@@ -2940,19 +2957,19 @@ async function loadPopulationFinalAuthorization({
     throw new ProtocolError('Population Bundle 与冻结执行身份的指纹不一致')
   }
   const currentControllerRevision = await trustedControllerRevision(repositoryRoot)
-  if (branchState.spec.executionIdentity && !recoverInfrastructure) {
+  if (branchState.spec.executionIdentity && !recoverInfrastructure && !sharedSuite) {
     assertExecutionIdentity(branchState.spec.executionIdentity, await captureExecutionIdentity(repositoryRoot))
   } else {
     await assertControllerRevisionForFinal({
       repositoryRoot,
       frozenRevision: frozenControllerRevision,
       currentRevision: currentControllerRevision,
-      recoveryRequested: recoverInfrastructure,
+      recoveryRequested: recoverInfrastructure || sharedSuite,
     })
   }
 
   let recovery = null
-  if (recoverInfrastructure) {
+  if (recoverInfrastructure && !sharedSuite) {
     if (state.final.branchId !== branchId || state.final.candidateId !== state.best.candidateId) {
       throw new ProtocolError('Population Final 失败记录与锁定 Champion 不一致')
     }

@@ -95,3 +95,17 @@ test('非法重试预算拒绝执行；归档失败不继续做题', async () =>
     sleep: async () => assert.fail('归档失败后不应继续'),
   }), /archive failed/u)
 })
+
+test('只有显式启用且证据完整的 reasoning-only 才可重试，拒答/tool_calls/截断不放宽', () => {
+  const request = { httpStatus: 200, streamError: false, transportError: false,
+    responseComplete: true, done: true, finishReason: 'stop', contentBytes: 0,
+    sawReasoning: true, sawRefusal: false, sawToolCalls: false, malformedEvents: 0 }
+  const error = failure({ code: 'reasoning-only-response', request })
+  assert.equal(isRetryableTrialInfrastructure(error), false)
+  assert.equal(isRetryableTrialInfrastructure(error, { retryReasoningOnly: true }), true)
+  for (const changed of [{ sawRefusal: true }, { sawToolCalls: true }, { finishReason: 'length' },
+    { httpStatus: 401 }, { contentBytes: 1 }, { done: false }, { responseComplete: false }]) {
+    assert.equal(isRetryableTrialInfrastructure(failure({ code: 'reasoning-only-response',
+      request: { ...request, ...changed } }), { retryReasoningOnly: true }), false)
+  }
+})
