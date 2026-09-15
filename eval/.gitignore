@@ -1,0 +1,5 @@
+# Run artifacts: scratch workspaces, per-task outputs, logs.
+# These contain copied benchmark files and agent deliverables — never commit.
+results/
+smoke/
+*.log
