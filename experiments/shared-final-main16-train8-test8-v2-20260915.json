@@ -1,0 +1,15 @@
+{
+  "id": "shared-final-main16-test8-v2-20260915",
+  "baselineFrom": "single",
+  "infrastructureRetries": 10,
+  "retryReasoningOnly": true,
+  "supersedeInterrupted": true,
+  "maximumConcurrentTrialsPerEntry": 1,
+  "populations": [
+    { "label": "single", "run": ".rsi/runs/populations/cowork-main16-ff-train8-test8-terra-xhigh-20260907-v1-single" },
+    { "label": "independent", "run": ".rsi/runs/populations/cowork-main16-ff-train8-test8-terra-xhigh-20260907-v1-independent" },
+    { "label": "mutualism", "run": ".rsi/runs/populations/cowork-main16-ff-train8-test8-terra-xhigh-20260907-v1-mutualism" },
+    { "label": "competition", "run": ".rsi/runs/populations/cowork-main16-ff-train8-test8-terra-xhigh-20260907-v1-competition" },
+    { "label": "combined", "run": ".rsi/runs/populations/cowork-main16-ff-train8-test8-terra-xhigh-20260907-v1-combined" }
+  ]
+}
