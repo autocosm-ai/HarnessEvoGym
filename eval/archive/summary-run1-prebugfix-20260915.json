@@ -1,0 +1,284 @@
+{
+  "h0": {
+    "mean_reward": 0.081456,
+    "tasks_completed": 8,
+    "tasks_total": 8,
+    "tasks": [
+      {
+        "task": "officeval_011",
+        "reward": 1.0,
+        "error": null
+      },
+      {
+        "task": "officeval_026",
+        "reward": -0.6111111111111112,
+        "error": null
+      },
+      {
+        "task": "officeval_033",
+        "reward": 0.0,
+        "error": null
+      },
+      {
+        "task": "officeval_051",
+        "reward": 0.017142857142857144,
+        "error": null
+      },
+      {
+        "task": "officeval_070",
+        "reward": 0.0,
+        "error": null
+      },
+      {
+        "task": "officeval_088",
+        "reward": 0.0,
+        "error": null
+      },
+      {
+        "task": "officeval_089",
+        "reward": 0.24561403508771928,
+        "error": null
+      },
+      {
+        "task": "officeval_097",
+        "reward": 0.0,
+        "error": null
+      }
+    ]
+  },
+  "single": {
+    "mean_reward": 0.283632,
+    "tasks_completed": 8,
+    "tasks_total": 8,
+    "tasks": [
+      {
+        "task": "officeval_011",
+        "reward": 1.0,
+        "error": null
+      },
+      {
+        "task": "officeval_026",
+        "reward": 0.3333333333333333,
+        "error": null
+      },
+      {
+        "task": "officeval_033",
+        "reward": 0.0,
+        "error": null
+      },
+      {
+        "task": "officeval_051",
+        "reward": 0.017142857142857144,
+        "error": null
+      },
+      {
+        "task": "officeval_070",
+        "reward": 0.5384615384615384,
+        "error": null
+      },
+      {
+        "task": "officeval_088",
+        "reward": 0.0,
+        "error": null
+      },
+      {
+        "task": "officeval_089",
+        "reward": 0.15789473684210525,
+        "error": null
+      },
+      {
+        "task": "officeval_097",
+        "reward": 0.2222222222222222,
+        "error": null
+      }
+    ]
+  },
+  "independent": {
+    "mean_reward": 0.198049,
+    "tasks_completed": 8,
+    "tasks_total": 8,
+    "tasks": [
+      {
+        "task": "officeval_011",
+        "reward": 1.0,
+        "error": null
+      },
+      {
+        "task": "officeval_026",
+        "reward": -0.1111111111111111,
+        "error": null
+      },
+      {
+        "task": "officeval_033",
+        "reward": 0.0,
+        "error": null
+      },
+      {
+        "task": "officeval_051",
+        "reward": 0.017142857142857144,
+        "error": null
+      },
+      {
+        "task": "officeval_070",
+        "reward": 0.0,
+        "error": null
+      },
+      {
+        "task": "officeval_088",
+        "reward": 0.0,
+        "error": null
+      },
+      {
+        "task": "officeval_089",
+        "reward": 0.12280701754385964,
+        "error": null
+      },
+      {
+        "task": "officeval_097",
+        "reward": 0.5555555555555556,
+        "error": null
+      }
+    ]
+  },
+  "mutualism": {
+    "mean_reward": 0.189643,
+    "tasks_completed": 8,
+    "tasks_total": 8,
+    "tasks": [
+      {
+        "task": "officeval_011",
+        "reward": 1.0,
+        "error": null
+      },
+      {
+        "task": "officeval_026",
+        "reward": -0.16666666666666666,
+        "error": null
+      },
+      {
+        "task": "officeval_033",
+        "reward": 0.0,
+        "error": null
+      },
+      {
+        "task": "officeval_051",
+        "reward": 0.017142857142857144,
+        "error": null
+      },
+      {
+        "task": "officeval_070",
+        "reward": 0.0,
+        "error": null
+      },
+      {
+        "task": "officeval_088",
+        "reward": 0.0,
+        "error": null
+      },
+      {
+        "task": "officeval_089",
+        "reward": 0.0,
+        "error": null
+      },
+      {
+        "task": "officeval_097",
+        "reward": 0.6666666666666666,
+        "error": null
+      }
+    ]
+  },
+  "competition": {
+    "mean_reward": 0.229805,
+    "tasks_completed": 8,
+    "tasks_total": 8,
+    "tasks": [
+      {
+        "task": "officeval_011",
+        "reward": 1.0,
+        "error": null
+      },
+      {
+        "task": "officeval_026",
+        "reward": 0.16666666666666666,
+        "error": null
+      },
+      {
+        "task": "officeval_033",
+        "reward": -0.058823529411764705,
+        "error": null
+      },
+      {
+        "task": "officeval_051",
+        "reward": 0.017142857142857144,
+        "error": null
+      },
+      {
+        "task": "officeval_070",
+        "reward": 0.0,
+        "error": null
+      },
+      {
+        "task": "officeval_088",
+        "reward": 0.0,
+        "error": null
+      },
+      {
+        "task": "officeval_089",
+        "reward": 0.15789473684210525,
+        "error": null
+      },
+      {
+        "task": "officeval_097",
+        "reward": 0.5555555555555556,
+        "error": null
+      }
+    ]
+  },
+  "combined": {
+    "mean_reward": 0.270811,
+    "tasks_completed": 8,
+    "tasks_total": 8,
+    "tasks": [
+      {
+        "task": "officeval_011",
+        "reward": 1.0,
+        "error": null
+      },
+      {
+        "task": "officeval_026",
+        "reward": -0.3333333333333333,
+        "error": null
+      },
+      {
+        "task": "officeval_033",
+        "reward": 0.0,
+        "error": null
+      },
+      {
+        "task": "officeval_051",
+        "reward": 0.017142857142857144,
+        "error": null
+      },
+      {
+        "task": "officeval_070",
+        "reward": 0.7692307692307693,
+        "error": null
+      },
+      {
+        "task": "officeval_088",
+        "reward": 0.0,
+        "error": null
+      },
+      {
+        "task": "officeval_089",
+        "reward": 0.15789473684210525,
+        "error": null
+      },
+      {
+        "task": "officeval_097",
+        "reward": 0.5555555555555556,
+        "error": null
+      }
+    ]
+  }
+}

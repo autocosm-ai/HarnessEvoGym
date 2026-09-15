@@ -44,12 +44,16 @@ def _response_result(
     finish_reason: str | None,
     saw_reasoning: bool,
     refused: bool,
+    saw_terminator: bool = True,
 ) -> dict:
+    """saw_terminator: 是否收到了明确的流结束信号（SSE 的 data: [DONE]）。
+    非流式响应天然是完整的，故默认 True。"""
     return {
         "text": text,
         "finish_reason": finish_reason,
         "saw_reasoning": saw_reasoning,
         "refused": refused,
+        "saw_terminator": saw_terminator,
     }
 
 
@@ -80,11 +84,15 @@ def _read_response(response: http.client.HTTPResponse) -> dict:
     finish_reason: str | None = None
     saw_reasoning = False
     refused = False
+    saw_terminator = False
     for line in raw.splitlines():
         if not line.startswith("data:"):
             continue
         data = line[5:].strip()
-        if not data or data == "[DONE]":
+        if data == "[DONE]":
+            saw_terminator = True
+            continue
+        if not data:
             continue
         event = json.loads(data)
         if event.get("error") is not None:
@@ -120,6 +128,7 @@ def _read_response(response: http.client.HTTPResponse) -> dict:
         finish_reason,
         saw_reasoning,
         refused,
+        saw_terminator,
     )
 
 
@@ -228,9 +237,29 @@ def query(
 
                 if result["refused"] or result["finish_reason"] == "content_filter":
                     raise RuntimeError("model gateway refused or filtered the completion")
+
                 text = result["text"].strip()
-                if text:
+
+                # 完整性判定：必须收到明确的终止信号，才认为这次响应是完整的。
+                # 该 provider 正常响应同时给出 data: [DONE] 和 finish_reason（已实测），
+                # 因此二者任一存在即视为完整；两者都缺失说明流在中途断开。
+                complete = result["saw_terminator"] or result["finish_reason"] is not None
+
+                if text and complete:
                     return text
+
+                if not complete:
+                    # 流被截断。两种情况都必须走上游重试：
+                    #  - 有正文：绝不能返回，agent 会拿着被截断的输出继续工作，
+                    #    把基础设施故障表现成能力不足（这正是 run 1 的 bug）。
+                    #  - 无正文：也不能落入下面的"空响应"分支 —— 那条路最终抛出
+                    #    _empty_response_error，而它不被 _is_retryable() 匹配，
+                    #    会导致整道题直接失败而非退避重试。
+                    detail = f"partial content: {len(text)} chars" if text else "no content"
+                    raise RuntimeError(
+                        "stream ended without terminal response "
+                        f"({detail}, finish_reason=missing)"
+                    )
 
                 if (
                     attempt < MAXIMUM_EMPTY_RESPONSE_ATTEMPTS

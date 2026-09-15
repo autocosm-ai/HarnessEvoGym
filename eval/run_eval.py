@@ -252,7 +252,13 @@ def run_mode(mode: str, out_dir: Path, scratch_root: Path) -> list[dict]:
         print(f"  [{mode}] {tid}  {tag}", flush=True)
         rows.append(r)
     mean = sum(x["reward"] for x in rows) / len(rows)
-    print(f"[{mode}] done  mean_reward={mean:.4f}", flush=True)
+    failed = [r["task"] for r in rows if r["error"]]
+    if failed:
+        # 有题未完成 —— 不报均值，避免把失败当成真实 0 分
+        print(f"[{mode}] INCOMPLETE  {len(rows)-len(failed)}/{len(rows)} 完成"
+              f"  未完成: {', '.join(failed)}", flush=True)
+    else:
+        print(f"[{mode}] done  mean_reward={mean:.4f}", flush=True)
     return rows
 
 
@@ -300,30 +306,70 @@ def main() -> None:
     elapsed = (time.time() - t0) / 60
     print(f"\n{'='*64}\nfinished in {elapsed:.1f} min\n{'='*64}", flush=True)
 
-    h0_mean = None
-    if "h0" in results:
-        h0_rows = results["h0"]
-        h0_mean = sum(r["reward"] for r in h0_rows) / len(h0_rows)
-
-    summary: dict[str, object] = {}
-    for m in args.modes:
-        rows = results.get(m, [])
-        mean = sum(r["reward"] for r in rows) / len(rows) if rows else 0.0
-        solved = sum(1 for r in rows if not r["error"])
-        summary[m] = {
-            "mean_reward": round(mean, 6),
-            "tasks_completed": solved,
-            "tasks_total": len(rows),
+    def mode_stats(rows: list[dict]) -> dict:
+        """只有全部题目完成才给出正式均值。任何一题失败 -> incomplete，
+        mean_reward 置 None，避免把基础设施故障当成真实 0 分计入分数。"""
+        total  = len(rows)
+        failed = [r["task"] for r in rows if r["error"]]
+        done   = [r for r in rows if not r["error"]]
+        if total and not failed:
+            return {
+                "status": "complete",
+                "mean_reward": round(sum(r["reward"] for r in rows) / total, 6),
+                "tasks_completed": total,
+                "tasks_total": total,
+                "failed_tasks": [],
+                "tasks": rows,
+            }
+        return {
+            "status": "incomplete",
+            "mean_reward": None,          # 正式分数不予出具
+            "partial_mean_of_completed": (
+                round(sum(r["reward"] for r in done) / len(done), 6) if done else None
+            ),
+            "tasks_completed": len(done),
+            "tasks_total": total,
+            "failed_tasks": failed,
             "tasks": rows,
         }
-        delta = ""
-        if h0_mean is not None and m != "h0":
-            delta = f"   vs h0: {mean - h0_mean:+.4f}"
-        print(f"  {m:14s} mean={mean:.4f}  ok={solved}/{len(rows)}{delta}", flush=True)
 
+    summary: dict[str, object] = {m: mode_stats(results.get(m, [])) for m in args.modes}
+
+    h0_stats = summary.get("h0")
+    h0_mean = h0_stats["mean_reward"] if isinstance(h0_stats, dict) else None
+
+    for m in args.modes:
+        s = summary[m]
+        assert isinstance(s, dict)
+        if s["status"] == "complete":
+            line = f"  {m:14s} mean={s['mean_reward']:.4f}  ok={s['tasks_completed']}/{s['tasks_total']}"
+            # 只有双方都完整时才给出对比
+            if h0_mean is not None and m != "h0":
+                line += f"   vs h0: {s['mean_reward'] - h0_mean:+.4f}"
+            elif m != "h0":
+                line += "   vs h0: n/a (h0 incomplete)"
+        else:
+            pm = s["partial_mean_of_completed"]
+            pm_txt = f"{pm:.4f}" if pm is not None else "n/a"
+            line = (f"  {m:14s} INCOMPLETE  ok={s['tasks_completed']}/{s['tasks_total']}"
+                    f"  (完成题部分均值={pm_txt}, 非正式)"
+                    f"  失败: {', '.join(s['failed_tasks'])}")
+        print(line, flush=True)
+
+    incomplete = [m for m in args.modes if summary[m]["status"] == "incomplete"]  # type: ignore[index]
     report = out_dir / "summary.json"
-    report.write_text(json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8")
+    report.write_text(json.dumps({
+        "run_complete": not incomplete,
+        "incomplete_modes": incomplete,
+        "modes": summary,
+    }, indent=2, ensure_ascii=False), encoding="utf-8")
+
     print(f"\nreport: {report}", flush=True)
+    if incomplete:
+        print(f"\n⚠  未产出正式结果 —— 以下 mode 有题目失败: {', '.join(incomplete)}", flush=True)
+        print("   正式均值与 mode 对比需要 6 个 mode 的 8 道题全部完成。", flush=True)
+    else:
+        print("\n✓ 全部 mode 完整完成，正式均值有效。", flush=True)
 
 
 if __name__ == "__main__":
