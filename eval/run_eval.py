@@ -31,14 +31,11 @@ from pathlib import Path
 
 EVAL_DIR    = Path(__file__).resolve().parent
 REPO_ROOT   = EVAL_DIR.parent
-# 016 worktree 里的冻结 population 数据
-_SIXTEEN    = (REPO_ROOT
-               / ".WorkTrees/016-fix-solver-failure-feedback"
-               / ".rsi/runs/populations")
+# 016 worktree 里的冻结 population 数据（绝对路径）
+_SIXTEEN_ROOT = Path("/data/workspace/liuzhou/projs/01-code-apps/项目-Deepseek-Harness-RSI/002-Code/.WorkTrees/016-fix-solver-failure-feedback")
+_SIXTEEN    = _SIXTEEN_ROOT / ".rsi/runs/populations"
 ROBUST_MODEL = EVAL_DIR / "model.py"
-RUN_VERIFIER = (REPO_ROOT
-                / ".WorkTrees/016-fix-solver-failure-feedback"
-                / "docker/omegause-officeval/run-verifier.py")
+RUN_VERIFIER = _SIXTEEN_ROOT / "docker/omegause-officeval/run-verifier.py"
 SOLVER_IMAGE = "harness-rsi/omegause-officeval:v1"
 
 FINAL_TASK_IDS = [
@@ -119,7 +116,11 @@ def run_one_task(mode: str, task_id: str, out_dir: Path) -> dict:
     api_key  = _require("RSI_PROVIDER_API_KEY")
     base_url = _require("RSI_PROVIDER_BASE_URL").rstrip("/")
 
-    # 换 model.py
+    # Docker requires absolute paths for bind mounts
+    ws_abs       = ws.resolve()
+    task_dir_abs = task_dir.resolve()
+    task_out_abs = task_out.resolve()
+    task_out_abs.mkdir(parents=True, exist_ok=True)
     shutil.copy2(orig, backup)
     shutil.copy2(ROBUST_MODEL, orig)
 
@@ -131,9 +132,9 @@ def run_one_task(mode: str, task_id: str, out_dir: Path) -> dict:
             "--network", "bridge",
             "--cpus", "4", "--memory", "8g", "--pids-limit", "512",
             # candidate workspace (ro) + task files (rw, agent writes here) + output
-            "-v", f"{ws}:/candidate:ro",
-            "-v", f"{task_dir}:/workspace",
-            "-v", f"{task_out}:/output",
+            "-v", f"{ws_abs}:/candidate:ro",
+            "-v", f"{task_dir_abs}:/workspace",
+            "-v", f"{task_out_abs}:/output",
             # solver env
             "-e", f"RSI_MODEL_GATEWAY_BASE_URL={base_url}",
             "-e", f"RSI_MODEL_GATEWAY_DUMMY_KEY={api_key}",
