@@ -1,7 +1,7 @@
 {
   "id": "shared-final-main16-test8-20260914",
   "baselineFrom": "single",
-  "infrastructureRetries": 10,
+  "infrastructureRetries": 5,
   "retryReasoningOnly": true,
   "supersedeInterrupted": true,
   "maximumConcurrentTrialsPerEntry": 1,

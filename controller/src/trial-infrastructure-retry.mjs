@@ -3,7 +3,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { ProtocolError } from './protocol.mjs'
 import { SolverFailure } from './solver-failure.mjs'
 
-export const MAXIMUM_FINAL_INFRASTRUCTURE_RETRIES = 10
+export const MAXIMUM_FINAL_INFRASTRUCTURE_RETRIES = 5
 
 export function validateInfrastructureRetries(value) {
   if (!Number.isSafeInteger(value) || value < 0 || value > MAXIMUM_FINAL_INFRASTRUCTURE_RETRIES) {
