@@ -5,6 +5,7 @@ import test from 'node:test'
 import { loadExperimentBundle } from '../src/adapters.mjs'
 import { REPOSITORY_ROOT } from '../src/config.mjs'
 import { createBudgetPlan } from '../src/evolution-modes.mjs'
+import { mutationCatalogForModuleSearch } from '../src/mutation-catalog.mjs'
 
 const MODES = ['single', 'independent', 'mutualism', 'competition', 'combined']
 
@@ -298,5 +299,51 @@ test('Updater 消融配置可独立选择 DSH、Codex 或 Claude Code Provider',
     assert.equal(bundle.updater.id, updaterId)
     assert.equal(bundle.providers.updater.id, providerId)
     assert.equal(bundle.experiment.models.updater.model, modelId)
+  }
+})
+
+test('Mutualism 层级消融只开放声明的 Region，Controller 投影为硬权限边界', async () => {
+  const cases = [
+    ['without-l3', ['model-transport', 'runtime-wiring'], [
+      'profile-policy', 'skill-guidance', 'agent-loop', 'tool-runtime',
+    ]],
+    ['without-l2-l3', [
+      'agent-loop', 'tool-runtime', 'model-transport', 'runtime-wiring',
+    ], ['profile-policy', 'skill-guidance']],
+  ]
+  for (const [name, expectedExcluded, expectedSelected] of cases) {
+    const bundle = await loadExperimentBundle(
+      resolve(REPOSITORY_ROOT, `experiments/cowork-msa-ablation16-codex-mutualism-${name}.json`),
+      REPOSITORY_ROOT,
+    )
+    const population = bundle.recipe.spec.population
+    assert.equal(population.mode, 'mutualism')
+    assert.equal(population.concurrency.n_branches, 2)
+    assert.equal(population.budget.total_budget, 16)
+    assert.deepEqual(bundle.recipe.spec.moduleSearch.excludeRegions, expectedExcluded)
+    const projected = mutationCatalogForModuleSearch(
+      bundle.target,
+      bundle.recipe.spec.moduleSearch,
+    )
+    assert.deepEqual(projected.spec.regions.map((region) => region.id), expectedSelected)
+    assert.equal(bundle.experiment.evolution.generations, 16)
+    assert.equal(bundle.experiment.models.solver.model, 'gpt-5.6-terra')
+    assert.equal(bundle.experiment.models.updater.model, 'gpt-5.6-terra')
+    assert.deepEqual(bundle.experiment.evolution.seeds, [20260827])
+  }
+})
+
+test('Mutualism 层级消融 MVP 使用 N2、总预算 2，只验证一轮候选', async () => {
+  for (const name of ['without-l3', 'without-l2-l3']) {
+    const bundle = await loadExperimentBundle(
+      resolve(REPOSITORY_ROOT, `experiments/cowork-msa-ablation2-codex-mutualism-${name}.json`),
+      REPOSITORY_ROOT,
+    )
+    assert.equal(bundle.recipe.spec.population.mode, 'mutualism')
+    assert.equal(bundle.recipe.spec.population.concurrency.n_branches, 2)
+    assert.equal(bundle.recipe.spec.population.budget.total_budget, 2)
+    assert.equal(bundle.experiment.evolution.generations, 1)
+    assert.equal(bundle.updater.id, 'codex-cli')
+    assert.equal(bundle.target.id, 'msa-minimal-cowork-rsi')
   }
 })
