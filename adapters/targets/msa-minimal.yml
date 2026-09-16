@@ -9,7 +9,7 @@ spec:
   source:
     kind: repository-tree
     path: sources/msa-minimal-harness
-    revision: d3ef58816c980549f4ea296cddab3bf54e4b6f9d
+    revision: f4660c4814c556c395af0c9e6f73edb11cac791d656c3d1b421c23251eed1c7c
 
   materialization:
     strategy: source-plus-seed-overlay
