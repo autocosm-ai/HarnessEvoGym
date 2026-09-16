@@ -33,13 +33,25 @@ from pathlib import Path
 
 # ── 常量 ─────────────────────────────────────────────────────────────────────
 
-EVAL_DIR      = Path(__file__).resolve().parent
-_SIXTEEN_ROOT = Path("/data/workspace/liuzhou/projs/01-code-apps/项目-Deepseek-Harness-RSI"
-                     "/002-Code/.WorkTrees/016-fix-solver-failure-feedback")
-_POPULATIONS  = _SIXTEEN_ROOT / ".rsi/runs/populations"
-ROBUST_MODEL  = EVAL_DIR / "model.py"
-RUN_VERIFIER  = _SIXTEEN_ROOT / "docker/omegause-officeval/run-verifier.py"
-SOLVER_IMAGE  = "harness-rsi/omegause-officeval:v1"
+EVAL_DIR  = Path(__file__).resolve().parent
+REPO_ROOT = EVAL_DIR.parent
+
+# Population 数据（冻结候选 workspace）不在 git 里，只存在于磁盘。
+# 默认读本仓库的 .rsi/runs/populations，可用环境变量指向别处
+# （例如仍留在 016 worktree 里的那 43 GB 数据）。
+_POPULATIONS = Path(
+    os.environ.get("RSI_POPULATIONS_ROOT")
+    or REPO_ROOT / ".rsi/runs/populations"
+)
+
+# verifier 运行器随仓库走，无需外部依赖。
+RUN_VERIFIER = Path(
+    os.environ.get("RSI_RUN_VERIFIER")
+    or REPO_ROOT / "docker/omegause-officeval/run-verifier.py"
+)
+
+ROBUST_MODEL = EVAL_DIR / "model.py"
+SOLVER_IMAGE = os.environ.get("RSI_SOLVER_IMAGE", "harness-rsi/omegause-officeval:v1")
 
 _POP_PREFIX = "cowork-main16-ff-train8-test8-terra-xhigh-20260907-v1-"
 
