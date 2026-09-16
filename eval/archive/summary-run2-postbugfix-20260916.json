@@ -1,0 +1,302 @@
+{
+  "run": "run2-postbugfix",
+  "date": "2026-09-16",
+  "note": "第二轮：含 SSE 完整性校验与不完整结果拒绝出分两处修复。competition 因宿主机侧权限 bug 单独补跑（commit 27c52e8917 修复后）。",
+  "run_complete": true,
+  "modes": {
+    "h0": {
+      "status": "complete",
+      "mean_reward": 0.0625,
+      "tasks_completed": 8,
+      "tasks_total": 8,
+      "failed_tasks": [],
+      "tasks": [
+        {
+          "task": "officeval_011",
+          "reward": 1.0,
+          "error": null
+        },
+        {
+          "task": "officeval_026",
+          "reward": -0.6111111111111112,
+          "error": null
+        },
+        {
+          "task": "officeval_033",
+          "reward": 0.0,
+          "error": null
+        },
+        {
+          "task": "officeval_051",
+          "reward": 0.0,
+          "error": null
+        },
+        {
+          "task": "officeval_070",
+          "reward": 0.0,
+          "error": null
+        },
+        {
+          "task": "officeval_088",
+          "reward": 0.0,
+          "error": null
+        },
+        {
+          "task": "officeval_089",
+          "reward": 0.0,
+          "error": null
+        },
+        {
+          "task": "officeval_097",
+          "reward": 0.1111111111111111,
+          "error": null
+        }
+      ]
+    },
+    "single": {
+      "status": "complete",
+      "mean_reward": 0.151631,
+      "tasks_completed": 8,
+      "tasks_total": 8,
+      "failed_tasks": [],
+      "tasks": [
+        {
+          "task": "officeval_011",
+          "reward": 1.0,
+          "error": null
+        },
+        {
+          "task": "officeval_026",
+          "reward": -0.6111111111111112,
+          "error": null
+        },
+        {
+          "task": "officeval_033",
+          "reward": 0.0,
+          "error": null
+        },
+        {
+          "task": "officeval_051",
+          "reward": 0.017142857142857144,
+          "error": null
+        },
+        {
+          "task": "officeval_070",
+          "reward": 0.0,
+          "error": null
+        },
+        {
+          "task": "officeval_088",
+          "reward": 0.0,
+          "error": null
+        },
+        {
+          "task": "officeval_089",
+          "reward": 0.14035087719298245,
+          "error": null
+        },
+        {
+          "task": "officeval_097",
+          "reward": 0.6666666666666666,
+          "error": null
+        }
+      ]
+    },
+    "independent": {
+      "status": "complete",
+      "mean_reward": 0.182698,
+      "tasks_completed": 8,
+      "tasks_total": 8,
+      "failed_tasks": [],
+      "tasks": [
+        {
+          "task": "officeval_011",
+          "reward": 1.0,
+          "error": null
+        },
+        {
+          "task": "officeval_026",
+          "reward": -0.1111111111111111,
+          "error": null
+        },
+        {
+          "task": "officeval_033",
+          "reward": 0.0,
+          "error": null
+        },
+        {
+          "task": "officeval_051",
+          "reward": 0.017142857142857144,
+          "error": null
+        },
+        {
+          "task": "officeval_070",
+          "reward": 0.0,
+          "error": null
+        },
+        {
+          "task": "officeval_088",
+          "reward": 0.0,
+          "error": null
+        },
+        {
+          "task": "officeval_089",
+          "reward": 0.0,
+          "error": null
+        },
+        {
+          "task": "officeval_097",
+          "reward": 0.5555555555555556,
+          "error": null
+        }
+      ]
+    },
+    "mutualism": {
+      "status": "complete",
+      "mean_reward": 0.340649,
+      "tasks_completed": 8,
+      "tasks_total": 8,
+      "failed_tasks": [],
+      "tasks": [
+        {
+          "task": "officeval_011",
+          "reward": 1.0,
+          "error": null
+        },
+        {
+          "task": "officeval_026",
+          "reward": 0.3333333333333333,
+          "error": null
+        },
+        {
+          "task": "officeval_033",
+          "reward": 0.0,
+          "error": null
+        },
+        {
+          "task": "officeval_051",
+          "reward": 0.017142857142857144,
+          "error": null
+        },
+        {
+          "task": "officeval_070",
+          "reward": 0.5384615384615384,
+          "error": null
+        },
+        {
+          "task": "officeval_088",
+          "reward": 0.0,
+          "error": null
+        },
+        {
+          "task": "officeval_089",
+          "reward": 0.2807017543859649,
+          "error": null
+        },
+        {
+          "task": "officeval_097",
+          "reward": 0.5555555555555556,
+          "error": null
+        }
+      ]
+    },
+    "competition": {
+      "status": "complete",
+      "mean_reward": 0.276782,
+      "tasks_completed": 8,
+      "tasks_total": 8,
+      "failed_tasks": [],
+      "tasks": [
+        {
+          "task": "officeval_011",
+          "reward": 1.0,
+          "error": null
+        },
+        {
+          "task": "officeval_026",
+          "reward": -0.1111111111111111,
+          "error": null
+        },
+        {
+          "task": "officeval_033",
+          "reward": 0.7058823529411765,
+          "error": null
+        },
+        {
+          "task": "officeval_051",
+          "reward": 0.017142857142857144,
+          "error": null
+        },
+        {
+          "task": "officeval_070",
+          "reward": 0.0,
+          "error": null
+        },
+        {
+          "task": "officeval_088",
+          "reward": 0.0,
+          "error": null
+        },
+        {
+          "task": "officeval_089",
+          "reward": 0.15789473684210525,
+          "error": null
+        },
+        {
+          "task": "officeval_097",
+          "reward": 0.4444444444444444,
+          "error": null
+        }
+      ]
+    },
+    "combined": {
+      "status": "complete",
+      "mean_reward": 0.301907,
+      "tasks_completed": 8,
+      "tasks_total": 8,
+      "failed_tasks": [],
+      "tasks": [
+        {
+          "task": "officeval_011",
+          "reward": 1.0,
+          "error": null
+        },
+        {
+          "task": "officeval_026",
+          "reward": -0.3333333333333333,
+          "error": null
+        },
+        {
+          "task": "officeval_033",
+          "reward": 0.0,
+          "error": null
+        },
+        {
+          "task": "officeval_051",
+          "reward": 0.017142857142857144,
+          "error": null
+        },
+        {
+          "task": "officeval_070",
+          "reward": 0.5384615384615384,
+          "error": null
+        },
+        {
+          "task": "officeval_088",
+          "reward": 0.0,
+          "error": null
+        },
+        {
+          "task": "officeval_089",
+          "reward": 0.5263157894736842,
+          "error": null
+        },
+        {
+          "task": "officeval_097",
+          "reward": 0.6666666666666666,
+          "error": null
+        }
+      ]
+    }
+  }
+}
