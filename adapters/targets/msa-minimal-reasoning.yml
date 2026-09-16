@@ -14,7 +14,7 @@ spec:
   materialization:
     strategy: source-plus-seed-overlay
     seedPath: targets/msa-minimal/reasoning-v1
-    seedDigest: f6ded20e49f9fdb644bae5023cfbc69132d529ee100ef0acdd026c6b77eefb29
+    seedDigest: 19413a0c012c15effff99ab4153d3e5367e48c8a7093de6770cee54fe2ab0186
     overrides:
       - model.py
       - run.py
