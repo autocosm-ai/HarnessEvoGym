@@ -191,18 +191,37 @@ def score(task_id: str, submission_dir: Path) -> tuple[float, str | None]:
     result_file = out_root / "verifier_result.json"
     result_file.unlink(missing_ok=True)
 
+    # 容器内 agent 以 root 运行，产出文件的权限由候选自己的写文件方式决定。
+    # 实测 competition 冠军 (g005-l3) 产出 600 root —— 宿主机 ubuntu 读不了。
+    # 先在容器内把 scratch 目录的归属改回宿主机 uid，再做宿主机侧复制。
+    chown_cmd = [
+        "docker", "run", "--rm", "--network", "none",
+        "-v", f"{out_root}:/out",
+        SOLVER_IMAGE,
+        "chown", "-R", f"{os.getuid()}:{os.getgid()}", "/out",
+    ]
+    try:
+        subprocess.run(chown_cmd, capture_output=True, text=True, timeout=120)
+    except Exception as exc:
+        return 0.0, f"chown failed: {exc}"
+
     # 只把交付物（非隐藏文件）复制给 verifier，排除 agent 的 trace/answer
     sub_copy = out_root / "_submission"
-    if sub_copy.exists():
-        shutil.rmtree(sub_copy)
-    sub_copy.mkdir(parents=True)
-    for item in submission_dir.iterdir():
-        if item.name.startswith("."):
-            continue
-        if item.is_dir():
-            shutil.copytree(item, sub_copy / item.name, symlinks=False)
-        else:
-            shutil.copy2(item, sub_copy / item.name)
+    try:
+        if sub_copy.exists():
+            shutil.rmtree(sub_copy)
+        sub_copy.mkdir(parents=True)
+        for item in submission_dir.iterdir():
+            if item.name.startswith("."):
+                continue
+            if item.is_dir():
+                shutil.copytree(item, sub_copy / item.name, symlinks=False)
+            else:
+                shutil.copy2(item, sub_copy / item.name)
+    except Exception as exc:
+        # 必须就地返回：若异常穿出去，会触发 main() 的 mode 级兜底，
+        # 把该 mode 剩余题目一起标废（run 2 的 competition 就是这样全军覆没）。
+        return 0.0, f"submission copy failed: {exc}"
 
     container = f"verify-{task_id}-{uuid.uuid4().hex[:8]}"
     cmd = [
@@ -247,7 +266,12 @@ def run_mode(mode: str, out_dir: Path, scratch_root: Path) -> list[dict]:
     print(f"[{mode}] start ({len(FINAL_TASK_IDS)} tasks)", flush=True)
     rows = []
     for tid in FINAL_TASK_IDS:
-        r = run_one_task(mode, tid, candidate_dir, out_dir)
+        # 单题异常必须就地兜住：否则会穿到 main() 的 mode 级 except，
+        # 把该 mode 尚未运行的题目一起标废（run 2 的 competition 即如此）。
+        try:
+            r = run_one_task(mode, tid, candidate_dir, out_dir)
+        except Exception as exc:
+            r = {"task": tid, "reward": 0.0, "error": f"unhandled: {type(exc).__name__}: {exc}"}
         tag = f"reward={r['reward']:.4f}" if not r["error"] else f"ERR {r['error'][:90]}"
         print(f"  [{mode}] {tid}  {tag}", flush=True)
         rows.append(r)
