@@ -1,20 +1,30 @@
-"""验证 run_eval.py 的不完整结果处理：注入一个失败题，确认真实代码拒绝出正式均值。"""
+"""验证 run_eval.py 的不完整结果处理：注入一个失败题，确认真实代码拒绝出正式均值。
+
+自包含：不依赖真实 population 数据，也不依赖所在 worktree 的路径。
+"""
 import importlib.util, json, os, sys, tempfile
 from pathlib import Path
 
-ROOT = ("/data/workspace/liuzhou/projs/01-code-apps/项目-Deepseek-Harness-RSI/002-Code"
-        "/.claude/worktrees/017-robust-final-eval")
+EVAL_DIR = Path(__file__).resolve().parent
+_tmp_ws = Path(tempfile.mkdtemp()) / "fake-workspace"
+_tmp_ws.mkdir(parents=True)
 
 os.environ.update({
     "RSI_PROVIDER_API_KEY": "dummy",
     "RSI_PROVIDER_BASE_URL": "https://example.invalid/v1",
-    "RSI_OFFICEVAL_DATASET_ROOT": "/data/workspace/liuzhou/projs/01-code-apps/项目-Cowork-Evolution-Benchmark/003-Reference/002-Reference-Code/OmegaUse-OfficeVal-Dataset",
-    "RSI_OFFICEVAL_EVALUATOR_ROOT": "/data/workspace/liuzhou/projs/01-code-apps/项目-Cowork-Evolution-Benchmark/003-Reference/002-Reference-Code/OmegaUse-OfficeVal",
+    "RSI_OFFICEVAL_DATASET_ROOT": os.environ.get(
+        "RSI_OFFICEVAL_DATASET_ROOT", str(_tmp_ws)),
+    "RSI_OFFICEVAL_EVALUATOR_ROOT": os.environ.get(
+        "RSI_OFFICEVAL_EVALUATOR_ROOT", str(_tmp_ws)),
 })
 
-spec = importlib.util.spec_from_file_location("re_mod", f"{ROOT}/eval/run_eval.py")
+spec = importlib.util.spec_from_file_location("re_mod", EVAL_DIR / "run_eval.py")
 mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(mod)
+
+# run_mode 已被下面整体 mock，真实候选 workspace 不会被读取；
+# 让 main() 的前置校验通过即可，无需 43 GB 冻结数据。
+mod.frozen_workspace = lambda mode: _tmp_ws
 
 TASKS = mod.FINAL_TASK_IDS
 
