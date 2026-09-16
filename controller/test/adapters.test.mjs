@@ -115,7 +115,7 @@ test('Claude Code Updater 与 Solver 可以绑定不同 Provider', async () => {
   assert.equal(bundle.target.id, 'msa-minimal')
   assert.equal(bundle.updater.protocol, 'claude-code-exec-v1')
   assert.equal(bundle.updater.runtime.package, '@anthropic-ai/claude-code')
-  assert.equal(bundle.updater.runtime.version, '2.1.259')
+  assert.equal(bundle.updater.runtime.version, '2.1.273')
   assert.equal(bundle.providers.solver.id, 'zcloud-openai')
   assert.equal(bundle.providers.solver.protocol, 'openai-chat-completions')
   assert.equal(bundle.providers.updater.id, 'zcloud-anthropic')
