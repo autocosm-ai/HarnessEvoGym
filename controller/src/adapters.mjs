@@ -771,7 +771,7 @@ function validateTextReasoningEnvironment({ id, spec, protocol }) {
       maximumUpstreamRetries: expectNumber(
         modelGateway.maximumUpstreamRetries ?? 2,
         'EnvironmentAdapter.spec.modelGateway.maximumUpstreamRetries',
-        { integer: true, min: 0, max: 5 },
+        { integer: true, min: 0, max: 20 },
       ),
       resources: {
         cpus: expectNumber(gatewayResources.cpus, 'modelGateway.resources.cpus', { min: 0.1, max: 32 }),
@@ -1082,7 +1082,7 @@ function validateOmegaUseOfficeValEnvironment({ id, spec, protocol }) {
       maximumUpstreamRetries: expectNumber(
         modelGateway.maximumUpstreamRetries ?? 2,
         'EnvironmentAdapter.spec.modelGateway.maximumUpstreamRetries',
-        { integer: true, min: 0, max: 5 },
+        { integer: true, min: 0, max: 20 },
       ),
       resources: {
         cpus: expectNumber(gatewayResources.cpus, 'modelGateway.resources.cpus', { min: 0.1, max: 32 }),

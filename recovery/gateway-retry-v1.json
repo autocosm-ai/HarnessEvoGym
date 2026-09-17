@@ -1,0 +1,80 @@
+{
+  "kind": "GatewayRetryCodePatch",
+  "description": "仅允许 Gateway 重试上限、退避和显式恢复入口的已审核补丁；旧冻结身份不改写。",
+  "changes": [
+    {
+      "path": "controller/src/adapters.mjs",
+      "before": {
+        "path": "controller/src/adapters.mjs",
+        "mode": "100644",
+        "sha256": "411b67ae716ced1feb16ecd8926ba0bf10af7d0531e685420118896a18235e50"
+      },
+      "after": {
+        "path": "controller/src/adapters.mjs",
+        "mode": "100644",
+        "sha256": "cbaa568367deda8c8fd2a87845a388e427d41aa297fb2d18248f59855e0fc480"
+      }
+    },
+    {
+      "path": "controller/src/cli.mjs",
+      "before": {
+        "path": "controller/src/cli.mjs",
+        "mode": "100755",
+        "sha256": "1df8c062f3c3bf2ed757e2d99197eef30c2d6bca363e97ac085f0f2fbce5ac05"
+      },
+      "after": {
+        "path": "controller/src/cli.mjs",
+        "mode": "100755",
+        "sha256": "a77bb4ee3ca06bdd66ec5a1c47efa92ff16194c6237527dad01ebf3419c65d96"
+      }
+    },
+    {
+      "path": "controller/src/cowork-model-gateway.mjs",
+      "before": {
+        "path": "controller/src/cowork-model-gateway.mjs",
+        "mode": "100644",
+        "sha256": "005334d22fbaba3d01237de1160cf0362ec754650863c146202d89c63e901676"
+      },
+      "after": {
+        "path": "controller/src/cowork-model-gateway.mjs",
+        "mode": "100644",
+        "sha256": "ee3fe99f820eace89ba1fee8c1d38be542eb13cafeef1d11b90fad1dc82173a7"
+      }
+    },
+    {
+      "path": "controller/src/cowork-orchestrator.mjs",
+      "before": {
+        "path": "controller/src/cowork-orchestrator.mjs",
+        "mode": "100644",
+        "sha256": "5818e9a9807bc3e0e7dac1a16d429eab88177eb2f344bf119211b110db25f99d"
+      },
+      "after": {
+        "path": "controller/src/cowork-orchestrator.mjs",
+        "mode": "100644",
+        "sha256": "51897eb29f5972c09ae5b734817c2dfcd0fddf7a9b28689124400c7e206028e0"
+      }
+    },
+    {
+      "path": "docker/model-gateway/server.mjs",
+      "before": {
+        "path": "docker/model-gateway/server.mjs",
+        "mode": "100644",
+        "sha256": "5375d5a534dccdbb20198ad0b06ccd1c8ad2df7374741947a99a4d10a684c56a"
+      },
+      "after": {
+        "path": "docker/model-gateway/server.mjs",
+        "mode": "100644",
+        "sha256": "7691ae824744b71be625bd4e1476af30bb0352d81f1410fd2a021857369b4477"
+      }
+    },
+    {
+      "path": "controller/src/gateway-retry-recovery.mjs",
+      "before": null,
+      "after": {
+        "path": "controller/src/gateway-retry-recovery.mjs",
+        "mode": "100644",
+        "sha256": "ad4ea14e970531e7c65b3349eff7705c6efb677ef195f6a85426fc968f3e18f1"
+      }
+    }
+  ]
+}

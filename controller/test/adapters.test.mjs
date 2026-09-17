@@ -204,9 +204,11 @@ test('OmegaUse Environment 并发 Trial 不能超过可审计上限', async () =
   assert.throws(() => validateEnvironmentAdapter(config), /maximumConcurrentTrials/u)
 })
 
-test('Environment Adapter 将上游模型额外重试限制在 0..5 次', async () => {
+test('Environment Adapter 接受 20 次上游重试并拒绝超过上限', async () => {
   const config = await readConfigFile(resolve(repositoryRoot, 'environments/omegause-officeval.yml'))
-  config.spec.modelGateway.maximumUpstreamRetries = 6
+  config.spec.modelGateway.maximumUpstreamRetries = 20
+  assert.equal(validateEnvironmentAdapter(config).modelGateway.maximumUpstreamRetries, 20)
+  config.spec.modelGateway.maximumUpstreamRetries = 21
   assert.throws(() => validateEnvironmentAdapter(config), /maximumUpstreamRetries/u)
 })
 

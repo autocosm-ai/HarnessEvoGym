@@ -60,6 +60,9 @@ import { PopulationOrchestrator } from './population-orchestrator.mjs'
 import { PopulationStore } from './population-store.mjs'
 import { acquireCampaignLock } from './campaign-lock.mjs'
 import {
+  assertGatewayRetryRecovery, loadGatewayRetryPatch, recordGatewayRetryRecovery, retryGatewayConfig,
+} from './gateway-retry-recovery.mjs'
+import {
   assertExecutionIdentity, captureExecutionIdentity, captureRuntimeInputs,
   evolutionFingerprint, EXECUTION_PATHS, ResumeCompatibilityError,
 } from './execution-identity.mjs'
@@ -363,6 +366,7 @@ export async function createContext({
   experimentPath,
   runRootOverride = null,
   gatewayScope = null,
+  gatewayRetries = null,
 }) {
   const absoluteExperimentPath = resolve(experimentPath)
   assertInside(repositoryRoot, absoluteExperimentPath, 'Experiment 配置')
@@ -433,7 +437,7 @@ export async function createContext({
   const searchStrategy = createSearchStrategyDriver({ adapter: bundle.strategy, docker })
   const modelGateway = gatewayScope
     ? new ModelGateway({
-        config: bundle.environment.modelGateway,
+        config: retryGatewayConfig(bundle.environment.modelGateway, gatewayRetries),
         docker,
         repositoryRoot,
         scopeId: gatewayScope,
@@ -1286,6 +1290,7 @@ export function createCoworkBranchEvolutionDriver({
   branchId,
   runRootOverride = null,
   expectedBundleDigest = null,
+  gatewayRetryRecovery = null,
   onEvent = () => {},
 }, {
   contextFactory = createContext,
@@ -1566,19 +1571,26 @@ export function createCoworkBranchEvolutionDriver({
     })
 
     const controllerRevision = await controllerRevisionReader(repositoryRoot)
-    assertExecutionIdentity(state.spec.executionIdentity, await captureExecutionIdentity(repositoryRoot))
+    const currentExecution = await captureExecutionIdentity(repositoryRoot)
+    if (gatewayRetryRecovery) {
+      assertGatewayRetryRecovery(state.spec.executionIdentity, currentExecution,
+        gatewayRetryRecovery.patch, gatewayRetryRecovery.retries)
+    } else {
+      assertExecutionIdentity(state.spec.executionIdentity, currentExecution)
+    }
     const revisionAuditChanged = controllerRevision !== state.spec.controllerRevision
       && state.spec.resumeAudit?.at(-1)?.currentRevision !== controllerRevision
     if (revisionAuditChanged) {
       state.spec.resumeAudit ??= []
       state.spec.resumeAudit.push({
         at: new Date().toISOString(), originalRevision: state.spec.controllerRevision,
-        currentRevision: controllerRevision, executionDigest: state.spec.executionIdentity.digest,
-        reason: 'identical-executed-content',
+        currentRevision: controllerRevision, executionDigest: currentExecution.digest,
+        reason: gatewayRetryRecovery ? 'gateway-retry-recovery' : 'identical-executed-content',
       })
       state.spec.resumeAudit = state.spec.resumeAudit.slice(-64)
     }
-    context = await contextFactory({ repositoryRoot, experimentPath, gatewayScope: runId })
+    context = await contextFactory({ repositoryRoot, experimentPath, gatewayScope: runId,
+      gatewayRetries: gatewayRetryRecovery?.retries ?? null })
     context.repositoryRoot = repositoryRoot
     context.runId = runId
     context.runRoot = runRoot
@@ -2661,6 +2673,7 @@ export async function runPopulationEvolution({
 export async function resumePopulationEvolution({
   repositoryRoot,
   runDirectory,
+  gatewayRetries = null,
   onEvent = () => {},
 }) {
   const requestedRunRoot = resolve(runDirectory)
@@ -2708,10 +2721,23 @@ export async function resumePopulationEvolution({
   const executionIdentity = await captureExecutionIdentity(repositoryRoot)
   const identityPath = join(runRoot, 'public', 'execution.identity.json')
   const storedIdentity = await pathExists(identityPath) ? await readJsonFile(identityPath) : null
-  assertExecutionIdentity(storedIdentity, executionIdentity)
-  for (const branchState of branchStates) assertExecutionIdentity(branchState.spec.executionIdentity, executionIdentity)
+  let gatewayRetryRecovery = null
+  if (gatewayRetries !== null) {
+    if (branchStates.length !== parentState.branches.length) {
+      throw new ResumeCompatibilityError('重试恢复要求所有 Branch 已保存完整状态')
+    }
+    const patch = await loadGatewayRetryPatch(repositoryRoot)
+    gatewayRetryRecovery = { patch, retries: gatewayRetries }
+    for (const identity of [storedIdentity, ...branchStates.map(row => row.spec.executionIdentity)]) {
+      assertGatewayRetryRecovery(identity, executionIdentity, patch, gatewayRetries)
+    }
+  } else {
+    assertExecutionIdentity(storedIdentity, executionIdentity)
+    for (const branchState of branchStates) assertExecutionIdentity(branchState.spec.executionIdentity, executionIdentity)
+  }
 
   const bundle = await loadExperimentBundle(experimentPath, repositoryRoot)
+  if (gatewayRetryRecovery) retryGatewayConfig(bundle.environment.modelGateway, gatewayRetries)
   const requestedRuntimeRoot = resolveInside(
     repositoryRoot,
     bundle.target.materialization.runtimeRoot,
@@ -2736,7 +2762,10 @@ export async function resumePopulationEvolution({
     config: frozenBundle.snapshot,
     recipe: bundle.recipe,
     configDigest: frozenBundle.digest,
-    fingerprint: evolutionFingerprint({ executionIdentity, configDigest: frozenBundle.digest }),
+    fingerprint: evolutionFingerprint({
+      executionIdentity: gatewayRetryRecovery ? storedIdentity : executionIdentity,
+      configDigest: frozenBundle.digest,
+    }),
   }
 
   const release = await acquireCampaignLock({
@@ -2745,6 +2774,13 @@ export async function resumePopulationEvolution({
     command: 'experiment resume',
   })
   try {
+    if (gatewayRetryRecovery) {
+      await recordGatewayRetryRecovery(runRoot, {
+        kind: 'GatewayRetryRecovery', maximumUpstreamRetries: gatewayRetries,
+        originalExecutionDigest: storedIdentity.digest, recoveryExecutionDigest: executionIdentity.digest,
+        originalConfigDigest: frozenBundle.digest, patch: gatewayRetryRecovery.patch,
+      })
+    }
     const orchestrator = new PopulationOrchestrator({
       loadedCampaign,
       campaignsRoot: populationsRoot,
@@ -2760,6 +2796,7 @@ export async function resumePopulationEvolution({
           branchId,
           runRootOverride: join(branchesRoot, branchId, 'run'),
           expectedBundleDigest: frozenBundle.digest,
+          gatewayRetryRecovery,
           onEvent,
         })
       },

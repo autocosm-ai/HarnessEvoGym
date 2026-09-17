@@ -100,9 +100,10 @@ async function branchFixture(t, {
       searchStrategy: { id: 'fixture', async preflight() {}, descriptor() { return { id: 'fixture' } } },
     }
   }
-  const createBranch = (branchId, runRoot) => createCoworkBranchEvolutionDriver({
+  const createBranch = (branchId, runRoot, gatewayRetryRecovery = null) => createCoworkBranchEvolutionDriver({
     repositoryRoot: fixture.root, experimentPath: join(fixture.root, 'fixture-experiment.json'),
     runId: `fixture-${mode}-${branchId}`, branchId, runRootOverride: runRoot, expectedBundleDigest: frozen.digest,
+    gatewayRetryRecovery,
   }, { contextFactory, environmentFactory: fixture.environmentFactory, controllerRevisionReader: async () => revision })
   return { ...fixture, bundle, frozen, createBranch, packets, updateCounts,
     changeAuditRevision() { revision = 'b'.repeat(40) } }
@@ -170,6 +171,33 @@ test('Provider 暂停后跨实例恢复同一 proposal，不重复调用 Updater
   assert.equal(done.spec.candidates[1].digest, paused.spec.inFlight.proposal.digest)
   assert.equal(done.spec.generationsCompleted, 1)
   assert.equal(done.spec.ledger.updaterUsage.requests, 1)
+})
+
+test('显式重试补丁恢复保留冻结身份和待评候选，不重做 Updater', async (t) => {
+  const fixture = await branchFixture(t, { providerFailure: true })
+  const runRoot = join(fixture.root, 'branch-run')
+  const first = fixture.createBranch('branch-001', runRoot)
+  await first.initialize()
+  await assert.rejects(first.advanceOne({ stepId: 'fixture-step-1', coordination: {} }))
+  const paused = JSON.parse(await readFile(join(runRoot, 'state.json')))
+  await mkdir(join(fixture.root, 'controller/src'), { recursive: true })
+  await writeFile(join(fixture.root, 'controller/src/retry-fixture.mjs'), '// 明确标记的恢复补丁 fixture\n')
+  const current = await captureExecutionIdentity(fixture.root)
+  const after = current.spec.files.find(row => row.path === 'controller/src/retry-fixture.mjs')
+  const patch = { kind: 'GatewayRetryCodePatch', changes: [{ path: after.path, before: null, after }] }
+  await assert.rejects(fixture.createBranch('branch-001', runRoot).restore(), /漂移/u)
+  fixture.changeAuditRevision()
+  fixture.modes.set('valid', 'valid')
+  const restored = fixture.createBranch('branch-001', runRoot, { patch, retries: 20 })
+  await restored.restore()
+  await restored.advanceOne({ stepId: 'fixture-step-1', coordination: {} })
+  const done = JSON.parse(await readFile(join(runRoot, 'state.json')))
+  assert.deepEqual(done.spec.executionIdentity, paused.spec.executionIdentity)
+  assert.equal(done.spec.candidates[1].digest, paused.spec.inFlight.proposal.digest)
+  assert.equal(done.spec.resumeAudit.at(-1).reason, 'gateway-retry-recovery')
+  assert.equal(done.spec.resumeAudit.at(-1).executionDigest, current.digest)
+  assert.equal(done.spec.generationsCompleted, 1)
+  assert.equal([...fixture.updateCounts.values()][0], 1)
 })
 
 test('非法 Mutation Report 同样保存 Candidate Digest/差异证据，拒绝后消耗一轮预算并可恢复修复', async (t) => {

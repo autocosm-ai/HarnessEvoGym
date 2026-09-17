@@ -37,7 +37,7 @@ const HELP = `HarnessEvoGym Controller
   harness-rsi experiment baseline --config <experiment.json> [--run-id <id>]
   harness-rsi experiment baseline-pack-export --run <run> --output <pack.json> --id <id> [--branch <branch-id>]
   harness-rsi experiment run --config <experiment.json> [--run-id <id>]
-  harness-rsi experiment resume --run <population-run>
+  harness-rsi experiment resume --run <population-run> [--gateway-retries 0..20]
   harness-rsi experiment finalize --run <single-run | population-run> [--recover-infrastructure] [--final-only] [--infrastructure-retries 0..5]
   harness-rsi experiment finalize-suite --config <shared-final.json> [--resume] [--validate-only]
   harness-rsi benchmark validate --config <benchmark.json> [--output <report.json>]
@@ -257,10 +257,11 @@ async function baselinePackExportCommand(args) {
 }
 
 async function evolveResumeCommand(args) {
-  const { options } = parseOptions(args, { valueOptions: new Set(['run', 'output']) })
+  const { options } = parseOptions(args, { valueOptions: new Set(['run', 'output', 'gateway-retries']) })
   const result = await resumePopulationEvolution({
     repositoryRoot: REPOSITORY_ROOT,
     runDirectory: requiredPath(options, 'run'),
+    gatewayRetries: options.has('gateway-retries') ? Number(options.get('gateway-retries')) : null,
     onEvent: progress,
   })
   await emit({

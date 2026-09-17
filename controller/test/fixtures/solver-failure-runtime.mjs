@@ -22,7 +22,7 @@ async function listen(server) {
   return server.address().port
 }
 
-export async function startFixtureGateway(t, { modes = new Map() } = {}) {
+export async function startFixtureGateway(t, { modes = new Map(), maximumUpstreamRetries = 0 } = {}) {
   const observed = []
   const upstream = http.createServer((request, response) => {
     const chunks = []
@@ -33,7 +33,7 @@ export async function startFixtureGateway(t, { modes = new Map() } = {}) {
       const mode = modes.get(requested) ?? requested
       observed.push({ mode, requestedTools: !!payload.tools })
       if (/^http[0-9]+$/u.test(mode)) {
-        response.writeHead(Number(mode.slice(4)), { 'content-type': 'application/json' })
+        response.writeHead(Number(mode.slice(4)), { 'content-type': 'application/json', 'retry-after': '0' })
         response.end('{"error":"fixture"}')
         return
       }
@@ -69,7 +69,8 @@ export async function startFixtureGateway(t, { modes = new Map() } = {}) {
       GATEWAY_CONTROL_TOKEN: control, GATEWAY_SOLVER_TOKEN: role, GATEWAY_UPDATER_TOKEN: 'u'.repeat(64),
       UPSTREAM_API_KEY_ENV: 'FIXTURE_PROVIDER_KEY', FIXTURE_PROVIDER_KEY: 'fixture-provider-key',
       UPSTREAM_BASE_URL_ENV: 'FIXTURE_PROVIDER_URL', FIXTURE_PROVIDER_URL: `http://127.0.0.1:${upstreamPort}`,
-      GATEWAY_MAX_UPSTREAM_RETRIES: '0', GATEWAY_MAX_REQUESTS: '1000', GATEWAY_MAX_CONCURRENT_REQUESTS: '16',
+      GATEWAY_MAX_UPSTREAM_RETRIES: String(maximumUpstreamRetries),
+      GATEWAY_MAX_REQUESTS: '1000', GATEWAY_MAX_CONCURRENT_REQUESTS: '16',
     }, stdio: ['ignore', 'ignore', 'pipe'],
   })
   let stderr = ''
@@ -118,7 +119,10 @@ export async function startFixtureGateway(t, { modes = new Map() } = {}) {
 
 export const failingRun = `import argparse, json, os
 from pathlib import Path
+import model
 from model import query
+# 此 fixture 专测故障分类；请求重试次数由真实网关专项测试覆盖。
+model.MAXIMUM_UPSTREAM_RETRIES = 0
 p = argparse.ArgumentParser()
 p.add_argument('--task'); p.add_argument('--answer'); p.add_argument('--trace'); p.add_argument('--profile')
 a = p.parse_args()

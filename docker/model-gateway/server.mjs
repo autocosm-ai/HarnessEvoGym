@@ -42,8 +42,8 @@ if (!Number.isInteger(maximumConcurrentRequests) || maximumConcurrentRequests < 
 }
 if (!Number.isInteger(maximumUpstreamRetries)
     || maximumUpstreamRetries < 0
-    || maximumUpstreamRetries > 5) {
-  throw new Error('model-gateway: GATEWAY_MAX_UPSTREAM_RETRIES 必须是 0..5 的整数')
+    || maximumUpstreamRetries > 20) {
+  throw new Error('model-gateway: GATEWAY_MAX_UPSTREAM_RETRIES 必须是 0..20 的整数')
 }
 
 const upstreamBase = new URL(rawBaseUrl)
@@ -125,7 +125,7 @@ function retryAfterMilliseconds(value) {
 function retryDelayMilliseconds(retryNumber, headers = {}) {
   const requested = retryAfterMilliseconds(headers['retry-after'])
   if (requested !== null) return requested
-  const exponential = Math.min(maximumRetryDelayMs, 250 * (2 ** Math.max(0, retryNumber - 1)))
+  const exponential = Math.min(maximumRetryDelayMs, 5_000 * (2 ** Math.max(0, retryNumber - 1)))
   const jitter = Math.floor(Math.random() * 251)
   return Math.min(maximumRetryDelayMs, exponential + jitter)
 }
@@ -583,7 +583,8 @@ const server = http.createServer((request, response) => {
       diagnostic.requestedTools = Array.isArray(parsed.tools) && parsed.tools.length > 0
     }
     // 同一 Trial 的完全相同请求共用总预算，避免 Candidate 空响应重试 × 网关网络重试。
-    // 首次请求之外最多 5 次重试；仅保存请求摘要，不保存消息或推理正文。
+    // 保留旧版至少 6 次的空响应请求额度；提高配置时两层共用首次 + N 次，
+    // 不让 model.py 重试与网关重试相乘。仅保存请求摘要。
     let retryBudget = null
     if (principal.trial) {
       const payloadDigest = createHash('sha256').update(payload).digest('hex')
@@ -613,7 +614,7 @@ const server = http.createServer((request, response) => {
 
     const forward = (attempt) => {
       if (response.destroyed || response.writableEnded) return
-      if (retryBudget && retryBudget.attempts >= 6) {
+      if (retryBudget && retryBudget.attempts >= Math.max(6, maximumUpstreamRetries + 1)) {
         if (diagnostic) Object.assign(diagnostic, {
           origin: 'gateway-control', httpStatus: 429,
           errorCode: 'identical-request-retry-budget-exhausted', responseComplete: true,
