@@ -1,0 +1,314 @@
+{
+  "kind": "BudgetAblationResultArchive",
+  "recordedAt": "2026-09-17T05:59:12.283Z",
+  "sourceRun": "budget-ablation-20260917/results-official",
+  "sourceSummarySha256": "f39b26550ec194f4b0b5dde3468c904c33e56af090919b6affe25862fda45543",
+  "sourceManifestSha256": "da1b604f64c33b5c9492c9fdb88d4af3db66154bf832b07ce72857366b02ded9",
+  "evaluationCode": {
+    "commit": "ec9f1c058c",
+    "modelSha256": "ddb46d704c0c89379020919718fda6e2f5d0fe3e2bdc43a0aad5d3fe8223c883",
+    "driverSha256": "83c3ab7171cf24c6a4b82a8f7827e3f05da6903d5c17ee29268112b6c7fade6f",
+    "baseEvaluatorSha256": "bece159f6aed4e67140095c14576f7997e76a878f7b4d856e52b54e834a2415f"
+  },
+  "configuration": {
+    "provider": "ZCloud",
+    "model": "gpt-5.6-terra",
+    "endpoint": "https://api.zcloudapi.com/v1",
+    "wireProtocol": "chat-completions",
+    "reasoningEffort": "not explicitly sent; upstream default",
+    "maxOutputTokens": 8192,
+    "solverMaxSteps": 12,
+    "taskIds": [
+      "officeval_011",
+      "officeval_026",
+      "officeval_033",
+      "officeval_051",
+      "officeval_070",
+      "officeval_088",
+      "officeval_089",
+      "officeval_097"
+    ]
+  },
+  "completion": {
+    "runComplete": true,
+    "completed": 96,
+    "total": 96,
+    "currentFailed": 0,
+    "previousSuccessesUnchanged": 82,
+    "resumedTasks": 14
+  },
+  "notes": [
+    "每个检查点单次评测，分数不能证明稳定的 Mode 排名。",
+    "Independent B4 与 B8 指向同一个冻结候选；分数差异来自重复评测波动。",
+    "N2 的 B4/B8 是种群总预算，通常对应各 Branch 的 G2/G4，并非改变 Branch 数量。",
+    "这份归档不混入此前 B16 的测试结果。",
+    "带请求级重试的 model.py 仅替换 scratch 副本；清单中 44 个源候选的内容摘要全部验证通过。",
+    "沿用此前独立评测器，未显式发送 reasoning_effort=xhigh，因此不能称为强制 xhigh 评测。"
+  ],
+  "candidates": [
+    {
+      "label": "combined-b04",
+      "mode": "combined",
+      "populationBudget": 4,
+      "branchId": "branch-001",
+      "candidateId": "g002-l3",
+      "digest": "1469504c85eb45235096e587ca357499b9588461eaa44a771b977423d150fb3c",
+      "campaign": "cowork-main16-ff-train8-test8-terra-xhigh-20260907-v1-combined",
+      "checkpoint": "public/checkpoints/budget-0004.json",
+      "meanReward": 0.407507,
+      "deltaVsH0": 0.358896,
+      "taskRewards": {
+        "officeval_011": 1,
+        "officeval_026": 0.3333333333333333,
+        "officeval_033": 0,
+        "officeval_051": 0.017142857142857144,
+        "officeval_070": 0.7692307692307693,
+        "officeval_088": 0,
+        "officeval_089": 0.47368421052631576,
+        "officeval_097": 0.6666666666666666
+      }
+    },
+    {
+      "label": "combined-b08",
+      "mode": "combined",
+      "populationBudget": 8,
+      "branchId": "branch-001",
+      "candidateId": "g004-l3",
+      "digest": "a4d39343bc3c9952115d7fdffabf90c911f1df200080a8da52bfdaea4a02055e",
+      "campaign": "cowork-main16-ff-train8-test8-terra-xhigh-20260907-v1-combined",
+      "checkpoint": "public/checkpoints/budget-0008.json",
+      "meanReward": 0.229173,
+      "deltaVsH0": 0.180562,
+      "taskRewards": {
+        "officeval_011": 1,
+        "officeval_026": -0.6111111111111112,
+        "officeval_033": 0,
+        "officeval_051": 0.017142857142857144,
+        "officeval_070": 0.5384615384615384,
+        "officeval_088": 0,
+        "officeval_089": 0.3333333333333333,
+        "officeval_097": 0.5555555555555556
+      }
+    },
+    {
+      "label": "competition-b04",
+      "mode": "competition",
+      "populationBudget": 4,
+      "branchId": "branch-001",
+      "candidateId": "g001-l3",
+      "digest": "63e94f4564de5a51af7de992a59fce2b2638029a8a79961617d0f0f727a729ed",
+      "campaign": "cowork-main16-ff-train8-test8-terra-xhigh-20260907-v1-competition",
+      "checkpoint": "public/checkpoints/budget-0004.json",
+      "meanReward": 0.221441,
+      "deltaVsH0": 0.17283,
+      "taskRewards": {
+        "officeval_011": 1,
+        "officeval_026": -0.3333333333333333,
+        "officeval_033": 0,
+        "officeval_051": 0.017142857142857144,
+        "officeval_070": 0,
+        "officeval_088": 0,
+        "officeval_089": 0.42105263157894735,
+        "officeval_097": 0.6666666666666666
+      }
+    },
+    {
+      "label": "competition-b08",
+      "mode": "competition",
+      "populationBudget": 8,
+      "branchId": "branch-002",
+      "candidateId": "g004-l3",
+      "digest": "b547742d8e68f57a038ef02b7c35e176e2c3466461d6ebffa8efcac5f8cf7f3b",
+      "campaign": "cowork-main16-ff-train8-test8-terra-xhigh-20260907-v1-competition",
+      "checkpoint": "public/checkpoints/budget-0008.json",
+      "meanReward": 0.221076,
+      "deltaVsH0": 0.172465,
+      "taskRewards": {
+        "officeval_011": 1,
+        "officeval_026": 0.16666666666666666,
+        "officeval_033": 0,
+        "officeval_051": 0.017142857142857144,
+        "officeval_070": 0,
+        "officeval_088": 0,
+        "officeval_089": 0.14035087719298245,
+        "officeval_097": 0.4444444444444444
+      }
+    },
+    {
+      "label": "h0",
+      "mode": "h0",
+      "populationBudget": 0,
+      "branchId": "branch-001",
+      "candidateId": "h0",
+      "digest": "c9303c1b83a05eb41f8f65dd9d4c58bda5f315ff2e361141bed4360ed8998e5c",
+      "campaign": "cowork-main16-ff-train8-test8-terra-xhigh-20260907-v1-single",
+      "checkpoint": "public/checkpoints/budget-0000.json",
+      "meanReward": 0.048611,
+      "deltaVsH0": null,
+      "taskRewards": {
+        "officeval_011": 1,
+        "officeval_026": -0.6111111111111112,
+        "officeval_033": 0,
+        "officeval_051": 0,
+        "officeval_070": 0,
+        "officeval_088": 0,
+        "officeval_089": 0,
+        "officeval_097": 0
+      }
+    },
+    {
+      "label": "independent-b04",
+      "mode": "independent",
+      "populationBudget": 4,
+      "branchId": "branch-001",
+      "candidateId": "g002-l3",
+      "digest": "ac700f5afcf1476900ad0ec954bd171b26aefed9847c556a719b5ca648197b0f",
+      "campaign": "cowork-main16-ff-train8-test8-terra-xhigh-20260907-v1-independent",
+      "checkpoint": "public/checkpoints/budget-0004.json",
+      "meanReward": 0.130798,
+      "deltaVsH0": 0.082187,
+      "taskRewards": {
+        "officeval_011": 1,
+        "officeval_026": -0.1111111111111111,
+        "officeval_033": 0,
+        "officeval_051": 0.017142857142857144,
+        "officeval_070": 0,
+        "officeval_088": 0,
+        "officeval_089": 0.14035087719298245,
+        "officeval_097": 0
+      }
+    },
+    {
+      "label": "independent-b08",
+      "mode": "independent",
+      "populationBudget": 8,
+      "branchId": "branch-001",
+      "candidateId": "g002-l3",
+      "digest": "ac700f5afcf1476900ad0ec954bd171b26aefed9847c556a719b5ca648197b0f",
+      "campaign": "cowork-main16-ff-train8-test8-terra-xhigh-20260907-v1-independent",
+      "checkpoint": "public/checkpoints/budget-0008.json",
+      "meanReward": 0.211938,
+      "deltaVsH0": 0.163327,
+      "taskRewards": {
+        "officeval_011": 1,
+        "officeval_026": -0.1111111111111111,
+        "officeval_033": 0,
+        "officeval_051": 0.017142857142857144,
+        "officeval_070": 0,
+        "officeval_088": 0,
+        "officeval_089": 0.12280701754385964,
+        "officeval_097": 0.6666666666666666
+      }
+    },
+    {
+      "label": "mutualism-b04",
+      "mode": "mutualism",
+      "populationBudget": 4,
+      "branchId": "branch-002",
+      "candidateId": "g001-l3",
+      "digest": "952f65f506bd97e0e4ad1dc211cdb38dc398591c11be8af3d762a32d3a90e951",
+      "campaign": "cowork-main16-ff-train8-test8-terra-xhigh-20260907-v1-mutualism",
+      "checkpoint": "public/checkpoints/budget-0004.json",
+      "meanReward": 0.1509,
+      "deltaVsH0": 0.102289,
+      "taskRewards": {
+        "officeval_011": 1,
+        "officeval_026": -0.6111111111111112,
+        "officeval_033": 0,
+        "officeval_051": 0.017142857142857144,
+        "officeval_070": 0,
+        "officeval_088": 0,
+        "officeval_089": 0.24561403508771928,
+        "officeval_097": 0.5555555555555556
+      }
+    },
+    {
+      "label": "mutualism-b08",
+      "mode": "mutualism",
+      "populationBudget": 8,
+      "branchId": "branch-002",
+      "candidateId": "g004-l3",
+      "digest": "2eb82d8a05a0f3af24b4fef01e7c8b6004496b960c3a834b03863748d49114a9",
+      "campaign": "cowork-main16-ff-train8-test8-terra-xhigh-20260907-v1-mutualism",
+      "checkpoint": "public/checkpoints/budget-0008.json",
+      "meanReward": 0.196587,
+      "deltaVsH0": 0.147976,
+      "taskRewards": {
+        "officeval_011": 1,
+        "officeval_026": -0.1111111111111111,
+        "officeval_033": 0,
+        "officeval_051": 0.017142857142857144,
+        "officeval_070": 0,
+        "officeval_088": 0,
+        "officeval_089": 0,
+        "officeval_097": 0.6666666666666666
+      }
+    },
+    {
+      "label": "single-b02",
+      "mode": "single",
+      "populationBudget": 2,
+      "branchId": "branch-001",
+      "candidateId": "g002-l3",
+      "digest": "0d53afed1e94ed9c9612c26c25dca29890bba1ddc6f778129fa2c4fe1a3c4fbf",
+      "campaign": "cowork-main16-ff-train8-test8-terra-xhigh-20260907-v1-single",
+      "checkpoint": "public/checkpoints/budget-0002.json",
+      "meanReward": 0.120198,
+      "deltaVsH0": 0.071587,
+      "taskRewards": {
+        "officeval_011": 1,
+        "officeval_026": -0.6111111111111112,
+        "officeval_033": 0,
+        "officeval_051": 0.017142857142857144,
+        "officeval_070": 0,
+        "officeval_088": 0,
+        "officeval_089": 0,
+        "officeval_097": 0.5555555555555556
+      }
+    },
+    {
+      "label": "single-b04",
+      "mode": "single",
+      "populationBudget": 4,
+      "branchId": "branch-001",
+      "candidateId": "g003-l3",
+      "digest": "683a4eafb25b5d4e42a8469dda85c11a2b25d0deecbe1b3d8cc3b8633c578603",
+      "campaign": "cowork-main16-ff-train8-test8-terra-xhigh-20260907-v1-single",
+      "checkpoint": "public/checkpoints/budget-0004.json",
+      "meanReward": 0.133356,
+      "deltaVsH0": 0.084745,
+      "taskRewards": {
+        "officeval_011": 1,
+        "officeval_026": -0.6111111111111112,
+        "officeval_033": 0,
+        "officeval_051": 0.017142857142857144,
+        "officeval_070": 0,
+        "officeval_088": 0,
+        "officeval_089": 0.10526315789473684,
+        "officeval_097": 0.5555555555555556
+      }
+    },
+    {
+      "label": "single-b08",
+      "mode": "single",
+      "populationBudget": 8,
+      "branchId": "branch-001",
+      "candidateId": "g008-l3",
+      "digest": "391c75ef0b8e57ec88fcde885c36a491377d781aaa78f5be30b59d0cf6e06264",
+      "campaign": "cowork-main16-ff-train8-test8-terra-xhigh-20260907-v1-single",
+      "checkpoint": "public/checkpoints/budget-0008.json",
+      "meanReward": 0.150956,
+      "deltaVsH0": 0.102345,
+      "taskRewards": {
+        "officeval_011": 1,
+        "officeval_026": -0.6111111111111112,
+        "officeval_033": 0,
+        "officeval_051": 0.017142857142857144,
+        "officeval_070": 0.5384615384615384,
+        "officeval_088": 0,
+        "officeval_089": 0.2631578947368421,
+        "officeval_097": 0
+      }
+    }
+  ]
+}
