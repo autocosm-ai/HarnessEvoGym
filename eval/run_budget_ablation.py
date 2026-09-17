@@ -9,15 +9,16 @@ digest，再复制到 scratch；仅 scratch 副本替换带上游重试的 model
 from __future__ import annotations
 
 import argparse
+import fcntl
 import importlib.util
 import json
 import shutil
-import sys
-import tempfile
 import time
+import uuid
 from pathlib import Path
 
 from budget_manifest import validate_manifest
+from budget_results import atomic_json, load_progress, succeeded, summarize
 
 
 EVAL_DIR = Path(__file__).resolve().parent
@@ -48,52 +49,38 @@ def _copy_candidate(record: dict, population_root: Path, scratch_root: Path, bas
 def _run_record(record: dict, manifest: dict, out_root: Path, scratch_root: Path, base_eval) -> dict:
     label = record["label"]
     target = out_root / label / "candidate_summary.json"
-    if target.is_file():
-        try:
-            previous = json.loads(target.read_text(encoding="utf-8"))
-            if previous.get("status") == "complete":
-                print(f"[{label}] resume: 已完成，跳过", flush=True)
-                return previous
-        except (OSError, json.JSONDecodeError):
-            pass
-    candidate = _copy_candidate(record, Path(manifest["source"]["populationRoot"]), scratch_root, base_eval)
     tasks = manifest["benchmark"]["taskIds"]
-    rows = []
+    rows, history = load_progress(target, record, tasks)
+    result = summarize(record, tasks, rows, history)
+    if result["status"] == "complete":
+        print(f"[{label}] resume: 已完成，跳过", flush=True)
+        return result
+    candidate = _copy_candidate(record, Path(manifest["source"]["populationRoot"]), scratch_root, base_eval)
+    print(f"[{label}] resume: 保留 {result['tasks_completed']}/{len(tasks)} 题，只补未完成题", flush=True)
+    atomic_json(target, result)
     for task_id in tasks:
+        if task_id in rows and succeeded(rows[task_id]):
+            continue
+        # 原失败输出移到历史目录，run_one_task 不会覆盖已有轨迹和交付物。
+        old_output = out_root / label / task_id
+        if task_id in rows or old_output.exists():
+            archive = out_root / label / "_attempts" / task_id / uuid.uuid4().hex
+            archive.parent.mkdir(parents=True, exist_ok=True)
+            if old_output.exists():
+                old_output.rename(archive)
+            history.append({"task": task_id, "result": rows.get(task_id),
+                            "artifacts": str(archive.relative_to(out_root))})
+        rows[task_id] = {"task": task_id, "reward": 0.0, "error": "interrupted or still running"}
+        atomic_json(target, summarize(record, tasks, rows, history))
         try:
             row = base_eval.run_one_task(label, task_id, candidate, out_root)
         except Exception as exc:  # 单题隔离：不能让一题异常连坐整个 checkpoint
             row = {"task": task_id, "reward": 0.0, "error": f"unhandled: {type(exc).__name__}: {exc}"}
-        rows.append(row)
+        rows[task_id] = row
+        atomic_json(target, summarize(record, tasks, rows, history))
         tag = f"reward={row['reward']:.4f}" if not row.get("error") else f"ERR {str(row['error'])[:120]}"
         print(f"  [{label}] {task_id} {tag}", flush=True)
-    failed = [row["task"] for row in rows if row.get("error")]
-    complete = not failed and len(rows) == len(tasks)
-    result = {
-        "status": "complete" if complete else "incomplete",
-        "label": label,
-        "mode": record["mode"],
-        "budgetScope": record["budgetScope"],
-        "budget": record["budget"],
-        "populationBudget": record["populationBudget"],
-        "branchId": record["branchId"],
-        "candidateId": record["candidateId"],
-        "digest": record["digest"],
-        "revision": record["revision"],
-        "checkpoint": record["checkpoint"],
-        "tasks_completed": len(rows) - len(failed),
-        "tasks_total": len(tasks),
-        "failed_tasks": failed,
-        "mean_reward": round(sum(row["reward"] for row in rows) / len(rows), 6) if complete else None,
-        "partial_mean_of_completed": (
-            round(sum(row["reward"] for row in rows if not row.get("error")) / (len(rows) - len(failed)), 6)
-            if len(rows) != len(failed) else None
-        ),
-        "tasks": rows,
-    }
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    return result
+    return summarize(record, tasks, rows, history)
 
 
 def main() -> None:
@@ -123,6 +110,12 @@ def main() -> None:
         raise SystemExit(f"缺少 robust model：{ROBUST_MODEL}")
     out_root = args.out.resolve()
     out_root.mkdir(parents=True, exist_ok=True)
+    # 锁保持到 main 返回，阻止两个 driver 同时复用/移动同一题的输出。
+    run_lock = (out_root / ".run.lock").open("a")
+    fcntl.flock(run_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    for record in records:
+        load_progress(out_root / record["label"] / "candidate_summary.json",
+                      record, manifest["benchmark"]["taskIds"])
     scratch_root = out_root / "_scratch"
     scratch_root.mkdir(parents=True, exist_ok=True)
     base_eval = _load_base_eval()
@@ -151,7 +144,7 @@ def main() -> None:
         "candidates": results,
         "elapsed_minutes": round((time.time() - started) / 60, 2),
     }
-    (out_root / "summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    atomic_json(out_root / "summary.json", summary)
     print(f"summary={out_root / 'summary.json'}", flush=True)
 
 

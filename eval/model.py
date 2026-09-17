@@ -2,7 +2,7 @@
 
 与候选 workspace 里的原版 model.py 接口完全一致（query() 签名不变），
 唯一区别：在 query() 内部加了对上游故障的指数退避重试，覆盖：
-  - HTTP 429 / 500 / 502 / 503 / 524
+  - HTTP 429 / 500 / 502 / 503 / 504 / 524
   - SSE 流中途断开（stream ended without terminal response、stream_read_error）
   - 底层 TCP 连接异常（ConnectionError、OSError）
 
@@ -21,7 +21,7 @@ from urllib.parse import urlsplit
 MAXIMUM_EMPTY_RESPONSE_ATTEMPTS = 3
 
 # ── 上游故障重试配置 ──────────────────────────────────────────────────────────
-_RETRYABLE_HTTP_STATUSES = {429, 500, 502, 503, 524}
+_RETRYABLE_HTTP_STATUSES = {429, 500, 502, 503, 504, 524}
 _UPSTREAM_RETRY_MAX = 8
 _UPSTREAM_RETRY_BASE_DELAY = 5.0   # 秒，指数退避基础
 _UPSTREAM_RETRY_MAX_DELAY  = 60.0  # 秒，单次等待上限
@@ -216,18 +216,18 @@ def query(
         try:
             for attempt in range(1, MAXIMUM_EMPTY_RESPONSE_ATTEMPTS + 1):
                 connection = _connect()
-                connection.request(
-                    "POST",
-                    endpoint,
-                    body=body,
-                    headers={
-                        "Authorization": f"Bearer {api_key}",
-                        "Content-Type": "application/json",
-                        "Content-Length": str(len(body)),
-                    },
-                )
-                response = connection.getresponse()
                 try:
+                    connection.request(
+                        "POST",
+                        endpoint,
+                        body=body,
+                        headers={
+                            "Authorization": f"Bearer {api_key}",
+                            "Content-Type": "application/json",
+                            "Content-Length": str(len(body)),
+                        },
+                    )
+                    response = connection.getresponse()
                     if response.status != 200:
                         error = response.read(4096).decode("utf-8", errors="replace")
                         raise RuntimeError(f"model gateway HTTP {response.status}: {error}")
@@ -276,7 +276,7 @@ def query(
                 continue
             raise
 
-        except (ConnectionError, OSError) as exc:
+        except (ConnectionError, OSError, http.client.HTTPException) as exc:
             if upstream_attempt < _UPSTREAM_RETRY_MAX:
                 last_exc = exc
                 continue

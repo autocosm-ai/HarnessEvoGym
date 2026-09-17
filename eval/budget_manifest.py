@@ -199,6 +199,12 @@ def tree_digest(root: Path) -> str:
 
 
 def validate_manifest(manifest: dict[str, Any], *, check_digest: bool = True) -> list[dict[str, Any]]:
+    tasks = manifest.get("benchmark", {}).get("taskIds")
+    if not isinstance(tasks, list) or not tasks or any(
+        not isinstance(task, str) or not task or task in {".", ".."} or "/" in task or "\\" in task
+        for task in tasks
+    ) or len(set(tasks)) != len(tasks):
+        raise ValueError("manifest taskIds 必须是非空、不重复的任务名清单")
     candidates = manifest.get("candidates")
     if not isinstance(candidates, list) or not candidates:
         raise ValueError("manifest.candidates 不能为空")
@@ -206,8 +212,13 @@ def validate_manifest(manifest: dict[str, Any], *, check_digest: bool = True) ->
     if not root.is_dir():
         raise ValueError(f"manifest populationRoot 不存在：{root}")
     seen: dict[tuple[str, str, str], tuple[str, str]] = {}
+    labels: set[str] = set()
     for record in candidates:
         record = _require_dict(record, "candidate")
+        label = record.get("label")
+        if not isinstance(label, str) or not label or label in {".", ".."} or "/" in label or "\\" in label or label in labels:
+            raise ValueError("manifest label 必须是安全且不重复的目录名")
+        labels.add(label)
         key = (str(record.get("branchId")), str(record.get("candidateId")), str(record.get("digest")))
         # 同一候选可能连续成为多个预算点的 Champion（例如 N2 的 B4/B8），
         # 允许重复引用，但必须指向同一 campaign/workspace，且 label 不能重复。
