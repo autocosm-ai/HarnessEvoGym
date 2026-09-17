@@ -4,4 +4,16 @@
 - Branch: `exp/ablation-mutualism-layers`
 - Status: active
 - Key result or expected output: 保持 Mutualism、N2、B16、数据与模型不变，仅限制可进化 Region
-- Next step: 完成配置校验和最小 MVP，确认后再启动正式实验
+- Next step: 监控正式 N2-B16 首轮 Updater 交付和候选评分，完成后评测 8 道隐藏题。
+
+## 2026-09-17 正式运行
+
+- 去掉 L3：`ablation16-mutualism-without-l3-retry-h0-20260917`
+- 只留 L1：`ablation16-mutualism-without-l2-l3-retry-h0-20260917`
+- 本机配置：`.rsi/experiments/ablation16-{without-l3,without-l2-l3}-shared-h0-20260917.json`
+- 公共 H0：`.rsi/baseline-packs/shared-retry-h0-20260917.json`，摘要 `a189cdd52e90922318bd9483420459a192e74247e1cccf966d457120872ba90a`。
+- H0 来自 without-l3 retry6 的 branch-001，训练 8 题均值 0.12788825757575756。包含请求级重试，不能冒充旧主表 H0。
+- 两组正式运行均成功导入同一个 H0 与首轮反馈，不重复跑基线。
+- 旧 B2 retry6 试跑在基线完成后主动停止，其已有结果原样保留；它们不是正式 B16 结果。
+- 启动时旧 Docker 空网络耗尽网段；清理已停止试跑的空网络后，正式 run 已原地 resume。
+- 日志：`/tmp/ablation16-without-l3-20260917.log`、`/tmp/ablation16-without-l2-l3-20260917.log`。
