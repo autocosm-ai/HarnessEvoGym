@@ -16,8 +16,8 @@ spec:
     bwrapPath: /usr/bin/bwrap
     setprivPath: /usr/bin/setpriv
     package: "@anthropic-ai/claude-code"
-    version: 2.1.273
-    distributionDigest: 0f0f170104a6430cfb0a64670863a6bd2bb0bf74c72241f76245ab1f9aea9553
+    version: 2.1.274
+    distributionDigest: f51b7715626fddfe54c23c5344ecb4bb557c7564120b71380e3e7e24c039b7a7
     maximumModelRequests: 64
     secretEnvironment:
       - RSI_CLAUDE_PROVIDER_API_KEY
