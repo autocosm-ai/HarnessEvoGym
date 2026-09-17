@@ -276,7 +276,8 @@ export function buildUpdaterInvocation({
       cwd: workspace,
       env: {
         ...commonEnvironment,
-        ANTHROPIC_BASE_URL: gatewayUrl,
+        // Anthropic SDK 自己追加 /v1/messages；Responses 的公共地址已带 /v1。
+        ANTHROPIC_BASE_URL: gatewayUrl.replace(/\/v1\/?$/u, ''),
         ANTHROPIC_API_KEY: gatewayDummyKey,
         CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1',
         DISABLE_TELEMETRY: '1',
@@ -338,6 +339,8 @@ export function buildUpdaterInvocation({
     bwrapPath,
     setprivPath,
     preserveSupplementaryGroups,
+    // Claude 会拒绝以 root 开启非交互权限模式，包括用户命名空间内的映射 root。
+    preserveUserIdentity: backend === 'claude-code-cli',
     network: isolatedGateway ? 'none' : 'shared',
     procMode: backend === 'codex-cli'
       ? 'synthetic-self'

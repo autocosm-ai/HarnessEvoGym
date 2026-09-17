@@ -302,6 +302,35 @@ test('强制可信 Anthropic Messages 字段、隔离真实凭据并合并流式
   assert.equal(bearerOnly.status, 401)
 })
 
+for (const prefix of ['', '/v1']) {
+  test(`Claude beta 请求兼容 Anthropic base URL ${prefix || '根地址'}`, async (t) => {
+    let received
+    const upstream = http.createServer(async (request, response) => {
+      const chunks = []
+      for await (const chunk of request) chunks.push(chunk)
+      received = { path: request.url, body: JSON.parse(Buffer.concat(chunks).toString('utf8')) }
+      response.writeHead(200, { 'content-type': 'text/event-stream' })
+      response.end('event: message_stop\ndata: {"type":"message_stop"}\n\n')
+    })
+    const upstreamUrl = await listen(upstream)
+    const gateway = await startModelGateway({
+      wireProtocol: 'anthropic-messages', upstreamBaseUrl: `${upstreamUrl}${prefix}`,
+      getApiKey: async () => 'anthropic-test-key', candidateApiKey: 'anthropic-test-dummy',
+      trustedModel: 'claude-sonnet-5', trustedReasoningEffort: 'high', maxOutputTokens: 8192,
+    })
+    t.after(async () => { await gateway.close(); await close(upstream) })
+    const response = await fetch(`${gateway.url}/messages?beta=true&model=wrong`, {
+      method: 'POST', headers: { 'x-api-key': 'anthropic-test-dummy', 'content-type': 'application/json' },
+      body: JSON.stringify({ model: 'wrong', max_tokens: 1, messages: [{ role: 'user', content: 'test' }] }),
+    })
+    await response.text()
+    assert.equal(response.status, 200)
+    assert.equal(received.path, '/v1/messages')
+    assert.equal(received.body.model, 'claude-sonnet-5')
+    assert.equal(received.body.max_tokens, 8192)
+  })
+}
+
 test('unbounded gateway preserves Harness-owned request budgets', async (t) => {
   const bodies = []
   const upstream = http.createServer(async (request, response) => {
