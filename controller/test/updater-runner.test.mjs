@@ -217,11 +217,13 @@ test('Claude Code updater 只使用隔离的 Anthropic Gateway 和固定 CLI 参
   const effort = invocation.args.lastIndexOf('--effort')
   assert.equal(invocation.args[model + 1], 'claude-sonnet-4-6')
   assert.equal(invocation.args[effort + 1], 'high')
-  assert.equal(invocation.env.ANTHROPIC_BASE_URL, options.gatewayUrl)
+  assert.equal(invocation.env.ANTHROPIC_BASE_URL, options.gatewayUrl.replace(/\/v1$/u, ''))
   assert.equal(invocation.env.ANTHROPIC_API_KEY, 'local-dummy')
   assert.equal(invocation.env.CLAUDE_CONFIG_DIR, undefined)
   assert.equal(invocation.env.HTTPS_PROXY, undefined)
   assert.equal(invocation.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC, '1')
+  assert.equal(invocation.args[invocation.args.indexOf('--uid') + 1], String(options.uid))
+  assert.equal(invocation.args[invocation.args.indexOf('--gid') + 1], String(options.gid))
   assert.equal(
     mountMode(invocation.args, '/srv/claude-code', UPDATER_SANDBOX_PATHS.runtime),
     '--ro-bind',

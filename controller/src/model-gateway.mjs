@@ -69,6 +69,11 @@ function normalizeUpstreamEndpoint(value, wireProtocol) {
   }
   base.hash = ''
   base.search = ''
+  // Anthropic 的 base URL 通常是站点根地址，也兼容已带 /v1 的旧配置。
+  if (wireProtocol === 'anthropic-messages') {
+    const prefix = base.pathname.replace(/\/+$/u, '')
+    base.pathname = prefix.endsWith('/v1') ? prefix : `${prefix}/v1`
+  }
   base.pathname = `${base.pathname.replace(/\/+$/u, '')}/${
     wireProtocol === 'anthropic-messages' ? 'messages' : 'responses'
   }`
@@ -688,7 +693,10 @@ export function createModelGateway(options) {
         await audit(403)
         return
       }
-      if (request.url !== config.requestPath) {
+      // Claude SDK 会附加 ?beta=true。路由只匹配路径，模型参数仍完全由网关固定。
+      const requestPath = config.wireProtocol === 'anthropic-messages'
+        ? request.url?.split('?', 1)[0] : request.url
+      if (requestPath !== config.requestPath) {
         rejectRequest(request, response, 404)
         await audit(404)
         return

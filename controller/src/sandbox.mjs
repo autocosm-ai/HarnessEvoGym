@@ -205,11 +205,15 @@ export function buildBubblewrapInvocation({
   hostname = 'harness-rsi',
   maskedPaths = [],
   preserveSupplementaryGroups = false,
+  preserveUserIdentity = false,
 }) {
   const userId = positiveIdentity(uid, 'sandbox uid')
   const groupId = positiveIdentity(gid, 'sandbox gid')
   const bwrap = absolutePath(bwrapPath, 'bwrapPath')
   const setpriv = absolutePath(setprivPath, 'setprivPath')
+  if (typeof preserveUserIdentity !== 'boolean') {
+    throw new ProtocolError('preserveUserIdentity 必须是布尔值')
+  }
   if (typeof preserveSupplementaryGroups !== 'boolean') {
     throw new ProtocolError('preserveSupplementaryGroups 必须是布尔值')
   }
@@ -245,8 +249,9 @@ export function buildBubblewrapInvocation({
     '--unshare-uts',
     '--unshare-cgroup',
     ...(network === 'none' ? ['--unshare-net'] : []),
-    '--uid', '0',
-    '--gid', '0',
+    // CLI 可能拒绝命名空间内的 root。可保留普通 UID/GID，宿主降权与隔离不变。
+    '--uid', preserveUserIdentity ? String(userId) : '0',
+    '--gid', preserveUserIdentity ? String(groupId) : '0',
     '--cap-drop', 'ALL',
     '--hostname', hostname,
     ...destinationParents(mounts),
