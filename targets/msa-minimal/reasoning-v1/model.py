@@ -1,165 +1,94 @@
-"""Reasoning CandidateSeed 的 Chat Completions 客户端。
+"""通过 Controller 隔离网关调用 OpenAI Chat Completions。
 
-对上游半截 SSE、空正文、可重试 HTTP 错误和连接中断做请求级重试。
-该文件必须自包含，因为 Reasoning CandidateSeed 单独物化，不会携带
-Cowork CandidateSeed 的文件。
+保留 MSA 上游 Agent 的 query(socket_path, api_key, messages, max_tokens)
+接口，但第一个参数由 run.py 注入为 Run 专属的内网 HTTP 地址。
 """
 
 from __future__ import annotations
 
 import http.client
 import json
-import ssl
-import time
+import os
 from urllib.parse import urlsplit
-
-MAXIMUM_UPSTREAM_RETRIES = 8
-UPSTREAM_RETRY_BASE_DELAY = 5.0
-UPSTREAM_RETRY_MAX_DELAY = 60.0
-RETRYABLE_HTTP_STATUSES = frozenset({429, 500, 502, 503, 504, 524})
-
-
-class RetryableModelError(RuntimeError):
-    pass
 
 
 def _content(value: object) -> str:
     if isinstance(value, str):
         return value
     if isinstance(value, list):
-        return "".join(
-            item["text"] for item in value
-            if isinstance(item, dict) and isinstance(item.get("text"), str)
-        )
+        parts: list[str] = []
+        for item in value:
+            if isinstance(item, dict) and isinstance(item.get("text"), str):
+                parts.append(item["text"])
+        return "".join(parts)
     return ""
 
 
 def _read_response(response: http.client.HTTPResponse) -> str:
     raw = response.read().decode("utf-8", errors="replace")
-    content_type = response.headers.get("content-type", "").lower()
-    if "text/event-stream" not in content_type:
-        try:
-            payload = json.loads(raw)
-            choice = payload.get("choices", [])[0]
-            message = choice.get("message", {})
-            text = _content(message.get("content"))
-            if not text.strip():
-                raise RetryableModelError("model gateway returned no final text")
-            return text
-        except (IndexError, KeyError, TypeError, json.JSONDecodeError) as exc:
-            raise RetryableModelError("model gateway returned invalid JSON response") from exc
+    if "text/event-stream" not in response.headers.get("content-type", "").lower():
+        payload = json.loads(raw)
+        choices = payload.get("choices", [])
+        return _content(choices[0].get("message", {}).get("content")) if choices else ""
 
     parts: list[str] = []
-    final_message = ""
-    finish_reason: str | None = None
-    saw_terminator = False
     for line in raw.splitlines():
         if not line.startswith("data:"):
             continue
         data = line[5:].strip()
-        if not data:
+        if not data or data == "[DONE]":
             continue
-        if data == "[DONE]":
-            saw_terminator = True
-            continue
-        try:
-            event = json.loads(data)
-        except json.JSONDecodeError as exc:
-            raise RetryableModelError("model gateway returned malformed SSE JSON") from exc
-        if event.get("error") is not None:
-            raise RetryableModelError("model gateway streamed an upstream error")
+        event = json.loads(data)
         choices = event.get("choices", [])
-        if not choices or not isinstance(choices[0], dict):
-            continue
-        choice = choices[0]
-        delta = choice.get("delta", {})
-        if not isinstance(delta, dict):
-            delta = {}
-        message = choice.get("message", {})
-        if not isinstance(message, dict):
-            message = {}
-        parts.append(_content(delta.get("content")))
-        message_content = _content(message.get("content"))
-        if message_content:
-            final_message = message_content
-        current_finish = choice.get("finish_reason")
-        if isinstance(current_finish, str):
-            finish_reason = current_finish
-
-    text = "".join(parts) or final_message
-    if not saw_terminator and finish_reason is None:
-        raise RetryableModelError(
-            f"stream ended without terminal response (partial content: {len(text)} chars)"
-        )
-    if not text.strip():
-        raise RetryableModelError("model gateway returned no final text")
-    return text
+        if choices:
+            parts.append(_content(choices[0].get("delta", {}).get("content")))
+    return "".join(parts)
 
 
-def _connection(parsed):
-    if parsed.scheme == "https":
-        return http.client.HTTPSConnection(
-            parsed.hostname, parsed.port or 443, timeout=1200,
-            context=ssl.create_default_context(),
-        )
-    return http.client.HTTPConnection(parsed.hostname, parsed.port or 80, timeout=1200)
-
-
-def _query_once(gateway_url: str, api_key: str, body: bytes) -> str:
-    parsed = urlsplit(gateway_url)
-    connection = _connection(parsed)
-    try:
-        endpoint = f"{parsed.path.rstrip('/')}/chat/completions" or "/chat/completions"
-        connection.request("POST", endpoint, body=body, headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-            "Content-Length": str(len(body)),
-        })
-        response = connection.getresponse()
-        if response.status != 200:
-            response.read(4096)
-            if response.status in RETRYABLE_HTTP_STATUSES:
-                raise RetryableModelError(f"model gateway HTTP {response.status}")
-            raise RuntimeError(f"model gateway HTTP {response.status}")
-        return _read_response(response).strip()
-    except (ConnectionError, OSError, TimeoutError) as exc:
-        raise RetryableModelError(f"model gateway connection failed: {type(exc).__name__}") from exc
-    finally:
-        connection.close()
+def _positive_environment(name: str) -> int:
+    value = int(os.environ[name])
+    if value < 1:
+        raise RuntimeError(f"{name} must be positive")
+    return value
 
 
 def query(
-    gateway_url: str,
+    socket_path: str,
     api_key: str,
-    model: str,
     messages: list[dict],
     max_output_tokens: int,
 ) -> str:
-    parsed = urlsplit(gateway_url)
-    if parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.username or parsed.password:
-        raise RuntimeError("model gateway URL must be an HTTP(S) endpoint")
+    parsed = urlsplit(socket_path)
+    if parsed.scheme != "http" or not parsed.hostname or parsed.username or parsed.password:
+        raise RuntimeError("model gateway URL must be an internal HTTP endpoint")
+    endpoint = f"{parsed.path.rstrip('/')}/chat/completions" or "/chat/completions"
+    controller_limit = _positive_environment("RSI_MODEL_GATEWAY_MAX_TOKENS")
     body = json.dumps({
-        "model": model,
+        "model": os.environ["RSI_MODEL_GATEWAY_MODEL"],
         "messages": messages,
-        "max_tokens": max_output_tokens,
+        "max_tokens": min(int(max_output_tokens), controller_limit),
         "stream": True,
         "stream_options": {"include_usage": True},
     }).encode("utf-8")
-    last_error: Exception | None = None
-    for attempt in range(MAXIMUM_UPSTREAM_RETRIES + 1):
-        try:
-            return _query_once(gateway_url, api_key, body)
-        except RetryableModelError as exc:
-            last_error = exc
-            if attempt >= MAXIMUM_UPSTREAM_RETRIES:
-                break
-            delay = min(UPSTREAM_RETRY_MAX_DELAY, UPSTREAM_RETRY_BASE_DELAY * (2 ** attempt))
-            print(
-                f"[model] upstream retry {attempt + 1}/{MAXIMUM_UPSTREAM_RETRIES} "
-                f"after {type(exc).__name__}; waiting {delay:.0f}s",
-                flush=True,
-            )
-            time.sleep(delay)
-    raise RuntimeError(
-        f"model gateway request failed after {MAXIMUM_UPSTREAM_RETRIES + 1} attempts: {last_error}"
-    ) from last_error
+    connection = http.client.HTTPConnection(parsed.hostname, parsed.port or 80, timeout=1200)
+    connection.request(
+        "POST",
+        endpoint,
+        body=body,
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "Content-Length": str(len(body)),
+        },
+    )
+    response = connection.getresponse()
+    try:
+        if response.status != 200:
+            error = response.read(4096).decode("utf-8", errors="replace")
+            raise RuntimeError(f"model gateway HTTP {response.status}: {error}")
+        answer = _read_response(response).strip()
+    finally:
+        connection.close()
+    if not answer:
+        raise RuntimeError("model gateway returned no text")
+    return answer
