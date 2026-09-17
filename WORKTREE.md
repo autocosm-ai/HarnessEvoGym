@@ -4,7 +4,7 @@
 - Branch: `exp/ablation-mutualism-layers`
 - Status: active
 - Key result or expected output: 保持 Mutualism、N2、B16、数据与模型不变，仅限制可进化 Region
-- Next step: 监控正式 N2-B16 首轮 Updater 交付和候选评分，完成后评测 8 道隐藏题。
+- Next step: 两组首轮均已完成，继续正式 N2-B16 进化，完成后评测 8 道隐藏题。
 
 ## 2026-09-17 正式运行
 
@@ -17,3 +17,5 @@
 - 旧 B2 retry6 试跑在基线完成后主动停止，其已有结果原样保留；它们不是正式 B16 结果。
 - 启动时旧 Docker 空网络耗尽网段；清理已停止试跑的空网络后，正式 run 已原地 resume。
 - 日志：`/tmp/ablation16-without-l3-20260917.log`、`/tmp/ablation16-without-l2-l3-20260917.log`。
+- 首轮已验证：两组各消耗 B2/16，两条 Branch 各完成 G1/8。L1+L2 的训练冠军为 0.188444，仅 L1 为 0.198280；均使用同一个公共 H0。
+- 第二轮四个 Updater 均已交付候选。实际 MutationDiff 符合限制：L1+L2 只改 agent.py/profile/skills；仅 L1 只改 profile/skills。不能用训练分数代替隐藏测试成绩。
