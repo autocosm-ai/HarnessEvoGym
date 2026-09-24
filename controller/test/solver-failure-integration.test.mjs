@@ -118,9 +118,12 @@ test('失败代码和改动列表在 JSON 转义后仍有严格字节上限', as
 })
 
 test('真实网关的无契约 tool_calls / 401 / 429 / 502 / SSE 中断均不伪装为 Candidate 零分', async (t) => {
-  for (const [mode, category] of [
-    ['tools', 'unknown'], ['http401', 'trusted-runtime'], ['http429', 'provider'],
-    ['http502', 'provider'], ['interrupt', 'provider'],
+  // 第三项是该模式单一尝试内的网关请求数。429/502/连接中断是可重试故障：H0 model.py 首次失败后
+  // 睡 5 秒重发第二次，再要睡 10 秒时被 fixture 的 10 秒进程超时 kill，因此留下 2 次请求。
+  // tool_calls 与 401 在候选侧直接抛不可重试错误，只打 1 次。
+  for (const [mode, category, expectedRequests] of [
+    ['tools', 'unknown', 1], ['http401', 'trusted-runtime', 1], ['http429', 'provider', 2],
+    ['http502', 'provider', 2], ['interrupt', 'provider', 2],
   ]) {
     await t.test(mode, async (child) => {
       const fixture = await runtimeFixture(child, { cases: [mode] })
@@ -128,7 +131,7 @@ test('真实网关的无契约 tool_calls / 401 / 429 / 502 / SSE 中断均不�
       await assert.rejects(environment.runCandidatePartition(options), (error) => error instanceof SolverFailure
         && error.failure.category === category)
       assert.equal(fixture.verifierCalls(), 0)
-      assert.equal(fixture.gateway.observed.length, 1)
+      assert.equal(fixture.gateway.observed.length, expectedRequests)
       await assert.rejects(readFile(options.outputPath), { code: 'ENOENT' })
     })
   }

@@ -11,7 +11,7 @@ import { validateBenchmark } from '../src/protocol.mjs'
 test('共享 H0 配置拒绝重复模式、越界重试和不存在的 Baseline 来源', () => {
   const base = { id: 'test-suite', baselineFrom: 'single', populations: [{ label: 'single', run: '/single' }] }
   assert.equal(validateSharedFinalConfig(base).infrastructureRetries, 5)
-  for (const extra of [{ baselineFrom: 'combined' }, { infrastructureRetries: 6 }, { retryReasoningOnly: 'yes' },
+  for (const extra of [{ baselineFrom: 'combined' }, { infrastructureRetries: 11 }, { retryReasoningOnly: 'yes' },
     { populations: [...base.populations, ...base.populations] }, { extra: 1 }]) {
     assert.throws(() => validateSharedFinalConfig({ ...base, ...extra }))
   }

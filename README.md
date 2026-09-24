@@ -22,7 +22,7 @@
   <img alt="status research preview" src="https://img.shields.io/badge/status-research_preview-f4a261?style=flat-square" />
   <img alt="license MIT" src="https://img.shields.io/badge/controller_license-MIT-4c8bf5?style=flat-square" />
   <img alt="population modes five" src="https://img.shields.io/badge/population_modes-5-8b5cf6?style=flat-square" />
-  <img alt="tests 413 passing" src="https://img.shields.io/badge/tests-413_passing-20a36a?style=flat-square" />
+  <img alt="tests 526 passing" src="https://img.shields.io/badge/tests-526_passing-20a36a?style=flat-square" />
 </p>
 
 HarnessEvoGym turns harness self-improvement into an experiment you can inspect:
@@ -166,7 +166,7 @@ This skips feedback replay, keeps H0/the Champion frozen, and leaves the
 train–test generalization gap unset. OmegaUse Final retries an uncommitted task
 up to five additional times for observed upstream stream/transport errors or
 transient HTTP errors (5/10/20/40/60-second backoff; configurable with
-`--infrastructure-retries 0..5`). Failed workspaces are archived; committed
+`--infrastructure-retries 0..10`, default 5). Failed workspaces are archived; committed
 results, including valid zero scores, are never rerun. Authentication errors,
 candidate errors, verifier failures and low scores do not trigger retries.
 This is bounded retry within the same Final claim, not cross-process Final

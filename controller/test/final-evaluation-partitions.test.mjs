@@ -59,7 +59,7 @@ test('旧 Final 默认保留 feedback + final 四步；Champion 为 H0 时不重
 
 test('Final 参数在领取 Claim/访问题目之前校验；基础设施失败不产生不完整报告', async () => {
   assert.throws(() => finalEvaluationPolicy({ finalOnly: 'yes' }), /布尔值/u)
-  assert.throws(() => finalEvaluationPolicy({ infrastructureRetries: 6 }), /0 到 5/u)
+  assert.throws(() => finalEvaluationPolicy({ infrastructureRetries: 11 }), /0 到 10/u)
   const { calls, options } = fixture()
   options.environment.runCandidatePartition = async (input) => {
     calls.push(input)

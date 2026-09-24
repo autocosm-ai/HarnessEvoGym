@@ -86,8 +86,8 @@ test('只对可信上游暂态错误重试，认证、配置、Verifier、Candid
 })
 
 test('非法重试预算拒绝执行；归档失败不继续做题', async () => {
-  for (const value of [-1, 6, 0.5, '5', null, Infinity, NaN]) {
-    assert.throws(() => validateInfrastructureRetries(value), /0 到 5/u)
+  for (const value of [-1, 11, 0.5, '5', null, Infinity, NaN]) {
+    assert.throws(() => validateInfrastructureRetries(value), /0 到 10/u)
   }
   await assert.rejects(withTrialInfrastructureRetries(async () => { throw failure() }, {
     maximumRetries: 5,

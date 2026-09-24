@@ -22,7 +22,7 @@
   <img alt="状态为研究预览版" src="https://img.shields.io/badge/status-research_preview-f4a261?style=flat-square" />
   <img alt="Controller 使用 MIT 许可证" src="https://img.shields.io/badge/controller_license-MIT-4c8bf5?style=flat-square" />
   <img alt="支持五种种群模式" src="https://img.shields.io/badge/population_modes-5-8b5cf6?style=flat-square" />
-  <img alt="413 项测试通过" src="https://img.shields.io/badge/tests-413_passing-20a36a?style=flat-square" />
+  <img alt="526 项测试通过" src="https://img.shields.io/badge/tests-526_passing-20a36a?style=flat-square" />
 </p>
 
 HarnessEvoGym 把 Harness 自进化变成一个可以审计的实验：**优化谁、在哪里做题、
@@ -154,8 +154,8 @@ unset RSI_PROVIDER_API_KEY
 只想比较隐藏测试分数时使用 `experiment finalize --run <run> --final-only`：
 它跳过 H0/Champion 的训练题回放，只跑冻结 H0 与冠军的 final，训练—测试提升差距
 留空，不重新训练或重新选择冠军。OmegaUse Final 默认对**尚未完成的题**最多追加
-5 次接口故障重试，等待 5/10/20/40/60 秒；可用 `--infrastructure-retries 0..5`
-调整。HTTP 200 响应内的 error、连接中断以及暂态 HTTP 错误可触发重试，明确的
+5 次接口故障重试，等待 5/10/20/40/60 秒；可用 `--infrastructure-retries 0..10`
+调整（默认 5）。HTTP 200 响应内的 error、连接中断以及暂态 HTTP 错误可触发重试，明确的
 401/403、配置错误、Verifier 故障、正常空回答/拒答/工具协议问题和合法零分不会触发。
 重试先归档失败题的半成品与诊断，再从干净工作区重做该题；已提交的题不重跑。
 这是**同一次 Final Claim 内**的有界重试，不是跨进程 Final Resume；重试耗尽仍失败，

@@ -38,7 +38,7 @@ const HELP = `HarnessEvoGym Controller
   harness-rsi experiment baseline-pack-export --run <run> --output <pack.json> --id <id> [--branch <branch-id>]
   harness-rsi experiment run --config <experiment.json> [--run-id <id>]
   harness-rsi experiment resume --run <population-run>
-  harness-rsi experiment finalize --run <single-run | population-run> [--recover-infrastructure] [--final-only] [--infrastructure-retries 0..5]
+  harness-rsi experiment finalize --run <single-run | population-run> [--recover-infrastructure] [--final-only] [--infrastructure-retries 0..10]
   harness-rsi experiment finalize-suite --config <shared-final.json> [--resume] [--validate-only]
   harness-rsi benchmark validate --config <benchmark.json> [--output <report.json>]
   harness-rsi evaluate compare \\

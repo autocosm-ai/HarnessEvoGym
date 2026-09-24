@@ -7,7 +7,7 @@ export const MAXIMUM_FINAL_INFRASTRUCTURE_RETRIES = 10
 
 export function validateInfrastructureRetries(value) {
   if (!Number.isSafeInteger(value) || value < 0 || value > MAXIMUM_FINAL_INFRASTRUCTURE_RETRIES) {
-    throw new ProtocolError('infrastructureRetries 必须是 0 到 5 的整数')
+    throw new ProtocolError(`infrastructureRetries 必须是 0 到 ${MAXIMUM_FINAL_INFRASTRUCTURE_RETRIES} 的整数`)
   }
   return value
 }

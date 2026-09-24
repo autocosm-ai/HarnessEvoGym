@@ -55,8 +55,11 @@ test('Final HTTP200 流内 error → 只重试失败题 → 真实 MSA 请求恢
   assert.equal(result.baselineRecords.get('officeval_001').reward, 0)
   assert.equal(result.baselineRecords.get('officeval_002').reward, 0.5)
   assert.equal(fixture.verifierCalls(), 2)
-  assert.equal(fixture.gateway.observed.length, 3)
-  assert.equal(fixture.driver.usage().requests, 3)
+  // 失败的 streamerror 题每次尝试打 2 次网关请求：H0 model.py 首次失败后睡 5 秒再重发，
+  // 第二次失败要睡 10 秒，但 fixture 的 10 秒进程超时先到期，进程被 kill 并交还 Controller。
+  // 因此 2 次（失败尝试）+ 1 次（Controller 重试后成功）+ 1 次（另一题）= 4。
+  assert.equal(fixture.gateway.observed.length, 4)
+  assert.equal(fixture.driver.usage().requests, 4)
   assert.deepEqual(waits, [5000])
   assert.deepEqual(await readFile(join(fixture.candidate, 'model.py')), before)
   assert.doesNotMatch(JSON.stringify(events), /officeval_|fixture_unavailable/u)
@@ -65,7 +68,7 @@ test('Final HTTP200 流内 error → 只重试失败题 → 真实 MSA 请求恢
   assert.ok(archives.some((path) => path.endsWith('recovery.json')))
   // 同一 Attempt 的已完成结果（包括 0 分）都复用，不再次调用模型或 Verifier。
   await environment.runCandidatePartition(options)
-  assert.equal(fixture.gateway.observed.length, 3)
+  assert.equal(fixture.gateway.observed.length, 4)
   assert.equal(fixture.verifierCalls(), 2)
 })
 
@@ -73,9 +76,10 @@ test('Final 重试 5 次仍失败：保留已完成题和失败证据，不生�
   const { fixture, environment, options, runRoot } = await finalFixture(t, ['valid', 'streamerror'])
   await assert.rejects(environment.runCandidatePartition(options), (error) => error instanceof SolverFailure
     && error.failure.code === 'upstream-contract-unproven')
-  assert.equal(fixture.gateway.observed.filter((entry) => entry.mode === 'streamerror').length, 6)
+  // 失败的 streamerror 题打满 6 次尝试（budget 5 + 首次），每次 2 请求 = 12；另一题 1 次成功请求。
+  assert.equal(fixture.gateway.observed.filter((entry) => entry.mode === 'streamerror').length, 12)
   assert.equal(fixture.verifierCalls(), 1)
-  assert.equal(fixture.driver.usage().requests, 7)
+  assert.equal(fixture.driver.usage().requests, 13)
   await assert.rejects(readFile(options.outputPath), { code: 'ENOENT' })
   const executionId = createHash('sha256').update(options.outputPath).digest('hex').slice(0, 12)
   const task = join(runRoot, 'trials', executionId, 'h0/final/officeval_001')
@@ -91,7 +95,9 @@ test('Final 暂态 429 与真实连接中断恢复后可继续评分', async (t)
         onInfrastructureRetry: () => fixture.modes.set(mode, 'valid'),
       })
       assert.equal(records.size, 1)
-      assert.equal(fixture.gateway.observed.length, 2)
+      // 首次尝试被超时截断前打了 2 次请求（5 秒退避后重发，第二次的 10 秒退避未走完即被 kill），
+      // Controller 重试后成功再 1 次。
+      assert.equal(fixture.gateway.observed.length, 3)
       assert.equal(fixture.verifierCalls(), 1)
       assert.deepEqual(waits, [5000])
     })
@@ -134,10 +140,10 @@ test('共享 Final 持久化重试预算防止 Resume 清零，已完成题不�
   const { fixture, environment, options, runRoot } = await finalFixture(t, ['valid', 'streamerror'])
   const selected = { ...options, strictFinalCheckpoints: true, retryReasoningOnly: true }
   await assert.rejects(environment.runCandidatePartition(selected))
-  assert.equal(fixture.gateway.observed.length, 7)
+  assert.equal(fixture.gateway.observed.length, 13)
   const restored = fixture.environmentFactory({ repositoryRoot: fixture.root, runRoot, retrySleep: async () => {} })
   await restored.preflight()
   await assert.rejects(restored.runCandidatePartition(selected), /重试预算已耗尽/u)
-  assert.equal(fixture.gateway.observed.length, 7)
+  assert.equal(fixture.gateway.observed.length, 13)
   assert.equal(fixture.verifierCalls(), 1)
 })
