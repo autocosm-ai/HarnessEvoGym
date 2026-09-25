@@ -56,7 +56,8 @@ import { runProcess, secretValuesFromEnvironment } from './process.mjs'
 import { createSearchStrategyDriver } from './search-strategy.mjs'
 import { withGlobalPermit } from './global-concurrency.mjs'
 import { resolveTargetSource } from './target-sources.mjs'
-import { PopulationOrchestrator } from './population-orchestrator.mjs'
+import { assertEvolutionAlgorithmAvailable, createEvolutionAlgorithmDriver } from './evolution-algorithm.mjs'
+import { supportsTaskInfrastructureRetries } from './environment-capabilities.mjs'
 import { PopulationStore } from './population-store.mjs'
 import { acquireCampaignLock } from './campaign-lock.mjs'
 import {
@@ -367,6 +368,7 @@ export async function createContext({
   const absoluteExperimentPath = resolve(experimentPath)
   assertInside(repositoryRoot, absoluteExperimentPath, 'Experiment 配置')
   const bundle = await loadExperimentBundle(absoluteExperimentPath, repositoryRoot)
+  assertEvolutionAlgorithmAvailable(bundle.recipe.spec.algorithm)
   const targetSource = await resolveTargetSource({
     repositoryRoot,
     source: bundle.target.source,
@@ -2579,6 +2581,7 @@ export async function runPopulationEvolution({
   safeRunId(runId)
   const controllerRevision = await trustedControllerRevision(repositoryRoot)
   const bundle = await loadExperimentBundle(resolve(experimentPath), repositoryRoot)
+  assertEvolutionAlgorithmAvailable(bundle.recipe.spec.algorithm)
   if (baselineOnly && bundle.recipe.spec.population.concurrency.n_branches !== 1) {
     throw new ProtocolError('公共 H0 Baseline 只能使用单 Branch Recipe，避免重复评测同一 Candidate')
   }
@@ -2610,23 +2613,26 @@ export async function runPopulationEvolution({
     command: 'experiment run',
   })
   try {
-    const orchestrator = new PopulationOrchestrator({
-      loadedCampaign,
-      campaignsRoot: populationsRoot,
-      campaignId: runId,
-      frozenConfig,
-      secretValues: secretValuesFromEnvironment(requiredSecrets(bundle)),
-      progress: (event) => onEvent({ stage: event.type, ...event, message: event.type }),
-      createBranch({ branchId, branchesRoot }) {
-        return createCoworkBranchEvolutionDriver({
-          repositoryRoot,
-          experimentPath,
-          runId: `${runId}-${branchId}`,
-          branchId,
-          runRootOverride: join(branchesRoot, branchId, 'run'),
-          expectedBundleDigest: frozenBundle.digest,
-          onEvent,
-        })
+    const orchestrator = createEvolutionAlgorithmDriver({
+      algorithm: bundle.recipe.spec.algorithm,
+      options: {
+        loadedCampaign,
+        campaignsRoot: populationsRoot,
+        campaignId: runId,
+        frozenConfig,
+        secretValues: secretValuesFromEnvironment(requiredSecrets(bundle)),
+        progress: (event) => onEvent({ stage: event.type, ...event, message: event.type }),
+        createBranch({ branchId, branchesRoot }) {
+          return createCoworkBranchEvolutionDriver({
+            repositoryRoot,
+            experimentPath,
+            runId: `${runId}-${branchId}`,
+            branchId,
+            runRootOverride: join(branchesRoot, branchId, 'run'),
+            expectedBundleDigest: frozenBundle.digest,
+            onEvent,
+          })
+        },
       },
     })
     const initialized = await orchestrator.initialize()
@@ -2712,6 +2718,7 @@ export async function resumePopulationEvolution({
   for (const branchState of branchStates) assertExecutionIdentity(branchState.spec.executionIdentity, executionIdentity)
 
   const bundle = await loadExperimentBundle(experimentPath, repositoryRoot)
+  assertEvolutionAlgorithmAvailable(bundle.recipe.spec.algorithm)
   const requestedRuntimeRoot = resolveInside(
     repositoryRoot,
     bundle.target.materialization.runtimeRoot,
@@ -2745,23 +2752,26 @@ export async function resumePopulationEvolution({
     command: 'experiment resume',
   })
   try {
-    const orchestrator = new PopulationOrchestrator({
-      loadedCampaign,
-      campaignsRoot: populationsRoot,
-      campaignId: runId,
-      frozenConfig: frozenBundle.snapshot,
-      secretValues: secretValuesFromEnvironment(requiredSecrets(bundle)),
-      progress: (event) => onEvent({ stage: event.type, ...event, message: event.type }),
-      createBranch({ branchId, branchesRoot }) {
-        return createCoworkBranchEvolutionDriver({
-          repositoryRoot,
-          experimentPath,
-          runId: `${runId}-${branchId}`,
-          branchId,
-          runRootOverride: join(branchesRoot, branchId, 'run'),
-          expectedBundleDigest: frozenBundle.digest,
-          onEvent,
-        })
+    const orchestrator = createEvolutionAlgorithmDriver({
+      algorithm: bundle.recipe.spec.algorithm,
+      options: {
+        loadedCampaign,
+        campaignsRoot: populationsRoot,
+        campaignId: runId,
+        frozenConfig: frozenBundle.snapshot,
+        secretValues: secretValuesFromEnvironment(requiredSecrets(bundle)),
+        progress: (event) => onEvent({ stage: event.type, ...event, message: event.type }),
+        createBranch({ branchId, branchesRoot }) {
+          return createCoworkBranchEvolutionDriver({
+            repositoryRoot,
+            experimentPath,
+            runId: `${runId}-${branchId}`,
+            branchId,
+            runRootOverride: join(branchesRoot, branchId, 'run'),
+            expectedBundleDigest: frozenBundle.digest,
+            onEvent,
+          })
+        },
       },
     })
     const state = await orchestrator.resume()
@@ -3086,7 +3096,7 @@ async function finalizeCoworkRun({
     runRoot,
   })
   // 旧 Environment 不声明按题断点能力时保持原执行方式，不能声称它支持安全重试。
-  if (environment.supportsTaskInfrastructureRetries !== true) {
+  if (!supportsTaskInfrastructureRetries(environment)) {
     evaluationPolicy = { ...evaluationPolicy, infrastructureRetries: 0, retryUnit: null }
   }
   onEvent({ stage: 'final-preflight', message: '重新确认冻结 Source 与 Benchmark Revision' })

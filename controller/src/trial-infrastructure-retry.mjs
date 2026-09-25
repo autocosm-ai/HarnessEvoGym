@@ -1,9 +1,11 @@
 import { setTimeout as delay } from 'node:timers/promises'
 
 import { ProtocolError } from './protocol.mjs'
+import { MAXIMUM_INFRASTRUCTURE_RETRIES } from './retry-policy.mjs'
 import { SolverFailure } from './solver-failure.mjs'
 
-export const MAXIMUM_FINAL_INFRASTRUCTURE_RETRIES = 10
+// 保留旧导出名，避免外部调用方破坏；新代码使用 retry-policy 的通用常量。
+export const MAXIMUM_FINAL_INFRASTRUCTURE_RETRIES = MAXIMUM_INFRASTRUCTURE_RETRIES
 
 export function validateInfrastructureRetries(value) {
   if (!Number.isSafeInteger(value) || value < 0 || value > MAXIMUM_FINAL_INFRASTRUCTURE_RETRIES) {

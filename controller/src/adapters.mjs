@@ -20,6 +20,7 @@ import {
 import { normalizeRelativePath } from './path-policy.mjs'
 import { ProtocolError, readJsonFile, validateBenchmark, validateEvaluationPolicy } from './protocol.mjs'
 import { normalizeCoworkEvolutionRecipe, normalizeEvolutionRecipe } from './evolution-recipe.mjs'
+import { MAXIMUM_UPSTREAM_RETRIES } from './retry-policy.mjs'
 
 const MUTATION_LEVELS = ['l1', 'l2', 'l3']
 const FULL_GIT_SHA = /^[0-9a-f]{40}$/u
@@ -771,7 +772,7 @@ function validateTextReasoningEnvironment({ id, spec, protocol }) {
       maximumUpstreamRetries: expectNumber(
         modelGateway.maximumUpstreamRetries ?? 2,
         'EnvironmentAdapter.spec.modelGateway.maximumUpstreamRetries',
-        { integer: true, min: 0, max: 5 },
+        { integer: true, min: 0, max: MAXIMUM_UPSTREAM_RETRIES },
       ),
       resources: {
         cpus: expectNumber(gatewayResources.cpus, 'modelGateway.resources.cpus', { min: 0.1, max: 32 }),
@@ -1082,7 +1083,7 @@ function validateOmegaUseOfficeValEnvironment({ id, spec, protocol }) {
       maximumUpstreamRetries: expectNumber(
         modelGateway.maximumUpstreamRetries ?? 2,
         'EnvironmentAdapter.spec.modelGateway.maximumUpstreamRetries',
-        { integer: true, min: 0, max: 5 },
+        { integer: true, min: 0, max: MAXIMUM_UPSTREAM_RETRIES },
       ),
       resources: {
         cpus: expectNumber(gatewayResources.cpus, 'modelGateway.resources.cpus', { min: 0.1, max: 32 }),

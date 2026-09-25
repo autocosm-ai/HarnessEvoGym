@@ -1,21 +1,5 @@
-"""
-独立泛化性评测 — 6 个候选 (h0 + 5 mode 冠军) × 8 道 sealed final 题。
-
-隔离保证（重要）：
-  1. 冻结的候选 workspace 只读复制到 scratch 目录，绝不原地修改。
-     model.py 的替换只发生在副本里。
-  2. 数据集目录绝不挂载给容器。每道题把题目文件复制到独立的 scratch
-     workspace，容器只在副本上工作。数据集永远不被写入。
-
-唯一的行为改动：副本里的 model.py 换成 eval/model.py（带上游断流重试）。
-agent.py / run.py / tools.py / profiles / skills 全部保持冠军原样。
-
-用法：
-  export RSI_PROVIDER_API_KEY=...
-  export RSI_PROVIDER_BASE_URL=https://api.zcloudapi.com/v1
-  export RSI_OFFICEVAL_DATASET_ROOT=/path/to/OmegaUse-OfficeVal-Dataset
-  export RSI_OFFICEVAL_EVALUATOR_ROOT=/path/to/OmegaUse-OfficeVal
-  python3 eval/run_eval.py --out eval/results
+"""可配置的独立 OfficeVal 评测。默认配置保留历史 6 候选 × 8 题。
+只运行候选和题目的副本；这是兼容评测工具，不生成 sealed-final 官方审计链。
 """
 
 from __future__ import annotations
@@ -23,390 +7,117 @@ from __future__ import annotations
 import argparse
 import concurrent.futures
 import json
-import os
-import shutil
 import subprocess
 import sys
 import time
-import uuid
 from pathlib import Path
 
-# ── 常量 ─────────────────────────────────────────────────────────────────────
-
-EVAL_DIR  = Path(__file__).resolve().parent
-REPO_ROOT = EVAL_DIR.parent
-
-# Population 数据（冻结候选 workspace）不在 git 里，只存在于磁盘。
-# 默认读本仓库的 .rsi/runs/populations，可用环境变量指向别处
-# （例如仍留在 016 worktree 里的那 43 GB 数据）。
-_POPULATIONS = Path(
-    os.environ.get("RSI_POPULATIONS_ROOT")
-    or REPO_ROOT / ".rsi/runs/populations"
-)
-
-# verifier 运行器随仓库走，无需外部依赖。
-RUN_VERIFIER = Path(
-    os.environ.get("RSI_RUN_VERIFIER")
-    or REPO_ROOT / "docker/omegause-officeval/run-verifier.py"
-)
-
-ROBUST_MODEL = EVAL_DIR / "model.py"
-SOLVER_IMAGE = os.environ.get("RSI_SOLVER_IMAGE", "harness-rsi/omegause-officeval:v1")
-
-_POP_PREFIX = "cowork-main16-ff-train8-test8-terra-xhigh-20260907-v1-"
-
-FINAL_TASK_IDS = [
-    "officeval_011", "officeval_026", "officeval_033", "officeval_051",
-    "officeval_070", "officeval_088", "officeval_089", "officeval_097",
-]
-
-# mode -> (population suffix, branch, candidate id)
-CANDIDATES: dict[str, tuple[str, str, str]] = {
-    "h0":          ("single",      "branch-001", "h0"),
-    "single":      ("single",      "branch-001", "g016-l3"),
-    "independent": ("independent", "branch-002", "g008-l3"),
-    "mutualism":   ("mutualism",   "branch-001", "g008-l3"),
-    "competition": ("competition", "branch-002", "g005-l3"),
-    "combined":    ("combined",    "branch-002", "g002-l3"),
-}
-
-SOLVER_MAX_STEPS  = 12
-MAX_OUTPUT_TOKENS = 8192
-TASK_TIMEOUT_S    = 3600
+from eval_config import DEFAULT_CONFIG, load_config, preflight
+from eval_results import atomic_json, cached_result, mode_stats, output_session, run_identity
+from eval_runtime import prepare_candidate_copy, run_one_task
 
 
-def _require(var: str) -> str:
-    v = os.environ.get(var, "").strip()
-    if not v:
-        raise SystemExit(f"ERROR: environment variable {var} is not set")
-    return v
-
-
-def frozen_workspace(mode: str) -> Path:
-    """冻结的候选 workspace —— 只读，绝不修改。"""
-    suffix, branch, cand = CANDIDATES[mode]
-    return (_POPULATIONS / f"{_POP_PREFIX}{suffix}" / "branches" / branch
-            / "run" / "candidates" / cand / "workspace")
-
-
-def task_instruction(task_id: str) -> str:
-    ds = Path(_require("RSI_OFFICEVAL_DATASET_ROOT"))
-    spec = ds / "tasks" / f"{task_id}.json"
-    if not spec.exists():
-        raise RuntimeError(f"task spec not found: {spec}")
-    rec = json.loads(spec.read_text(encoding="utf-8"))
-    text = rec.get("instruction") or rec.get("task")
-    if not text:
-        raise RuntimeError(f"no instruction field in {spec}")
-    return text
-
-
-def prepare_candidate_copy(mode: str, scratch_root: Path) -> Path:
-    """
-    把冻结候选 workspace 复制到 scratch，并在副本里换上带重试的 model.py。
-    冻结目录本身不被触碰。每个 mode 只需复制一次，8 道题共用这份代码副本。
-    """
-    src = frozen_workspace(mode)
-    dst = scratch_root / mode / "_candidate"
-    if dst.exists():
-        shutil.rmtree(dst)
-    dst.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(src, dst, symlinks=False)
-    shutil.copy2(ROBUST_MODEL, dst / "model.py")
-    return dst
-
-
-def prepare_task_workspace(task_id: str, task_out: Path) -> Path:
-    """
-    把题目文件复制到独立的 scratch workspace。容器只挂载这个副本，
-    数据集目录永不挂载、永不写入。
-    """
-    ds = Path(_require("RSI_OFFICEVAL_DATASET_ROOT"))
-    src = ds / "task_files" / task_id
-    if not src.is_dir():
-        raise RuntimeError(f"task files not found: {src}")
-    dst = task_out / "workspace"
-    if dst.exists():
-        shutil.rmtree(dst)
-    shutil.copytree(src, dst, symlinks=False)
-    return dst
-
-
-# ── 单题执行 ─────────────────────────────────────────────────────────────────
-
-def run_one_task(mode: str, task_id: str, candidate_dir: Path, out_dir: Path) -> dict:
-    task_out = (out_dir / mode / task_id).resolve()
-    task_out.mkdir(parents=True, exist_ok=True)
-
-    try:
-        instruction = task_instruction(task_id)
-        task_ws     = prepare_task_workspace(task_id, task_out).resolve()
-    except Exception as exc:
-        return {"task": task_id, "reward": 0.0, "error": f"setup: {exc}"}
-
-    api_key   = _require("RSI_PROVIDER_API_KEY")
-    base_url  = _require("RSI_PROVIDER_BASE_URL").rstrip("/")
-    container = f"eval-{mode}-{task_id}-{uuid.uuid4().hex[:8]}"
-
-    cmd = [
-        "docker", "run", "--rm",
-        "--name", container,
-        "--network", "bridge",
-        "--cpus", "4", "--memory", "8g", "--pids-limit", "512",
-        # 候选代码副本（只读）
-        "-v", f"{candidate_dir.resolve()}:/candidate:ro",
-        # 题目文件副本（可写；这是 scratch，不是数据集）
-        "-v", f"{task_ws}:/workspace",
-        "-w", "/workspace",
-        "-e", f"RSI_MODEL_GATEWAY_BASE_URL={base_url}",
-        "-e", f"RSI_MODEL_GATEWAY_DUMMY_KEY={api_key}",
-        "-e", "RSI_MODEL_GATEWAY_MODEL=gpt-5.6-terra",
-        "-e", f"RSI_MODEL_GATEWAY_MAX_TOKENS={MAX_OUTPUT_TOKENS}",
-        "-e", f"RSI_SOLVER_MAX_STEPS={SOLVER_MAX_STEPS}",
-        SOLVER_IMAGE,
-        "python3", "/candidate/run.py",
-        "--task", instruction,
-        "--answer", "/workspace/.eval_answer.txt",
-        "--trace",  "/workspace/.eval_trace.jsonl",
-        "--profile", "cowork",
-    ]
-
-    try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=TASK_TIMEOUT_S)
-    except subprocess.TimeoutExpired:
-        subprocess.run(["docker", "kill", container], capture_output=True)
-        return {"task": task_id, "reward": 0.0, "error": f"timeout {TASK_TIMEOUT_S}s"}
-    except Exception as exc:
-        return {"task": task_id, "reward": 0.0, "error": str(exc)}
-
-    if proc.returncode != 0:
-        tail = (proc.stderr or proc.stdout or "").strip().splitlines()
-        snippet = " | ".join(tail[-3:])[:400] if tail else "no output"
-        return {"task": task_id, "reward": 0.0, "error": f"exit {proc.returncode}: {snippet}"}
-
-    reward, err = score(task_id, task_ws)
-    return {"task": task_id, "reward": reward, "error": err}
-
-
-def score(task_id: str, submission_dir: Path) -> tuple[float, str | None]:
-    """
-    在容器内运行 verifier —— 宿主机没有 python-docx/openpyxl/python-pptx，
-    这些依赖只装在 solver 镜像里。submission 目录以副本形式挂载，
-    verifier 会 chdir 进去，因此传副本而非 scratch workspace 本体。
-    """
-    ev = Path(_require("RSI_OFFICEVAL_EVALUATOR_ROOT")).resolve()
-    verifier = ev / "verifiers" / f"{task_id}_verifier.py"
-    if not verifier.exists():
-        return 0.0, f"verifier missing: {verifier.name}"
-
-    out_root = submission_dir.parent.resolve()
-    result_file = out_root / "verifier_result.json"
-    result_file.unlink(missing_ok=True)
-
-    # 容器内 agent 以 root 运行，产出文件的权限由候选自己的写文件方式决定。
-    # 实测 competition 冠军 (g005-l3) 产出 600 root —— 宿主机 ubuntu 读不了。
-    # 先在容器内把 scratch 目录的归属改回宿主机 uid，再做宿主机侧复制。
-    chown_cmd = [
-        "docker", "run", "--rm", "--network", "none",
-        "-v", f"{out_root}:/out",
-        SOLVER_IMAGE,
-        "chown", "-R", f"{os.getuid()}:{os.getgid()}", "/out",
-    ]
-    try:
-        subprocess.run(chown_cmd, capture_output=True, text=True, timeout=120)
-    except Exception as exc:
-        return 0.0, f"chown failed: {exc}"
-
-    # 只把交付物（非隐藏文件）复制给 verifier，排除 agent 的 trace/answer
-    sub_copy = out_root / "_submission"
-    try:
-        if sub_copy.exists():
-            shutil.rmtree(sub_copy)
-        sub_copy.mkdir(parents=True)
-        for item in submission_dir.iterdir():
-            if item.name.startswith("."):
-                continue
-            if item.is_dir():
-                shutil.copytree(item, sub_copy / item.name, symlinks=False)
-            else:
-                shutil.copy2(item, sub_copy / item.name)
-    except Exception as exc:
-        # 必须就地返回：若异常穿出去，会触发 main() 的 mode 级兜底，
-        # 把该 mode 剩余题目一起标废（run 2 的 competition 就是这样全军覆没）。
-        return 0.0, f"submission copy failed: {exc}"
-
-    container = f"verify-{task_id}-{uuid.uuid4().hex[:8]}"
-    cmd = [
-        "docker", "run", "--rm",
-        "--name", container,
-        "--network", "none",
-        "--cpus", "2", "--memory", "4g", "--pids-limit", "256",
-        "-v", f"{ev}:/evaluator:ro",
-        "-v", f"{sub_copy}:/submission",
-        "-v", f"{out_root}:/out",
-        SOLVER_IMAGE,
-        "python3", "/opt/harness-rsi/run-officeval-verifier.py",
-        "--verifier",    f"/evaluator/verifiers/{task_id}_verifier.py",
-        "--submission",  "/submission",
-        "--output",      "/out/verifier_result.json",
-        "--expected-id", task_id,
-    ]
-    try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
-        if proc.returncode != 0:
-            tail = (proc.stderr or proc.stdout or "").strip().splitlines()
-            return 0.0, f"verifier: {' | '.join(tail[-2:])[:300]}"
-        r = json.loads(result_file.read_text(encoding="utf-8"))
-        max_score = float(r.get("max_score") or 1) or 1.0
-        return float(r.get("total_score", 0)) / max_score, None
-    except subprocess.TimeoutExpired:
-        subprocess.run(["docker", "kill", container], capture_output=True)
-        return 0.0, "verifier timeout"
-    except Exception as exc:
-        return 0.0, f"verifier exception: {exc}"
-
-
-# ── 每个 mode 串行跑 8 题 ────────────────────────────────────────────────────
-
-def run_mode(mode: str, out_dir: Path, scratch_root: Path) -> list[dict]:
-    try:
-        candidate_dir = prepare_candidate_copy(mode, scratch_root)
-    except Exception as exc:
-        print(f"[{mode}] candidate copy failed: {exc}", file=sys.stderr, flush=True)
-        return [{"task": t, "reward": 0.0, "error": f"candidate copy: {exc}"} for t in FINAL_TASK_IDS]
-
-    print(f"[{mode}] start ({len(FINAL_TASK_IDS)} tasks)", flush=True)
+def run_mode(mode, out_dir, config, inputs, fingerprint, resume):
     rows = []
-    for tid in FINAL_TASK_IDS:
-        # 单题异常必须就地兜住：否则会穿到 main() 的 mode 级 except，
-        # 把该 mode 尚未运行的题目一起标废（run 2 的 competition 即如此）。
-        try:
-            r = run_one_task(mode, tid, candidate_dir, out_dir)
-        except Exception as exc:
-            r = {"task": tid, "reward": 0.0, "error": f"unhandled: {type(exc).__name__}: {exc}"}
-        tag = f"reward={r['reward']:.4f}" if not r["error"] else f"ERR {r['error'][:90]}"
-        print(f"  [{mode}] {tid}  {tag}", flush=True)
-        rows.append(r)
-    mean = sum(x["reward"] for x in rows) / len(rows)
-    failed = [r["task"] for r in rows if r["error"]]
-    if failed:
-        # 有题未完成 —— 不报均值，避免把失败当成真实 0 分
-        print(f"[{mode}] INCOMPLETE  {len(rows)-len(failed)}/{len(rows)} 完成"
-              f"  未完成: {', '.join(failed)}", flush=True)
-    else:
-        print(f"[{mode}] done  mean_reward={mean:.4f}", flush=True)
+    candidate_dir = None
+    for task in config["tasks"]:
+        result_path = out_dir / mode / task / "result.json"
+        row = cached_result(result_path, fingerprint, task) if resume else None
+        if row is not None:
+            print(f"[{mode}] {task}: 复用已完成结果 {row['reward']:.4f}", flush=True)
+        else:
+            try:
+                if candidate_dir is None:
+                    candidate_dir = prepare_candidate_copy(mode, out_dir / "_scratch", config)
+                row = run_one_task(mode, task, candidate_dir, out_dir, config, inputs)
+            except Exception as exc:
+                row = {"task": task, "reward": None,
+                       "error": f"{type(exc).__name__}: {exc}"}
+            # 每完成一题就落盘；后续题目或进程失败不会抹掉前面的得分。
+            atomic_json(result_path, {"fingerprint": fingerprint, "result": row})
+            print(f"[{mode}] {task}: " + (
+                f"ERR {row['error']}" if row["error"] else f"reward={row['reward']:.4f}"
+            ), flush=True)
+        rows.append(row)
     return rows
 
 
-def main() -> None:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--modes", nargs="+", default=list(CANDIDATES))
-    ap.add_argument("--concurrency", type=int, default=6)
-    ap.add_argument("--out", type=Path, default=Path("eval/results"))
-    args = ap.parse_args()
+def make_report(results, modes, tasks):
+    summary = {mode: mode_stats(results.get(mode, []), tasks) for mode in modes}
+    incomplete = [mode for mode in modes if summary[mode]["status"] != "complete"]
+    return {"run_complete": not incomplete, "incomplete_modes": incomplete, "modes": summary}
 
-    # 前置校验
-    for m in args.modes:
-        if m not in CANDIDATES:
-            raise SystemExit(f"unknown mode: {m}")
-        ws = frozen_workspace(m)
-        if not ws.is_dir():
-            raise SystemExit(f"frozen workspace missing for {m}: {ws}")
-    for p in (ROBUST_MODEL, RUN_VERIFIER):
-        if not p.exists():
-            raise SystemExit(f"required file missing: {p}")
-    for v in ("RSI_PROVIDER_API_KEY", "RSI_PROVIDER_BASE_URL",
-              "RSI_OFFICEVAL_DATASET_ROOT", "RSI_OFFICEVAL_EVALUATOR_ROOT"):
-        _require(v)
 
+def execute(args):
+    config = load_config(args.config)
+    modes = args.modes or list(config["candidates"])
+    if args.concurrency < 1:
+        raise ValueError("--concurrency 必须大于零")
     out_dir = args.out.resolve()
-    out_dir.mkdir(parents=True, exist_ok=True)
-    scratch_root = out_dir / "_scratch"
-    scratch_root.mkdir(parents=True, exist_ok=True)
+    inputs = preflight(config, modes, out_dir, require_credentials=not args.dry_run)
+    if args.dry_run:
+        print(json.dumps({
+            "status": "validated", "modes": {m: str(config["candidates"][m]) for m in modes},
+            "tasks": config["tasks"], "solver": config["solver"], "out": str(out_dir),
+        }, indent=2, ensure_ascii=False))
+        return 0
 
-    print(f"modes={args.modes}  concurrency={args.concurrency}  out={out_dir}", flush=True)
-    print("dataset is never mounted; task files are copied per task", flush=True)
-    t0 = time.time()
-
-    results: dict[str, list[dict]] = {}
-    with concurrent.futures.ThreadPoolExecutor(max_workers=args.concurrency) as pool:
-        futures = {pool.submit(run_mode, m, out_dir, scratch_root): m for m in args.modes}
-        for fut in concurrent.futures.as_completed(futures):
-            m = futures[fut]
-            try:
-                results[m] = fut.result()
-            except Exception as exc:
-                print(f"[{m}] fatal: {exc}", file=sys.stderr, flush=True)
-                results[m] = [{"task": t, "reward": 0.0, "error": str(exc)} for t in FINAL_TASK_IDS]
-
-    elapsed = (time.time() - t0) / 60
-    print(f"\n{'='*64}\nfinished in {elapsed:.1f} min\n{'='*64}", flush=True)
-
-    def mode_stats(rows: list[dict]) -> dict:
-        """只有全部题目完成才给出正式均值。任何一题失败 -> incomplete，
-        mean_reward 置 None，避免把基础设施故障当成真实 0 分计入分数。"""
-        total  = len(rows)
-        failed = [r["task"] for r in rows if r["error"]]
-        done   = [r for r in rows if not r["error"]]
-        if total and not failed:
-            return {
-                "status": "complete",
-                "mean_reward": round(sum(r["reward"] for r in rows) / total, 6),
-                "tasks_completed": total,
-                "tasks_total": total,
-                "failed_tasks": [],
-                "tasks": rows,
+    image = subprocess.run(
+        ["docker", "image", "inspect", "--format", "{{.Id}}", config["solver"]["image"]],
+        check=True, capture_output=True, text=True, timeout=30,
+    ).stdout.strip()
+    if not image.startswith("sha256:"):
+        raise ValueError("无法确认 Solver 镜像内容 ID")
+    manifest = run_identity(config, modes, inputs, image)
+    # 固定本次实际运行的镜像，避免任务之间 tag 被改指。
+    config = {**config, "solver": {**config["solver"], "image": image}}
+    with output_session(out_dir, manifest, args.resume):
+        results = {}
+        start = time.monotonic()
+        atomic_json(out_dir / "summary.json", make_report(results, modes, config["tasks"]))
+        with concurrent.futures.ThreadPoolExecutor(max_workers=args.concurrency) as pool:
+            futures = {
+                pool.submit(run_mode, mode, out_dir, config, inputs,
+                            manifest["fingerprint"], args.resume): mode
+                for mode in modes
             }
-        return {
-            "status": "incomplete",
-            "mean_reward": None,          # 正式分数不予出具
-            "partial_mean_of_completed": (
-                round(sum(r["reward"] for r in done) / len(done), 6) if done else None
-            ),
-            "tasks_completed": len(done),
-            "tasks_total": total,
-            "failed_tasks": failed,
-            "tasks": rows,
-        }
+            for future in concurrent.futures.as_completed(futures):
+                mode = futures[future]
+                try:
+                    results[mode] = future.result()
+                except Exception as exc:
+                    print(f"[{mode}] 结果写入或执行失败: {exc}", file=sys.stderr, flush=True)
+                    # 保留已经落盘的成功题目；未返回的题目仍按缺失处理。
+                    results[mode] = [
+                        row for task in config["tasks"]
+                        if (row := cached_result(out_dir / mode / task / "result.json",
+                                                 manifest["fingerprint"], task)) is not None
+                    ]
+                atomic_json(out_dir / "summary.json", make_report(results, modes, config["tasks"]))
+        report = make_report(results, modes, config["tasks"])
+        atomic_json(out_dir / "summary.json", report)
+        for mode, stats in report["modes"].items():
+            print(f"{mode}: {stats['status']}  {stats['tasks_completed']}/{stats['tasks_total']}"
+                  f"  mean={stats['mean_reward']}", flush=True)
+        print(f"耗时 {(time.monotonic()-start)/60:.1f} 分钟；报告: {out_dir / 'summary.json'}")
+        return 0 if report["run_complete"] else 2
 
-    summary: dict[str, object] = {m: mode_stats(results.get(m, [])) for m in args.modes}
 
-    h0_stats = summary.get("h0")
-    h0_mean = h0_stats["mean_reward"] if isinstance(h0_stats, dict) else None
-
-    for m in args.modes:
-        s = summary[m]
-        assert isinstance(s, dict)
-        if s["status"] == "complete":
-            line = f"  {m:14s} mean={s['mean_reward']:.4f}  ok={s['tasks_completed']}/{s['tasks_total']}"
-            # 只有双方都完整时才给出对比
-            if h0_mean is not None and m != "h0":
-                line += f"   vs h0: {s['mean_reward'] - h0_mean:+.4f}"
-            elif m != "h0":
-                line += "   vs h0: n/a (h0 incomplete)"
-        else:
-            pm = s["partial_mean_of_completed"]
-            pm_txt = f"{pm:.4f}" if pm is not None else "n/a"
-            line = (f"  {m:14s} INCOMPLETE  ok={s['tasks_completed']}/{s['tasks_total']}"
-                    f"  (完成题部分均值={pm_txt}, 非正式)"
-                    f"  失败: {', '.join(s['failed_tasks'])}")
-        print(line, flush=True)
-
-    incomplete = [m for m in args.modes if summary[m]["status"] == "incomplete"]  # type: ignore[index]
-    report = out_dir / "summary.json"
-    report.write_text(json.dumps({
-        "run_complete": not incomplete,
-        "incomplete_modes": incomplete,
-        "modes": summary,
-    }, indent=2, ensure_ascii=False), encoding="utf-8")
-
-    print(f"\nreport: {report}", flush=True)
-    if incomplete:
-        print(f"\n⚠  未产出正式结果 —— 以下 mode 有题目失败: {', '.join(incomplete)}", flush=True)
-        print("   正式均值与 mode 对比需要 6 个 mode 的 8 道题全部完成。", flush=True)
-    else:
-        print("\n✓ 全部 mode 完整完成，正式均值有效。", flush=True)
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
+    parser.add_argument("--modes", nargs="+")
+    parser.add_argument("--concurrency", type=int, default=6)
+    parser.add_argument("--out", type=Path, default=Path("eval/results"))
+    parser.add_argument("--resume", action="store_true", help="只复用相同输入下已经打分成功的题目")
+    parser.add_argument("--dry-run", action="store_true", help="检查配置和本地文件，不调用 Docker 或 API")
+    args = parser.parse_args(argv)
+    try:
+        return execute(args)
+    except (ValueError, OSError, subprocess.SubprocessError) as exc:
+        print(f"评测未完成: {exc}", file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

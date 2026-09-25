@@ -1,10 +1,10 @@
 """验证 SSE 完整性判定：正常响应必须放行，截断必须被识别为可重试。"""
 import importlib.util, sys, json, io
+from pathlib import Path
 
 spec = importlib.util.spec_from_file_location(
     "rmodel",
-    "/data/workspace/liuzhou/projs/01-code-apps/项目-Deepseek-Harness-RSI/002-Code"
-    "/.claude/worktrees/017-robust-final-eval/eval/model.py")
+    Path(__file__).resolve().parent / "model.py")
 m = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(m)
 

@@ -4,6 +4,7 @@ import { isAbsolute, relative, resolve, sep } from 'node:path'
 
 import { mutationPolicyFromConfiguration } from './mutation.mjs'
 import { ProtocolError } from './protocol.mjs'
+import { MAXIMUM_INFRASTRUCTURE_RETRIES } from './retry-policy.mjs'
 
 const API_VERSION = 'harness-rsi/v1alpha1'
 const RUNTIME_KINDS = new Set(['PutnamBenchRuntime', 'HleTextMathRuntime'])
@@ -171,7 +172,12 @@ export function validatePutnamRuntime(input) {
   if (solver.gatewayConcurrencyPerTask !== undefined) {
     integer(solver.gatewayConcurrencyPerTask, 'solver.gatewayConcurrencyPerTask', errors, { minimum: 1, maximum: 16 })
   }
-  integer(solver.infrastructureRetries, 'solver.infrastructureRetries', errors, { minimum: 0, maximum: 5 })
+  integer(
+    solver.infrastructureRetries,
+    'solver.infrastructureRetries',
+    errors,
+    { minimum: 0, maximum: MAXIMUM_INFRASTRUCTURE_RETRIES },
+  )
   integer(
     solver.infrastructureRetryBaseDelaySeconds,
     'solver.infrastructureRetryBaseDelaySeconds',

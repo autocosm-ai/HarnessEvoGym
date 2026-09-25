@@ -12,10 +12,8 @@ import {
 import { acquireCampaignLock } from './campaign-lock.mjs'
 import { CampaignStore } from './campaign-store.mjs'
 import { EvolutionOrchestrator } from './orchestrator.mjs'
-import {
-  PopulationOrchestrator,
-  formatPopulationStatus,
-} from './population-orchestrator.mjs'
+import { formatPopulationStatus } from './population-orchestrator.mjs'
+import { createEvolutionAlgorithmDriver } from './evolution-algorithm.mjs'
 import { PopulationStore } from './population-store.mjs'
 import { fingerprintControllerImplementation } from './implementation-fingerprint.mjs'
 import { prepareHleTextMathDataset } from './hle-dataset.mjs'
@@ -906,7 +904,10 @@ export async function runCampaignCliCommand(group, action, args, dependencies = 
         }
         orchestrator = typeof dependencies.createPopulationOrchestrator === 'function'
           ? dependencies.createPopulationOrchestrator(populationOptions)
-          : new PopulationOrchestrator(populationOptions)
+          : createEvolutionAlgorithmDriver({
+              algorithm: context.campaign.recipe?.spec?.algorithm,
+              options: populationOptions,
+            })
       } else {
         const stack = await createRuntimeStack({
           context,

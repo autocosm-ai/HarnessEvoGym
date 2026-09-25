@@ -8,6 +8,13 @@ import test from 'node:test'
 import { createEvaluationSummary } from '../src/evaluation-summary.mjs'
 import { normalizeEvolutionRecipe } from '../src/evolution-recipe.mjs'
 import { PopulationOrchestrator } from '../src/population-orchestrator.mjs'
+import { createEvolutionAlgorithmDriver, registerEvolutionAlgorithm } from '../src/evolution-algorithm.mjs'
+
+// 注册入口接入真实账本、检查点和恢复测试，不以空方法代替算法执行。
+registerEvolutionAlgorithm('fixture-population-v1', (options) => new PopulationOrchestrator(options))
+function populationDriver(options) {
+  return createEvolutionAlgorithmDriver({ algorithm: 'fixture-population-v1', options })
+}
 
 const FINGERPRINT = 'a'.repeat(64)
 
@@ -85,7 +92,7 @@ async function runMode(mode, {
   const contexts = new Map()
   const calls = new Map()
 
-  const orchestrator = new PopulationOrchestrator({
+  const orchestrator = populationDriver({
     loadedCampaign: loaded(mode, checkpointing),
     campaignsRoot,
     campaignId: `generic-${mode}`,
@@ -440,7 +447,7 @@ test('Checkpoint 文件落盘后进程中断，可从稳定 Population 状态幂
       latestAttempts: true,
     },
   }
-  const first = new PopulationOrchestrator({
+  const first = populationDriver({
     loadedCampaign: loaded('single', checkpointing),
     campaignsRoot,
     campaignId,
@@ -480,7 +487,7 @@ test('Checkpoint 文件落盘后进程中断，可从稳定 Population 状态幂
   )
   const checkpointBeforeResume = await readFile(checkpointPath, 'utf8')
 
-  const second = new PopulationOrchestrator({
+  const second = populationDriver({
     loadedCampaign: loaded('single', checkpointing),
     campaignsRoot,
     campaignId,

@@ -22,7 +22,7 @@
   <img alt="状态为研究预览版" src="https://img.shields.io/badge/status-research_preview-f4a261?style=flat-square" />
   <img alt="Controller 使用 MIT 许可证" src="https://img.shields.io/badge/controller_license-MIT-4c8bf5?style=flat-square" />
   <img alt="支持五种种群模式" src="https://img.shields.io/badge/population_modes-5-8b5cf6?style=flat-square" />
-  <img alt="526 项测试通过" src="https://img.shields.io/badge/tests-526_passing-20a36a?style=flat-square" />
+  <img alt="Node 与 Python 测试" src="https://img.shields.io/badge/tests-Node_%2B_Python-20a36a?style=flat-square" />
 </p>
 
 HarnessEvoGym 把 Harness 自进化变成一个可以审计的实验：**优化谁、在哪里做题、
@@ -30,7 +30,7 @@ HarnessEvoGym 把 Harness 自进化变成一个可以审计的实验：**优化�
 不会把“选手”和“裁判”混在一起。
 
 ~~~
-Target × Environment × EvolutionRecipe
+Target × Environment × EvolutionAlgorithm × EvolutionRecipe
 ~~~
 
 同一套种群算法既能让 MSA Minimal 在真实 Office 任务上进化，也能验证 Reasoning
@@ -229,11 +229,18 @@ Sealed Final 结果，不能只挑最高分。
 - 想增加新的模块选择算法，就新增 **SearchStrategy**：它只能返回 Region ID，不能返回
   文件路径、凭据或隐藏评测信息。
 
+- 想扩展种群编排，就注册 **EvolutionAlgorithm**：目前须兼容现有 PopulationStore、
+  状态格式和 Branch/Budget 契约。通过可信启动脚本注册；尚不支持任意外部算法或状态格式。
+
 - 想重新组合 Mode、Branch、Budget、共享规则和搜索策略，就新增
   **EvolutionRecipe**，不需要改 Controller 主循环。
 
 完整目录图、术语、协议、扩展步骤、测试矩阵和 PR Checklist 都在
 [Contributor 开发指南](CONTRIBUTING.md)。
+
+独立 [OfficeVal 评测工具](eval/README.md) 可配置候选、题目和模型，并支持复用已完成题目的
+分数继续评测。它是兼容工具，不生成 Controller 的 sealed-final 审计链。
+修改后运行 `npm test`、`npm run check` 和 `npm run test:eval`。
 
 ## 信任与可复现性
 

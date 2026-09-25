@@ -170,6 +170,56 @@ test('EvolutionRecipe 可按 Target Region 做任意层级消融', () => {
   assert.throws(() => normalizeEvolutionRecipe(invalid), /不能同时出现/u)
 })
 
+test('EvolutionRecipe 可以声明可插拔 Algorithm，并保持旧 Recipe 默认兼容', () => {
+  const base = normalizeEvolutionRecipe({
+    apiVersion: 'harness-rsi/v1alpha1',
+    kind: 'EvolutionRecipe',
+    spec: {
+      population: controllerConfig('single', { total: 4 }),
+      moduleSearch: {
+        authority: 'strategy-directed',
+        riskCeiling: 'l1',
+        strategy: 'linear-hill-climb',
+      },
+    },
+  })
+  assert.equal(base.spec.algorithm, undefined)
+
+  const configured = normalizeEvolutionRecipe({
+    apiVersion: 'harness-rsi/v1alpha1',
+    kind: 'EvolutionRecipe',
+    spec: {
+      population: controllerConfig('single', { total: 4 }),
+      algorithm: { id: 'grhs', configuration: { patience: 3 } },
+      moduleSearch: {
+        authority: 'strategy-directed',
+        riskCeiling: 'l1',
+        strategy: 'linear-hill-climb',
+      },
+    },
+  })
+  assert.deepEqual(configured.spec.algorithm, {
+    id: 'grhs',
+    configuration: { patience: 3 },
+  })
+  assert.throws(
+    () => normalizeEvolutionRecipe({
+      apiVersion: 'harness-rsi/v1alpha1',
+      kind: 'EvolutionRecipe',
+      spec: {
+        population: controllerConfig('single', { total: 4 }),
+        algorithm: { id: 'Bad Algorithm' },
+        moduleSearch: {
+          authority: 'strategy-directed',
+          riskCeiling: 'l1',
+          strategy: 'linear-hill-climb',
+        },
+      },
+    }),
+    /kebab-case/u,
+  )
+})
+
 test('五种 N2B16 消融 Recipe 共用同一组 Budget 里程碑', async () => {
   for (const mode of MODES) {
     const recipe = normalizeEvolutionRecipe(await readConfigFile(resolve(

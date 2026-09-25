@@ -3,6 +3,7 @@ import { TextReasoningEnvironment } from './environments/text-reasoning.mjs'
 import { diffModelUsage } from './cowork-model-gateway.mjs'
 import { assertPathKind } from './config.mjs'
 import { ProtocolError } from './protocol.mjs'
+import { environmentCapabilities } from './environment-capabilities.mjs'
 import { resolve } from 'node:path'
 import {
   ensureDshRuntime,
@@ -143,13 +144,15 @@ async function runWithUsage(modelGateway, accumulator, role, operation) {
  * 新 Benchmark 只需在这里注册新 Driver，编排器不感知其任务目录和评分细节。
  */
 export function createEnvironmentRunner(options) {
-  return createRegistered(
+  const driver = createRegistered(
     ENVIRONMENT_FACTORIES,
     'Environment',
     options.environment.protocol,
     options,
     ['preflight', 'runCandidatePartition'],
   )
+  environmentCapabilities(driver)
+  return driver
 }
 
 function createDshSolverDriver({ target, provider, docker, repositoryRoot, sourceRevision, sourcePath, modelGateway = null }) {

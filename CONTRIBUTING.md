@@ -17,7 +17,7 @@ Controller 算法的 Contributor。
 平台不是“让一个 Agent 随便改自己”。它组合三个独立维度：
 
 ~~~
-Target × Environment × EvolutionRecipe
+Target × Environment × EvolutionAlgorithm × EvolutionRecipe
 ~~~
 
 | 维度                  | 回答的问题                     | 典型内容                                           |
@@ -25,6 +25,7 @@ Target × Environment × EvolutionRecipe
 | Target                | 优化谁？哪些模块允许改？       | Harness Source、Seed、Runtime、Validator、Catalog |
 | Environment           | 在哪里做题？怎么评分？         | Task、Workspace、Verifier、Metric、Split           |
 | EvolutionRecipe       | 怎么组织和搜索？               | Mode、Branch、Budget、共享、SearchStrategy         |
+| EvolutionAlgorithm    | 谁实现种群执行和恢复？         | 兼容 Population 状态的可信 Driver                  |
 | Trusted Controller    | 谁来强制规则并决定晋升？       | Lease、Diff、调度、谱系、评测、晋升、回滚         |
 
 Controller 不应该出现“如果是 DSH 就这样，如果是 Cowork 就那样”的业务分支。

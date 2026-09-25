@@ -14,6 +14,7 @@ import { setTimeout as sleep } from 'node:timers/promises'
 
 import { isProviderInfrastructureAudit, startModelGateway } from './model-gateway.mjs'
 import { ProtocolError } from './protocol.mjs'
+import { MAXIMUM_INFRASTRUCTURE_RETRIES } from './retry-policy.mjs'
 import {
   buildHarnessInvocation,
   prepareTask,
@@ -622,7 +623,7 @@ export async function runPartition({
   if (maximumGatewayConcurrencyPerTask !== null) {
     assertInteger(maximumGatewayConcurrencyPerTask, 'maximumGatewayConcurrencyPerTask', 1, 16)
   }
-  assertInteger(infrastructureRetries, 'infrastructureRetries', 0, 5)
+  assertInteger(infrastructureRetries, 'infrastructureRetries', 0, MAXIMUM_INFRASTRUCTURE_RETRIES)
   assertInteger(
     infrastructureRetryBaseDelayMs,
     'infrastructureRetryBaseDelayMs',

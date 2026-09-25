@@ -34,8 +34,9 @@ OpenAI Responses/Anthropic Messages 宿主隔离，不是同一协议的重复�
 | Source           | 保存可信、固定的上游源码 Revision                              | 否                             |
 | Target           | 声明 Source、CandidateSeed、Materializer、Driver、Validator 和 Catalog | 否                             |
 | Environment      | 声明题目、任务工作区、Verifier 和评分指标                           | 否                             |
-| EvolutionRecipe  | 组合 Population Mode、Module Search、Budget、Checkpoint 和经验共享    | 否                             |
-| SearchStrategy   | 从 Catalog 选父 Candidate 和 Region ID                             | 否；它也不能直接写 Candidate       |
+| EvolutionRecipe  | 组合 Algorithm、Population Mode、Module Search、Budget、Checkpoint 和经验共享 | 否                          |
+| EvolutionAlgorithm | 决定 Branch 拓扑、预算分配、候选选择、停止和恢复                         | 否                             |
+| SearchStrategy   | 从 Catalog 选父 Candidate 和 Region ID                                  | 否；它也不能直接写 Candidate       |
 | Solver           | 用 Candidate Harness 在任务环境中真正解题                         | 只通过 Candidate 间接改变行为         |
 | Updater          | 读取反馈和源码，在一个 Session 内分析、提假设并改 Candidate     | 只能改本轮 Lease 允许的 Candidate 路径 |
 | Controller       | 实例化、发权、调度、Diff 校验、谱系、晋升和回滚                     | 否                             |
@@ -44,6 +45,15 @@ OpenAI Responses/Anthropic Messages 宿主隔离，不是同一协议的重复�
 Updater 内部仍无需固定的失败分析器、提案器或构建器。它在一次上下文中完成推理、
 修改和检查。SearchStrategy 是 Controller 侧的“搜索哪个模块”算法，不负责自然语言归因，
 也不帮 Updater 写代码。
+
+EvolutionAlgorithm 与 SearchStrategy 的职责分开：Algorithm 决定种群如何运行，Strategy
+决定下一步搜索哪里。Recipe 可以通过可选的 `spec.algorithm` 选择已注册的 Algorithm；未声明时
+保持 `population-v1`，所以旧配置不需要迁移。Algorithm Driver 必须实现
+`initialize`、`run`、`resume`、`report` 和 `freezeBaseline`，并通过 `store` 暴露
+当前 Run 的 `PopulationStore`。状态、Checkpoint 和报告须兼容已有 Population 格式。
+Factory 由可信启动代码在同一进程、校验和运行之前注册；CLI 不会动态加载外部模块。
+默认算法不接受额外 `configuration` 字段，参数仍放在 Recipe.population。
+这提供了现有 Population 契约内的扩展入口，任意拓扑/状态格式和算子生成算法尚未实现。
 
 ## 一轮进化
 
@@ -142,7 +152,7 @@ Solver 给出主定理的 proof replacement。独立可信重放把证明放回�
 
 共享控制平面现已包括：冻结 Manifest、可注册 Source Resolver、Source+Seed Candidate 实例化、
 可配置 L1/L2/L3 Diff 边界、Mutation Catalog/Plan/Lease、内置与沙箱 SearchStrategy、
-通用 Population/Branch 协议、单 Session 变异、Candidate 构建、逐题 Checkpoint、验证反馈、
+可注册 EvolutionAlgorithm、通用 Population/Branch 协议、单 Session 变异、Candidate 构建、逐题 Checkpoint、验证反馈、
 权限租约和实现/Runtime 证明。HZY 原有生产 Reasoning 链路继续提供仅子进程可见的
 sealed test、严格晋升/回滚、崩溃恢复、单写者锁、FD 凭据和关闭后的完整报告。
 

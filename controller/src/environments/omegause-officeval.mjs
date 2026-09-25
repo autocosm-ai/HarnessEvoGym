@@ -453,6 +453,20 @@ export class OmegaUseOfficeValEnvironment {
     this.runtimeRevision = null
   }
 
+  describeCapabilities() {
+    return Object.freeze({
+      apiVersion: 'harness-rsi/v1alpha1',
+      environment: this.environment.id,
+      partitions: Object.freeze(['feedback', 'selection', 'final']),
+      supportsFeedback: true,
+      supportsHiddenFinal: true,
+      supportsTaskRetry: true,
+      supportsCheckpointResume: true,
+      scoreType: 'scalar',
+      artifactType: 'workspace-files',
+    })
+  }
+
   async preflight() {
     const loaded = await loadManifest(this.repositoryRoot, this.environment, this.benchmark)
     const [datasetRoot, evaluatorRoot] = await Promise.all([

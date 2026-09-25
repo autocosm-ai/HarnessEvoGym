@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { environmentCapabilities, supportsTaskInfrastructureRetries } from '../src/environment-capabilities.mjs'
 
 import {
   createEnvironmentRunner,
@@ -42,9 +43,26 @@ test('受审查的 Contributor Driver 可以注册，编排器只依赖接口', 
     usage() { return {} },
   }))
 
-  assert.ok(createEnvironmentRunner({ environment: { protocol: 'fixture-environment-v1' } }))
+  const environment = createEnvironmentRunner({ environment: { protocol: 'fixture-environment-v1' } })
+  assert.equal(environmentCapabilities(environment).supportsTaskRetry, false)
   assert.ok(createSolverDriver({ target: { solver: { protocol: 'fixture-solver-v1' } } }))
   assert.ok(createUpdaterDriver({ updater: { protocol: 'fixture-updater-v1' } }))
+})
+
+test('环境能力兼容旧驱动，并拒绝自相矛盾的恢复声明', () => {
+  assert.equal(supportsTaskInfrastructureRetries({ supportsTaskInfrastructureRetries: true }), true)
+  const capabilities = {
+    apiVersion: 'harness-rsi/v1alpha1', partitions: ['feedback', 'final'],
+    supportsFeedback: true, supportsHiddenFinal: true,
+    supportsTaskRetry: true, supportsCheckpointResume: true,
+  }
+  const driver = { describeCapabilities: () => capabilities }
+  assert.equal(supportsTaskInfrastructureRetries(driver), true)
+  assert.throws(() => environmentCapabilities({
+    ...driver, supportsTaskInfrastructureRetries: false,
+  }), /不一致/u)
+  capabilities.supportsCheckpointResume = false
+  assert.throws(() => environmentCapabilities(driver), /不一致/u)
 })
 
 test('Driver Registry 拒绝覆盖协议和不完整实现', () => {

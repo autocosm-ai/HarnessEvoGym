@@ -22,7 +22,7 @@
   <img alt="status research preview" src="https://img.shields.io/badge/status-research_preview-f4a261?style=flat-square" />
   <img alt="license MIT" src="https://img.shields.io/badge/controller_license-MIT-4c8bf5?style=flat-square" />
   <img alt="population modes five" src="https://img.shields.io/badge/population_modes-5-8b5cf6?style=flat-square" />
-  <img alt="tests 526 passing" src="https://img.shields.io/badge/tests-526_passing-20a36a?style=flat-square" />
+  <img alt="Node and Python tests" src="https://img.shields.io/badge/tests-Node_%2B_Python-20a36a?style=flat-square" />
 </p>
 
 HarnessEvoGym turns harness self-improvement into an experiment you can inspect:
@@ -31,7 +31,7 @@ independent components, while a frozen Controller owns permissions, evaluation,
 promotion, rollback, and lineage.
 
 ~~~
-Target × Environment × EvolutionRecipe
+Target × Environment × EvolutionAlgorithm × EvolutionRecipe
 ~~~
 
 This separation lets the same population algorithm evolve an MSA Minimal Cowork
@@ -223,11 +223,20 @@ one-time sealed-final result.
   materialization, isolation, verifier, Result protocol, split, and metric.
 - Add a **SearchStrategy** when you want a new Region-selection algorithm. It
   may return Region IDs, never file paths or credentials.
+- Register an **EvolutionAlgorithm** to customize population orchestration.
+  Drivers currently share the existing PopulationStore, state schema, and
+  Branch/budget contracts. Registration is programmatic in a trusted launcher;
+  arbitrary external algorithms and state formats are not supported.
 - Add an **EvolutionRecipe** when you want to recombine an existing population
   topology, branch count, budget, sharing rule, and search strategy.
 
 The full file map, protocols, extension checklist, and test matrix are in the
 [Contributor guide](CONTRIBUTING.md).
+
+The standalone [OfficeVal evaluator](eval/README.md) accepts candidate/task/model
+configuration and can resume completed task scores. It is a compatibility runner,
+separate from the Controller's sealed-final audit chain. Verify changes with
+`npm test`, `npm run check`, and `npm run test:eval`.
 
 ## Trust and reproducibility
 

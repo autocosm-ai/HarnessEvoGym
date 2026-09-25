@@ -5,6 +5,7 @@ import {
   loadPopulationFinalAuthorization, publicBundleSnapshot, stopContextModelGateways,
 } from './cowork-orchestrator.mjs'
 import { createEnvironmentRunner } from './factories.mjs'
+import { supportsTaskInfrastructureRetries } from './environment-capabilities.mjs'
 import { captureRuntimeInputs } from './execution-identity.mjs'
 import { ProtocolError, readJsonFile } from './protocol.mjs'
 import { digest, readOptionalJson } from './final-suite-store.mjs'
@@ -60,7 +61,7 @@ export async function prepareFinalSuiteEntry({ repositoryRoot, populationRoot, l
     target: bundle.target, solverDriver: context.solverDriver, docker: context.docker,
     runRoot: population.runRoot,
   })
-  if (!environment.supportsTaskInfrastructureRetries) throw new ProtocolError('Environment 不支持按题恢复')
+  if (!supportsTaskInfrastructureRetries(environment)) throw new ProtocolError('Environment 不支持按题恢复')
   const preflight = await environment.preflight()
   if (preflight.sourceRevision !== state.spec.benchmarkSourceRevision) throw new ProtocolError('Benchmark Source 漂移')
   await environment.ensureRuntime()

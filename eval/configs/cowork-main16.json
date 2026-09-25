@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "candidates": {
+    "h0": {
+      "population": "cowork-main16-ff-train8-test8-terra-xhigh-20260907-v1-single",
+      "branch": "branch-001",
+      "candidate": "h0"
+    },
+    "single": {
+      "population": "cowork-main16-ff-train8-test8-terra-xhigh-20260907-v1-single",
+      "branch": "branch-001",
+      "candidate": "g016-l3"
+    },
+    "independent": {
+      "population": "cowork-main16-ff-train8-test8-terra-xhigh-20260907-v1-independent",
+      "branch": "branch-002",
+      "candidate": "g008-l3"
+    },
+    "mutualism": {
+      "population": "cowork-main16-ff-train8-test8-terra-xhigh-20260907-v1-mutualism",
+      "branch": "branch-001",
+      "candidate": "g008-l3"
+    },
+    "competition": {
+      "population": "cowork-main16-ff-train8-test8-terra-xhigh-20260907-v1-competition",
+      "branch": "branch-002",
+      "candidate": "g005-l3"
+    },
+    "combined": {
+      "population": "cowork-main16-ff-train8-test8-terra-xhigh-20260907-v1-combined",
+      "branch": "branch-002",
+      "candidate": "g002-l3"
+    }
+  },
+  "tasks": [
+    "officeval_011",
+    "officeval_026",
+    "officeval_033",
+    "officeval_051",
+    "officeval_070",
+    "officeval_088",
+    "officeval_089",
+    "officeval_097"
+  ],
+  "solver": {
+    "model": "gpt-5.6-terra",
+    "image": "harness-rsi/omegause-officeval:v1",
+    "max_steps": 12,
+    "max_output_tokens": 8192,
+    "task_timeout_seconds": 3600
+  }
+}

@@ -1,4 +1,5 @@
 import { normalizeControllerConfig } from './evolution-modes.mjs'
+import { normalizeEvolutionAlgorithm } from './evolution-algorithm-reference.mjs'
 import { ProtocolError } from './protocol.mjs'
 
 const API_VERSION = 'harness-rsi/v1alpha1'
@@ -191,9 +192,10 @@ export function normalizeEvolutionRecipe(input) {
     throw new ProtocolError('EvolutionRecipe 协议无效')
   }
   const spec = object(recipe.spec, 'EvolutionRecipe.spec')
-  rejectUnknown(spec, new Set(['population', 'moduleSearch', 'checkpointing']), 'EvolutionRecipe.spec')
+  rejectUnknown(spec, new Set(['population', 'moduleSearch', 'checkpointing', 'algorithm']), 'EvolutionRecipe.spec')
   const population = freezePopulation(normalizeControllerConfig(spec.population))
   const moduleSearch = normalizeModuleSearch(spec.moduleSearch)
+  const algorithm = normalizeEvolutionAlgorithm(spec.algorithm)
   const checkpointing = normalizeCheckpointing(
     spec.checkpointing,
     population.budget.total_budget,
@@ -201,7 +203,12 @@ export function normalizeEvolutionRecipe(input) {
   return Object.freeze({
     apiVersion: API_VERSION,
     kind: 'EvolutionRecipe',
-    spec: Object.freeze({ population, moduleSearch, checkpointing }),
+    spec: Object.freeze({
+      population,
+      moduleSearch,
+      ...(algorithm === null ? {} : { algorithm }),
+      checkpointing,
+    }),
   })
 }
 

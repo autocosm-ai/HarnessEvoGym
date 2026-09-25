@@ -216,18 +216,18 @@ def query(
         try:
             for attempt in range(1, MAXIMUM_EMPTY_RESPONSE_ATTEMPTS + 1):
                 connection = _connect()
-                connection.request(
-                    "POST",
-                    endpoint,
-                    body=body,
-                    headers={
-                        "Authorization": f"Bearer {api_key}",
-                        "Content-Type": "application/json",
-                        "Content-Length": str(len(body)),
-                    },
-                )
-                response = connection.getresponse()
                 try:
+                    connection.request(
+                        "POST",
+                        endpoint,
+                        body=body,
+                        headers={
+                            "Authorization": f"Bearer {api_key}",
+                            "Content-Type": "application/json",
+                            "Content-Length": str(len(body)),
+                        },
+                    )
+                    response = connection.getresponse()
                     if response.status != 200:
                         error = response.read(4096).decode("utf-8", errors="replace")
                         raise RuntimeError(f"model gateway HTTP {response.status}: {error}")
@@ -276,7 +276,7 @@ def query(
                 continue
             raise
 
-        except (ConnectionError, OSError) as exc:
+        except (OSError, http.client.HTTPException, json.JSONDecodeError) as exc:
             if upstream_attempt < _UPSTREAM_RETRY_MAX:
                 last_exc = exc
                 continue

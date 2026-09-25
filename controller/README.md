@@ -10,6 +10,7 @@ Controller 是 RSI 系统的可信、确定性控制平面。Updater 负责开�
 | `src/adapters.mjs`             | Target/Updater/Provider/Environment/Strategy/Experiment 配置校验 |
 | `src/mutation-catalog.mjs`     | Target Region Catalog、Strategy Plan 校验与单轮 Lease       |
 | `src/search-strategy.mjs`      | 内置策略 Registry 与无网络 Docker JSON 策略协议          |
+| `src/evolution-algorithm.mjs`  | Evolution Algorithm Registry 与 Population 生命周期适配  |
 | `src/candidate.mjs`            | Tree Snapshot、Digest、Diff Guard、Manifest、Mutation Report |
 | `src/path-policy.mjs`          | 安全相对路径、Glob、只读优先级和扩展名策略                  |
 | `src/docker.mjs`               | 无 Shell 的 Docker CLI、资源与权限限制                      |
@@ -44,8 +45,8 @@ load/validate
 ```
 
 Updater 内部不拆成固定的 `failure-analyzer`、`mutation-proposer` 或 `candidate-builder`
-服务。它是一个完整 Coding Agent Session，自己归因、改代码和自检。`SearchStrategy`
-只决定搜索父 Candidate 和哪些 Target Region；Controller 将 Region 翻译成 Lease，
+服务。它是一个完整 Coding Agent Session，自己归因、改代码和自检。`EvolutionAlgorithm`
+决定 Branch、Budget、晋升和恢复；`SearchStrategy` 只决定搜索父 Candidate 和哪些 Target Region；Controller 将 Region 翻译成 Lease，
 并且只信真实文件 Diff，不把 Mutation Report 当作授权证据。
 
 ## 命令
@@ -86,4 +87,13 @@ OmegaUse-OfficeVal；真正接 pi-agent 时，还需同时补它的 Adapter Sche
 Source/Materialization 生命周期和 Driver 注册，不是只注册一个函数就能运行。
 
 Driver 能执行和挂载工作区，因此必须作为受审查的 Controller 代码；只做搜索决策的外部
-Strategy 才可以使用沙箱镜像。
+Strategy 才可以使用沙箱镜像。EvolutionAlgorithm 通过 `spec.algorithm` 选择已注册实现；
+未声明时使用 `population-v1`，保证旧 Recipe 兼容。新的 Algorithm 必须实现
+`initialize`、`run`、`resume`、`report`、`freezeBaseline`，暴露当前 Run 的
+`PopulationStore`，并保持既有状态、预算、Checkpoint 和报告契约。需在可信启动脚本内
+注册，恢复时也须加载同一实现；CLI 不自动安装或加载外部算法。
+
+Environment 可通过 `describeCapabilities()` 声明分区、反馈、隐藏测试、按题重试和
+Checkpoint 恢复能力。Final 执行据此决定能否按题重试；旧 Driver 的
+`supportsTaskInfrastructureRetries` 保持兼容。OfficeVal 支持按题恢复，Text Reasoning
+冒烟环境暂不支持，不会再把它误报为可复用逐题结果。

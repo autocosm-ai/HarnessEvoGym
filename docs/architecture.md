@@ -8,7 +8,7 @@ HarnessEvoGym uses an independent GitHub repository as its trusted control plane
 
 This separates the mutable Solver from the immutable evaluation root and allows projects such as DeepSeek Harness and pi-agent to become Targets or Updaters through adapters without changing the Controller loop.
 
-## Target × Environment × EvolutionRecipe
+## Target × Environment × EvolutionAlgorithm × EvolutionRecipe
 
 The Future Population Controller remains the algorithmic base, but now consumes
 only a generic BranchEvolutionDriver and EvaluationSummary. Targets define the
@@ -34,7 +34,8 @@ protocol.
 | Source          | Trusted, pinned upstream source revision                              | No                           |
 | Target          | Source, CandidateSeed, Materializer, Driver, Validator, and Catalog  | No                           |
 | Environment     | Tasks, task workspaces, verifier, and primary metrics                | No                           |
-| EvolutionRecipe | Population mode, module search, budget, and peer sharing             | No                           |
+| EvolutionRecipe | Algorithm, population mode, module search, budget, and peer sharing   | No                           |
+| EvolutionAlgorithm | Branch topology, budget allocation, selection, stopping, and resume | No                           |
 | SearchStrategy  | Selects parent Candidate and region IDs                               | No; cannot edit a Candidate  |
 | Solver          | Performs tasks with the Candidate Harness                             | Indirectly through Candidate |
 | Updater         | Reads evidence and code, then analyzes and edits in one session       | Current lease paths only     |
@@ -42,9 +43,20 @@ protocol.
 | Evaluator       | Frozen tasks, rubrics, cost, and safety gates                         | No                           |
 
 The Updater does not require fixed failure-analyzer, proposal, or builder
-services. It reasons, edits, and checks in one context. SearchStrategy is a
-separate Controller-side algorithm that chooses where to search; it neither
+services. It reasons, edits, and checks in one context. EvolutionAlgorithm
+decides how the population runs, while SearchStrategy chooses where to search;
+neither
 performs natural-language diagnosis nor edits Candidate code.
+
+Recipes may select a registered Algorithm through optional `spec.algorithm`.
+When omitted, the compatibility default is `population-v1`. An Algorithm Driver
+implements `initialize`, `run`, `resume`, `report`, and `freezeBaseline`, and exposes
+the current run's `PopulationStore` as `store`. State, checkpoint and report formats
+must remain Population-compatible. Factories are registered by trusted code in
+the same process before validation/run/resume; the CLI does not dynamically load
+external modules. The default algorithm accepts no extra `configuration` keys.
+This is an extension point for existing Population contracts, not a claim that
+arbitrary topology/state formats or operator-generation algorithms are implemented.
 
 ## One evolution round
 
@@ -151,7 +163,7 @@ The superproject pins a DeepSeek Harness SHA, making every experiment reproducib
 
 The shared control plane now includes frozen manifests, registered Source resolvers,
 Source-plus-Seed Candidate materialization, configurable L1/L2/L3 diff
-enforcement, Mutation Catalog/Plan/Lease, builtin and sandboxed SearchStrategy,
+enforcement, Mutation Catalog/Plan/Lease, registered EvolutionAlgorithm, builtin and sandboxed SearchStrategy,
 generic Population/Branch protocols, one-session mutations, Candidate builds,
 per-task checkpoints, validation feedback, permission leases, and
 implementation/runtime attestation. The existing HZY production-Reasoning path

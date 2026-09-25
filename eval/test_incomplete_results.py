@@ -1,71 +1,54 @@
-"""验证 run_eval.py 的不完整结果处理：注入一个失败题，确认真实代码拒绝出正式均值。
+"""不完整结果必须保持 incomplete，不能把缺失、重复或非法分数当成正常结果。"""
 
-自包含：不依赖真实 population 数据，也不依赖所在 worktree 的路径。
-"""
-import importlib.util, json, os, sys, tempfile
-from pathlib import Path
+import unittest
 
-EVAL_DIR = Path(__file__).resolve().parent
-_tmp_ws = Path(tempfile.mkdtemp()) / "fake-workspace"
-_tmp_ws.mkdir(parents=True)
+from eval_results import mode_stats
+from run_eval import make_report
 
-os.environ.update({
-    "RSI_PROVIDER_API_KEY": "dummy",
-    "RSI_PROVIDER_BASE_URL": "https://example.invalid/v1",
-    "RSI_OFFICEVAL_DATASET_ROOT": os.environ.get(
-        "RSI_OFFICEVAL_DATASET_ROOT", str(_tmp_ws)),
-    "RSI_OFFICEVAL_EVALUATOR_ROOT": os.environ.get(
-        "RSI_OFFICEVAL_EVALUATOR_ROOT", str(_tmp_ws)),
-})
 
-spec = importlib.util.spec_from_file_location("re_mod", EVAL_DIR / "run_eval.py")
-mod = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(mod)
+class IncompleteResultsTests(unittest.TestCase):
+    tasks = ["officeval_001", "officeval_002"]
 
-# run_mode 已被下面整体 mock，真实候选 workspace 不会被读取；
-# 让 main() 的前置校验通过即可，无需 43 GB 冻结数据。
-mod.frozen_workspace = lambda mode: _tmp_ws
+    def rows(self):
+        return [{"task": task, "reward": 0.5, "error": None} for task in self.tasks]
 
-TASKS = mod.FINAL_TASK_IDS
+    def test_complete_and_negative_rewards(self):
+        rows = self.rows()
+        rows[0]["reward"] = -0.5
+        result = mode_stats(rows, self.tasks)
+        self.assertEqual(result["status"], "complete")
+        self.assertEqual(result["mean_reward"], 0.0)
 
-def fake_run_mode(mode, out_dir, scratch_root):
-    """h0 全部成功；single 第 3 题失败；其余全部成功。"""
-    rows = []
-    for i, t in enumerate(TASKS):
-        if mode == "single" and i == 2:
-            rows.append({"task": t, "reward": 0.0, "error": "timeout 3600s"})
-        else:
-            rows.append({"task": t, "reward": 0.5, "error": None})
-    return rows
+    def test_failed_task_has_no_official_score(self):
+        rows = self.rows()
+        rows[1].update(reward=0.0, error="timeout")
+        report = make_report({"h0": self.rows(), "single": rows}, ["h0", "single"], self.tasks)
+        self.assertFalse(report["run_complete"])
+        self.assertEqual(report["incomplete_modes"], ["single"])
+        self.assertEqual(report["modes"]["h0"]["mean_reward"], 0.5)
+        single = report["modes"]["single"]
+        self.assertIsNone(single["mean_reward"])
+        self.assertEqual(single["partial_mean_of_completed"], 0.5)
+        self.assertEqual(single["tasks_completed"], 1)
+        self.assertEqual(single["tasks_total"], 2)
+        self.assertEqual(single["failed_tasks"], [self.tasks[1]])
 
-mod.run_mode = fake_run_mode
+    def test_missing_duplicate_and_extra_tasks(self):
+        for rows in ([], self.rows()[:1], [self.rows()[0]] * 2,
+                     self.rows() + [{"task": "unexpected", "reward": 1, "error": None}]):
+            with self.subTest(rows=rows):
+                result = mode_stats(rows, self.tasks)
+                self.assertEqual(result["status"], "incomplete")
+                self.assertIsNone(result["mean_reward"])
+                self.assertEqual(result["tasks_total"], 2)
 
-tmp = Path(tempfile.mkdtemp())
-sys.argv = ["run_eval.py", "--modes", "h0", "single", "--concurrency", "2", "--out", str(tmp)]
+    def test_invalid_scores_cannot_be_completed(self):
+        for invalid in (float("nan"), float("inf"), True, None, "0.5"):
+            rows = self.rows()
+            rows[0]["reward"] = invalid
+            with self.subTest(invalid=invalid):
+                self.assertIsNone(mode_stats(rows, self.tasks)["mean_reward"])
 
-print("--- 运行 main() ---")
-mod.main()
 
-print("\n--- 校验 summary.json ---")
-d = json.loads((tmp / "summary.json").read_text())
-fails = []
-def check(name, got, want):
-    ok = got == want
-    print(f"  {'PASS' if ok else 'FAIL'}  {name}: got={got!r} want={want!r}")
-    if not ok: fails.append(name)
-
-check("run_complete", d["run_complete"], False)
-check("incomplete_modes", d["incomplete_modes"], ["single"])
-check("h0.status", d["modes"]["h0"]["status"], "complete")
-check("h0.mean_reward", d["modes"]["h0"]["mean_reward"], 0.5)
-check("single.status", d["modes"]["single"]["status"], "incomplete")
-check("single.mean_reward IS None", d["modes"]["single"]["mean_reward"], None)
-check("single.tasks_completed", d["modes"]["single"]["tasks_completed"], 7)
-check("single.failed_tasks", d["modes"]["single"]["failed_tasks"], [TASKS[2]])
-# 部分均值只统计完成题：7 题 x 0.5 / 7 = 0.5（不被失败的 0 稀释）
-check("single.partial_mean", d["modes"]["single"]["partial_mean_of_completed"], 0.5)
-
-print()
-if fails:
-    print(f"FAILED: {fails}"); sys.exit(1)
-print("all checks passed — 失败题不会被当成 0 分计入分数")
+if __name__ == "__main__":
+    unittest.main()

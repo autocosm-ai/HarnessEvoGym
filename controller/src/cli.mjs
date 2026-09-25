@@ -2,6 +2,7 @@
 
 import { resolve } from 'node:path'
 import { loadExperimentBundle, validateAnyAdapter } from './adapters.mjs'
+import { assertEvolutionAlgorithmAvailable } from './evolution-algorithm.mjs'
 import { readConfigFile, REPOSITORY_ROOT } from './config.mjs'
 import { evaluateBenchmark } from './evaluator.mjs'
 import {
@@ -74,7 +75,7 @@ const HELP = `HarnessEvoGym Controller
   - experiment finalize / finalize-suite 是允许解锁 Cowork sealed final 的受控入口。
   - finalize-suite 只测一次共享 H0 和各 Population 冻结冠军；--resume 不重做已提交题。
   - --recover-infrastructure 只能在 Population 上次失败且从未访问 sealed final 时使用，并且只能恢复一次。
-  - --final-only 只评测隐藏题，不重新回放训练题；OmegaUse Final 默认对接口故障最多追加重试 5 次。
+  - --final-only 只评测隐藏题，不重新回放训练题；OmegaUse Final 默认追加重试 5 次，最多允许 10 次。
   - Provider 密钥只从运行时环境变量读取，不写入 Experiment 或 .rsi 产物。
 `
 
@@ -139,6 +140,7 @@ async function validateAdapterCommand(args) {
 async function validateExperimentCommand(args) {
   const { options } = parseOptions(args, { valueOptions: new Set(['config', 'output']) })
   const bundle = await loadExperimentBundle(requiredPath(options, 'config'), REPOSITORY_ROOT)
+  assertEvolutionAlgorithmAvailable(bundle.recipe.spec.algorithm)
   await emit({
     apiVersion: 'harness-rsi/v1alpha1',
     kind: 'ExperimentValidationReport',

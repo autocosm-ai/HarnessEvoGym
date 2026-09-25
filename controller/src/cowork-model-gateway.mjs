@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { setTimeout as delay } from 'node:timers/promises'
 import { resolve } from 'node:path'
 import { ProtocolError } from './protocol.mjs'
+import { MAXIMUM_UPSTREAM_RETRIES } from './retry-policy.mjs'
 
 const USAGE_COUNTER_FIELDS = [
   'acceptedRequests',
@@ -134,8 +135,10 @@ export async function buildModelGatewayImage({ config, docker, repositoryRoot })
 export function validateModelGatewayEnvironment(config) {
   if (!Number.isSafeInteger(config.maximumUpstreamRetries ?? 2)
       || (config.maximumUpstreamRetries ?? 2) < 0
-      || (config.maximumUpstreamRetries ?? 2) > 5) {
-    throw new ProtocolError('Model Gateway maximumUpstreamRetries 必须是 0..5 的整数')
+      || (config.maximumUpstreamRetries ?? 2) > MAXIMUM_UPSTREAM_RETRIES) {
+    throw new ProtocolError(
+      `Model Gateway maximumUpstreamRetries 必须是 0..${MAXIMUM_UPSTREAM_RETRIES} 的整数`,
+    )
   }
   const apiKey = process.env[config.upstreamApiKeyEnvironment]
   const baseUrl = process.env[config.upstreamBaseUrlEnvironment]

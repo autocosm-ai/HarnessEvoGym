@@ -69,6 +69,19 @@ test('validates and fingerprints the complete frozen production runtime', async 
   assert.throws(() => combineCampaignFingerprint('a'.repeat(64), loaded.fingerprint), /implementation/u)
 })
 
+test('Solver infrastructureRetries 与 Final 共用 0..10 的外层预算上限', () => {
+  const valid = fixture()
+  valid.solver.infrastructureRetries = 10
+  assert.doesNotThrow(() => validatePutnamRuntime(valid))
+
+  const invalid = fixture()
+  invalid.solver.infrastructureRetries = 11
+  assert.throws(
+    () => validatePutnamRuntime(invalid),
+    (error) => error instanceof ProtocolError && error.details.some((detail) => /infrastructureRetries.*0\.\.10/u.test(detail)),
+  )
+})
+
 test('repository HLE runtime freezes one-hour partitions and the low-effort judge', async () => {
   const path = fileURLToPath(new URL('../../environments/hle-text-math/runtime.json', import.meta.url))
   const loaded = await loadPutnamRuntime(path)

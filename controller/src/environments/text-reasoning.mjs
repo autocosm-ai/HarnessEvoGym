@@ -215,6 +215,20 @@ export class TextReasoningEnvironment {
     this.runtimeImage = null
   }
 
+  describeCapabilities() {
+    return Object.freeze({
+      apiVersion: TASKS_API_VERSION,
+      environment: this.environment.id,
+      partitions: Object.freeze(['feedback', 'selection', 'final']),
+      supportsFeedback: true,
+      supportsHiddenFinal: true,
+      supportsTaskRetry: false,
+      supportsCheckpointResume: false,
+      scoreType: 'scalar',
+      artifactType: 'text-answer',
+    })
+  }
+
   async preflight() {
     const tasksPath = resolveInside(
       this.repositoryRoot,
