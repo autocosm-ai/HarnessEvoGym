@@ -1,0 +1,52 @@
+identity:
+  name: fake-environment
+  version: 0.1.0
+  author: RSI Team
+  description: 无需 API Key 的示例 Environment，用于测试插件系统和 Algorithm 开发
+
+protocol:
+  kind: environment
+  version: v1
+  implementation: fake-deterministic-v1
+
+capabilities:
+  partitions:
+    - training
+    - validation
+    - hidden
+  metrics:
+    - accuracy
+    - latency
+  checkpointing: true
+  parallelizable: false
+
+runtime:
+  type: node
+  node:
+    version: ">=20.0.0"
+    entrypoint: ./index.mjs
+
+dependencies:
+  node: {}
+
+trust:
+  mode: trusted
+
+configuration:
+  schema:
+    type: object
+    properties:
+      taskCount:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 10
+        description: 每个分区的任务数量
+      difficulty:
+        type: string
+        enum: [easy, medium, hard]
+        default: easy
+        description: 任务难度级别
+      seed:
+        type: integer
+        description: 随机种子（用于生成确定性任务）

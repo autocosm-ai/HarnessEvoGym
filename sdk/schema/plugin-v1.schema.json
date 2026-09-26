@@ -1,0 +1,166 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://harness-evo-gym.dev/schema/plugin-v1.schema.json",
+  "title": "Harness EvoGym Plugin Manifest",
+  "description": "插件清单文件 plugin.yaml 的 JSON Schema 定义",
+  "type": "object",
+  "required": ["identity", "protocol", "runtime", "trust"],
+  "properties": {
+    "identity": {
+      "type": "object",
+      "required": ["name", "version"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "description": "插件名称，kebab-case"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[a-z0-9.]+)?$",
+          "description": "语义化版本号"
+        },
+        "author": {
+          "type": "string",
+          "description": "作者或组织"
+        },
+        "description": {
+          "type": "string",
+          "description": "插件功能描述"
+        },
+        "repository": {
+          "type": "string",
+          "description": "源码仓库 URL"
+        }
+      }
+    },
+    "protocol": {
+      "type": "object",
+      "required": ["kind", "version"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["environment", "solver", "updater", "algorithm", "evaluator", "strategy"],
+          "description": "插件类型"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^v[0-9]+$",
+          "description": "实现的协议版本，如 v1"
+        },
+        "implementation": {
+          "type": "string",
+          "description": "协议实现的具体名称，如 omegause-officeval-docker"
+        }
+      }
+    },
+    "capabilities": {
+      "type": "object",
+      "description": "能力声明，具体字段因 protocol.kind 而异",
+      "additionalProperties": true
+    },
+    "runtime": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["node", "docker", "python"],
+          "description": "运行时类型"
+        },
+        "node": {
+          "type": "object",
+          "properties": {
+            "version": {
+              "type": "string",
+              "description": "Node.js 版本要求"
+            },
+            "entrypoint": {
+              "type": "string",
+              "description": "入口文件相对路径"
+            }
+          }
+        },
+        "docker": {
+          "type": "object",
+          "properties": {
+            "image": {
+              "type": "string",
+              "description": "Docker 镜像名称"
+            },
+            "tag": {
+              "type": "string",
+              "description": "镜像标签"
+            },
+            "digest": {
+              "type": "string",
+              "description": "镜像 SHA256 摘要，用于锁定"
+            }
+          }
+        },
+        "python": {
+          "type": "object",
+          "properties": {
+            "version": {
+              "type": "string",
+              "description": "Python 版本要求"
+            },
+            "entrypoint": {
+              "type": "string",
+              "description": "入口模块或脚本"
+            }
+          }
+        }
+      }
+    },
+    "dependencies": {
+      "type": "object",
+      "description": "依赖声明",
+      "properties": {
+        "node": {
+          "type": "object",
+          "description": "Node.js 包依赖",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "python": {
+          "type": "object",
+          "description": "Python 包依赖",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "trust": {
+      "type": "object",
+      "required": ["mode"],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["trusted", "sandbox"],
+          "description": "trusted: 插件运行在 Controller 进程内；sandbox: 隔离运行"
+        },
+        "permissions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["filesystem-read", "filesystem-write", "network", "docker"]
+          },
+          "description": "sandbox 模式下需要的权限"
+        }
+      }
+    },
+    "configuration": {
+      "type": "object",
+      "description": "插件配置 schema，用于验证用户传入的参数",
+      "properties": {
+        "schema": {
+          "type": "object",
+          "description": "JSON Schema 定义"
+        }
+      }
+    }
+  }
+}

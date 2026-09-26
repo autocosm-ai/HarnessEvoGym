@@ -1,0 +1,27 @@
+{
+  "name": "harness-evo-gym-sdk",
+  "version": "0.1.0",
+  "description": "Harness EvoGym Plugin SDK - 定义 Target、Environment、Algorithm、Updater、Evaluator 标准接口",
+  "type": "module",
+  "exports": {
+    ".": "./index.mjs",
+    "./environment": "./interfaces/environment.mjs",
+    "./solver": "./interfaces/solver.mjs",
+    "./updater": "./interfaces/updater.mjs",
+    "./algorithm": "./interfaces/algorithm.mjs",
+    "./evaluator": "./interfaces/evaluator.mjs",
+    "./schema": "./schema/plugin-v1.schema.json"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "keywords": [
+    "rsi",
+    "self-improvement",
+    "evolution",
+    "plugin",
+    "sdk"
+  ],
+  "author": "RSI Team",
+  "license": "MIT"
+}
