@@ -55,10 +55,8 @@ export function registerPlugin(manifest, factory) {
     throw new ProtocolError(`不支持的插件类型：${kind}`)
   }
 
-  // 协议名称：implementation-version（如 fake-deterministic-v1）
-  const protocolName = implementation
-    ? `${implementation}-${version}`
-    : `${manifest.identity.name}-${version}`
+  // 协议名称：implementation 已包含版本（如 fake-deterministic-v1），不再重复拼接
+  const protocolName = implementation ?? `${manifest.identity.name}-${version}`
 
   if (registry.has(protocolName)) {
     throw new ProtocolError(`插件协议重复注册：${protocolName}`)

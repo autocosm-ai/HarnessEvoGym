@@ -1,4 +1,4 @@
-import { describe, it } from 'node:test'
+import { describe, it, before } from 'node:test'
 import assert from 'node:assert/strict'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -14,6 +14,11 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const FAKE_ENV_PATH = resolve(__dirname, '../../sdk/examples/fake-environment')
 
 describe('Plugin Loader', () => {
+  // 只注册一次，所有测试共享
+  before(async () => {
+    await autoRegisterPlugin(FAKE_ENV_PATH)
+  })
+
   it('加载 Fake Environment 插件清单', async () => {
     const manifest = await loadPluginManifest(FAKE_ENV_PATH)
 
@@ -27,8 +32,6 @@ describe('Plugin Loader', () => {
   })
 
   it('自动注册 Fake Environment 插件', async () => {
-    await autoRegisterPlugin(FAKE_ENV_PATH)
-
     const plugin = findPlugin('environment', 'fake-deterministic-v1')
     assert.ok(plugin, '插件应该已注册')
     assert.equal(plugin.manifest.identity.name, 'fake-environment')
@@ -36,7 +39,6 @@ describe('Plugin Loader', () => {
   })
 
   it('列出已注册的 Environment 插件', async () => {
-    await autoRegisterPlugin(FAKE_ENV_PATH)
 
     const plugins = listRegisteredPlugins('environment')
     const fakeEnv = plugins.find((p) => p.name === 'fake-environment')
@@ -48,8 +50,6 @@ describe('Plugin Loader', () => {
   })
 
   it('创建 Fake Environment Driver 实例', async () => {
-    await autoRegisterPlugin(FAKE_ENV_PATH)
-
     const driver = createPluginDriver('environment', 'fake-deterministic-v1', {
       config: {
         taskCount: 5,
@@ -69,8 +69,6 @@ describe('Plugin Loader', () => {
   })
 
   it('Fake Environment 生成确定性任务', async () => {
-    await autoRegisterPlugin(FAKE_ENV_PATH)
-
     const driver = createPluginDriver('environment', 'fake-deterministic-v1', {
       config: { taskCount: 3, difficulty: 'easy', seed: 12345 },
     })
@@ -92,8 +90,6 @@ describe('Plugin Loader', () => {
   })
 
   it('Fake Environment 难度级别影响任务类型', async () => {
-    await autoRegisterPlugin(FAKE_ENV_PATH)
-
     const easyDriver = createPluginDriver('environment', 'fake-deterministic-v1', {
       config: { taskCount: 5, difficulty: 'easy', seed: 99 },
     })

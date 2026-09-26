@@ -1,4 +1,4 @@
-import { describe, it } from 'node:test'
+import { describe, it, before } from 'node:test'
 import assert from 'node:assert/strict'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -11,8 +11,11 @@ const FAKE_ENV_PATH = resolve(__dirname, '../../sdk/examples/fake-environment')
 const FAKE_CANDIDATE_PATH = resolve(__dirname, '../../sdk/examples/fake-candidate')
 
 describe('Fake Environment + Fake Candidate 集成测试', () => {
-  it('运行完整的 training partition 试炼', async () => {
+  before(async () => {
     await autoRegisterPlugin(FAKE_ENV_PATH)
+  })
+
+  it('运行完整的 training partition 试炼', async () => {
 
     const driver = createPluginDriver('environment', 'fake-deterministic-v1', {
       config: { taskCount: 5, difficulty: 'easy', seed: 42 },
@@ -57,8 +60,6 @@ describe('Fake Environment + Fake Candidate 集成测试', () => {
   })
 
   it('测试不同难度级别', async () => {
-    await autoRegisterPlugin(FAKE_ENV_PATH)
-
     const difficulties = ['easy', 'medium', 'hard']
     const taskWorkspace = await mkdtemp(resolve(tmpdir(), 'harness-test-'))
 
@@ -85,8 +86,6 @@ describe('Fake Environment + Fake Candidate 集成测试', () => {
   })
 
   it('测试不同 partition', async () => {
-    await autoRegisterPlugin(FAKE_ENV_PATH)
-
     const driver = createPluginDriver('environment', 'fake-deterministic-v1', {
       config: { taskCount: 3, difficulty: 'easy', seed: 200 },
     })
@@ -115,8 +114,6 @@ describe('Fake Environment + Fake Candidate 集成测试', () => {
   })
 
   it('测试 Candidate 缺失时的错误处理', async () => {
-    await autoRegisterPlugin(FAKE_ENV_PATH)
-
     const driver = createPluginDriver('environment', 'fake-deterministic-v1', {
       config: { taskCount: 2, difficulty: 'easy', seed: 300 },
     })
@@ -149,8 +146,6 @@ describe('Fake Environment + Fake Candidate 集成测试', () => {
   })
 
   it('验证确定性：相同 seed 生成相同结果', async () => {
-    await autoRegisterPlugin(FAKE_ENV_PATH)
-
     const seed = 999
     const taskWorkspace = await mkdtemp(resolve(tmpdir(), 'harness-test-'))
 
