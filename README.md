@@ -1,8 +1,5 @@
 <p align="center">
-  <picture>
-    <source media="(prefers-reduced-motion: reduce)" srcset="docs/assets/harness-evo-gym-hero.png" />
-    <img src="docs/assets/harness-evo-gym-loop.gif" width="100%" alt="HarnessEvoGym composes a Target, Environment, and Evolution Recipe into a trusted self-evolution loop." />
-  </picture>
+  <img src="docs/assets/harness-evo-gym-hero-v2.png" width="100%" alt="HarnessEvoGym evolves multiple agent harnesses around a trusted controller." />
 </p>
 
 <h1 align="center">HarnessEvoGym</h1>
@@ -38,6 +35,10 @@ This separation lets the same population algorithm evolve an MSA Minimal Cowork
 agent on real Office tasks, exercise a Reasoning pipeline, or accept a new
 Harness and Benchmark through adapters—without moving the evaluator into the
 mutable system.
+
+<p align="center">
+  <img src="docs/assets/harness-evo-gym-loop-v2.png" width="100%" alt="The HarnessEvoGym candidate, environment, solver, verifier, and updater loop." />
+</p>
 
 ## Why this exists
 
@@ -85,7 +86,7 @@ semantic validator, and Diff Guard enforce *where* it can write.
 | Capability              | Implemented                                                        |
 | ----------------------- | ------------------------------------------------------------------ |
 | Harness Targets         | MSA Minimal Cowork, MSA Minimal Reasoning, DeepSeek Harness path   |
-| Updaters                | Isolated Codex CLI 0.149.1 and DeepSeek Harness                    |
+| Updaters                | Isolated Codex CLI, Claude Code CLI, and DeepSeek Harness          |
 | Environments            | OmegaUse-OfficeVal and HLE Text-only Math |
 | Population topologies   | Single, Independent, Mutualism, Competition, Combined              |
 | Module search           | Linear hill climb, progressive risk expansion, Docker strategy API |
@@ -188,7 +189,7 @@ The repository includes a fixed formal training configuration:
 | Setting                 | Value                                                     |
 | ----------------------- | --------------------------------------------------------- |
 | Target / Solver         | MSA Minimal Cowork, full 12-step runtime                  |
-| Updater                 | Isolated Codex CLI 0.149.1                                |
+| Updater                 | Isolated Codex CLI                                         |
 | Solver + Updater model  | `gpt-5.6-terra`, high reasoning, 8192 output tokens       |
 | Search space            | L1 prompt/skills + L2 agent loop/tool runtime             |
 | Search strategy         | `linear-hill-climb`                                       |
