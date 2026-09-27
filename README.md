@@ -86,7 +86,7 @@ semantic validator, and Diff Guard enforce *where* it can write.
 | ----------------------- | ------------------------------------------------------------------ |
 | Harness Targets         | MSA Minimal Cowork, MSA Minimal Reasoning, DeepSeek Harness path   |
 | Updaters                | Isolated Codex CLI 0.149.1 and DeepSeek Harness                    |
-| Environments            | OmegaUse-OfficeVal, synthetic text Reasoning, HLE/Putnam paths     |
+| Environments            | OmegaUse-OfficeVal, Harbor Task v1, synthetic text Reasoning, HLE/Putnam paths |
 | Population topologies   | Single, Independent, Mutualism, Competition, Combined              |
 | Module search           | Linear hill climb, progressive risk expansion, Docker strategy API |
 | Mutable risk ceilings   | Target-defined L1/L2/L3 with different files for every Harness     |

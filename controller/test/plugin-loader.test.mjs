@@ -9,6 +9,7 @@ import {
   listRegisteredPlugins,
   createPluginDriver,
 } from '../src/plugin-loader.mjs'
+import { registeredDriverProtocols } from '../src/factories.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const FAKE_ENV_PATH = resolve(__dirname, '../../sdk/examples/fake-environment')
@@ -36,6 +37,7 @@ describe('Plugin Loader', () => {
     assert.ok(plugin, '插件应该已注册')
     assert.equal(plugin.manifest.identity.name, 'fake-environment')
     assert.equal(typeof plugin.factory, 'function')
+    assert.ok(registeredDriverProtocols().environment.includes('fake-deterministic-v1'))
   })
 
   it('列出已注册的 Environment 插件', async () => {
@@ -62,10 +64,12 @@ describe('Plugin Loader', () => {
     assert.equal(typeof driver.preflight, 'function')
     assert.equal(typeof driver.runCandidatePartition, 'function')
     assert.equal(typeof driver.getCapabilities, 'function')
+    assert.equal(typeof driver.describeCapabilities, 'function')
 
     const capabilities = driver.getCapabilities()
     assert.deepEqual(capabilities.partitions, ['training', 'validation', 'hidden'])
     assert.deepEqual(capabilities.metrics, ['accuracy', 'latency'])
+    assert.deepEqual(driver.describeCapabilities().partitions, ['feedback', 'selection', 'final'])
   })
 
   it('Fake Environment 生成确定性任务', async () => {

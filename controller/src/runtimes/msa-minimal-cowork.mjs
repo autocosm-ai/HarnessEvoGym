@@ -282,6 +282,7 @@ export async function runMsaMinimalCoworkSolver({
   task,
   name,
   timeoutMs,
+  resources,
   containerWorkspace = '/workspace',
 }) {
   validateModel({ model, provider })
@@ -360,6 +361,7 @@ export async function runMsaMinimalCoworkSolver({
     readOnlyRoot: true,
     capabilities: [],
     captureExecutionEvidence: true,
+    ...(resources ? { resources } : {}),
     timeoutMs,
   }).catch((error) => {
     error.solverProcess = solverProcessEvidence(error.processResult)

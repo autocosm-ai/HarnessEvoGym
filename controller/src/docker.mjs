@@ -146,8 +146,25 @@ export class DockerClient {
     return { id: result.stdout.trim(), name: safeName }
   }
 
-  async copyFrom(container, source, destination) {
-    return await runProcess(this.binary, ['cp', `${container}:${source}`, destination], { timeoutMs: 300_000 })
+  async copyFrom(container, source, destination, { owner = null } = {}) {
+    if (typeof container !== 'string' || !/^[a-z0-9][a-z0-9_.-]*$/u.test(container)) {
+      throw new ProtocolError('Docker cp 容器名称无效')
+    }
+    if (typeof source !== 'string' || !source.startsWith('/') || /[\u0000\r\n]/u.test(source)) {
+      throw new ProtocolError('Docker cp 容器源路径无效')
+    }
+    if (!isAbsolute(destination) || /[\u0000\r\n]/u.test(destination)) {
+      throw new ProtocolError('Docker cp 目标路径必须是绝对路径')
+    }
+    const args = ['cp']
+    if (owner !== null) {
+      if (typeof owner !== 'string' || !/^\d+:\d+$/u.test(owner)) {
+        throw new ProtocolError('Docker cp owner 必须是 UID:GID')
+      }
+      args.push(`--chown=${owner}`)
+    }
+    args.push(`${container}:${source}`, destination)
+    return await runProcess(this.binary, args, { timeoutMs: 300_000 })
   }
 
   async removeContainer(container) {

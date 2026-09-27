@@ -17,6 +17,7 @@
     "test:eval": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s eval -p 'test_*.py'"
   },
   "dependencies": {
+    "smol-toml": "^1.9.0",
     "yaml": "2.9.0"
   }
 }

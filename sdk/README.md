@@ -38,13 +38,14 @@ sdk/
 
 1. 创建插件目录，编写 `plugin.yaml`
 2. 实现对应协议的接口（继承 SDK 提供的基类或直接实现）
-3. 本地测试：`harness plugin validate ./my-plugin`
+3. 本地测试：使用 `node controller/src/plugin-loader.mjs` 的加载 API，或运行项目测试
 4. 发布：npm 包或 Git 仓库
-5. 安装：`harness plugin install <package-or-repo>`
+5. 当前版本不自动安装外部插件；请在受审查的启动脚本中显式调用 `autoRegisterPlugin()`，再交给 Controller 使用
 
 ## 设计原则
 
 - **协议版本化**：接口破坏性变更时递增版本号
 - **能力声明**：插件主动声明支持的功能，Controller 按需选择
 - **信任边界**：Controller、Evaluator、隐藏任务属于信任根，不能放入 Candidate
+- 当前 Node 插件加载器只执行 `trusted` 插件；`sandbox` 清单需要独立进程执行器，暂不会被自动加载
 - **可复现性**：插件版本、依赖、Docker 镜像全部锁定并记录到 ExecutionIdentity

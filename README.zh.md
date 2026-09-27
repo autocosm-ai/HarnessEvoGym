@@ -82,7 +82,7 @@ Prompt 负责告诉 Updater“为什么改、怎么分析”；MutationLease、V
 | --------------------- | ----------------------------------------------------------------- |
 | Harness Target        | MSA Minimal Cowork、MSA Minimal Reasoning、DeepSeek Harness 路径 |
 | Updater               | 隔离的 Codex CLI 0.149.1、DeepSeek Harness                       |
-| Environment           | OmegaUse-OfficeVal、Synthetic Reasoning、HLE/Putnam 路径         |
+| Environment           | OmegaUse-OfficeVal、Harbor Task v1、Synthetic Reasoning、HLE/Putnam 路径 |
 | Population Topology   | Single、Independent、Mutualism、Competition、Combined            |
 | Module Search         | Linear Hill Climb、Progressive Risk Expansion、Docker Strategy API |
 | 风险分层              | 每个 Target 自己定义 L1/L2/L3 和对应文件                         |

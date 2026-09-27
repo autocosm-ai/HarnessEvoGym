@@ -3,6 +3,11 @@ import { resolve, join } from 'node:path'
 import { parse as parseYAML } from 'yaml'
 import { ProtocolError } from './protocol.mjs'
 import { validatePluginManifest, isProtocolCompatible } from '../../sdk/index.mjs'
+import {
+  registerEnvironmentDriver,
+  registerSolverDriver,
+  registerUpdaterDriver,
+} from './factories.mjs'
 
 /**
  * Plugin 注册表，按协议类型分类存储
@@ -48,7 +53,10 @@ export async function loadPluginManifest(pluginPath) {
  * @param {Function} factory - Driver Factory 函数
  */
 export function registerPlugin(manifest, factory) {
-  const { kind, version, implementation } = manifest.protocol
+  if (manifest.trust?.mode !== 'trusted') {
+    throw new ProtocolError('当前插件加载器只允许 trusted 插件；sandbox 需要独立进程执行器')
+  }
+  const { kind, implementation } = manifest.protocol
   const registry = PLUGIN_REGISTRY[kind]
 
   if (!registry) {
@@ -62,12 +70,81 @@ export function registerPlugin(manifest, factory) {
     throw new ProtocolError(`插件协议重复注册：${protocolName}`)
   }
 
+  // 经过清单校验的插件直接接入 Controller Registry；没有带版本实现名的
+  // 插件仍可通过 SDK Registry 使用，但不会被实验配置误选。
+  const controllerRegistrars = {
+    environment: registerEnvironmentDriver,
+    solver: registerSolverDriver,
+    updater: registerUpdaterDriver,
+  }
+  const registrar = controllerRegistrars[kind]
+  if (registrar && /^[a-z0-9]+(?:-[a-z0-9]+)*-v[0-9]+$/u.test(protocolName)) {
+    registrar(protocolName, (options) => buildPluginDriver(manifest, factory, kind, options))
+  }
   registry.set(protocolName, {
     manifest,
     factory,
   })
 
   console.log(`[Plugin] 注册 ${kind}: ${protocolName} (${manifest.identity.name}@${manifest.identity.version})`)
+}
+
+function buildPluginDriver(manifest, factory, kind, options) {
+  const requiredVersion = manifest.protocol.version
+  if (!isProtocolCompatible(requiredVersion, manifest.protocol.version)) {
+    throw new ProtocolError(
+      `插件协议版本不兼容：要求 ${requiredVersion}，提供 ${manifest.protocol.version}`,
+    )
+  }
+  const driver = factory(options)
+  if (!driver || typeof driver !== 'object') {
+    throw new ProtocolError(`插件 ${manifest.identity.name} Factory 返回值无效`)
+  }
+  const requiredMethods = {
+    environment: ['preflight', 'runCandidatePartition'],
+    solver: ['ensureRuntime', 'run', 'usage'],
+    updater: ['ensureRuntime', 'stageContext', 'run', 'usage'],
+    algorithm: ['initialize', 'run', 'resume', 'report', 'freezeBaseline'],
+    evaluator: ['validateManifest', 'evaluate', 'formatReport'],
+  }
+  for (const method of requiredMethods[kind] ?? []) {
+    if (typeof driver[method] !== 'function') {
+      throw new ProtocolError(`插件 ${manifest.identity.name} 缺少方法：${method}()`)
+    }
+  }
+  if (kind === 'environment') adaptEnvironmentCapabilities(driver, manifest)
+  return driver
+}
+
+function adaptEnvironmentCapabilities(driver, manifest) {
+  if (typeof driver.describeCapabilities !== 'function'
+      && typeof driver.getCapabilities !== 'function') {
+    throw new ProtocolError(`插件 ${manifest.identity.name} 缺少 describeCapabilities() 或 getCapabilities()`)
+  }
+  if (typeof driver.describeCapabilities !== 'function') {
+    const sdkCapabilities = driver.getCapabilities()
+    if (!sdkCapabilities || typeof sdkCapabilities !== 'object' || Array.isArray(sdkCapabilities)
+        || !Array.isArray(sdkCapabilities.partitions)) {
+      throw new ProtocolError(`插件 ${manifest.identity.name} 返回的 Environment capabilities 无效`)
+    }
+    const partitionMap = { training: 'feedback', validation: 'selection', hidden: 'final' }
+    const partitions = [...new Set(sdkCapabilities.partitions.map((item) => partitionMap[item]).filter(Boolean))]
+    driver.describeCapabilities = () => Object.freeze({
+      apiVersion: 'harness-rsi/v1alpha1',
+      environment: manifest.identity.name,
+      partitions,
+      supportsFeedback: partitions.includes('feedback'),
+      supportsHiddenFinal: partitions.includes('final'),
+      supportsTaskRetry: sdkCapabilities.checkpointing === true,
+      supportsCheckpointResume: sdkCapabilities.checkpointing === true,
+      scoreType: 'plugin',
+      artifactType: 'plugin',
+    })
+  }
+  if (typeof driver.getCapabilities !== 'function') {
+    driver.getCapabilities = () => driver.describeCapabilities()
+  }
+  return driver
 }
 
 /**
@@ -190,24 +267,5 @@ export function createPluginDriver(kind, protocol, options) {
     )
   }
 
-  // 调用 factory 创建 Driver 实例
-  const driver = factory(options)
-
-  // 验证 Driver 接口（根据 kind 检查必需方法）
-  const requiredMethods = {
-    environment: ['preflight', 'runCandidatePartition', 'getCapabilities'],
-    solver: ['ensureRuntime', 'run', 'usage'],
-    updater: ['ensureRuntime', 'stageContext', 'run', 'usage'],
-    algorithm: ['initialize', 'run', 'resume', 'report', 'freezeBaseline'],
-    evaluator: ['validateManifest', 'evaluate', 'formatReport'],
-  }
-
-  const methods = requiredMethods[kind] ?? []
-  for (const method of methods) {
-    if (typeof driver[method] !== 'function') {
-      throw new ProtocolError(`插件 ${manifest.identity.name} 缺少方法：${method}()`)
-    }
-  }
-
-  return driver
+  return buildPluginDriver(manifest, factory, kind, options)
 }

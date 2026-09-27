@@ -16,12 +16,43 @@ export { Evaluator } from './interfaces/evaluator.mjs'
  * @returns {boolean} 是否合法
  */
 export function validatePluginManifest(manifest) {
-  // TODO: 使用 plugin-v1.schema.json 进行 JSON Schema 验证
-  if (!manifest || typeof manifest !== 'object') return false
-  if (!manifest.identity?.name || !manifest.identity?.version) return false
-  if (!manifest.protocol?.kind || !manifest.protocol?.version) return false
-  if (!manifest.runtime?.type) return false
-  if (!manifest.trust?.mode) return false
+  if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) return false
+  const plain = (value) => value && typeof value === 'object' && !Array.isArray(value)
+  const identity = manifest.identity
+  const protocol = manifest.protocol
+  const runtime = manifest.runtime
+  const trust = manifest.trust
+  if (!plain(identity) || !plain(protocol) || !plain(runtime) || !plain(trust)) return false
+  if (typeof identity.name !== 'string' || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(identity.name)) return false
+  if (typeof identity.version !== 'string'
+      || !/^\d+\.\d+\.\d+(?:-[a-z0-9.]+)?$/u.test(identity.version)) return false
+  const kinds = new Set(['environment', 'solver', 'updater', 'algorithm', 'evaluator', 'strategy'])
+  if (typeof protocol.kind !== 'string' || !kinds.has(protocol.kind)) return false
+  if (typeof protocol.version !== 'string' || !/^v\d+$/u.test(protocol.version)) return false
+  if (protocol.implementation !== undefined
+      && (typeof protocol.implementation !== 'string'
+        || !/^[a-z0-9]+(?:-[a-z0-9]+)*-v\d+$/u.test(protocol.implementation))) return false
+  if (!new Set(['node', 'docker', 'python']).has(runtime.type)) return false
+  if (runtime.type === 'node') {
+    if (!plain(runtime.node) || typeof runtime.node.entrypoint !== 'string'
+        || runtime.node.entrypoint.length === 0 || runtime.node.entrypoint.startsWith('/')
+        || runtime.node.entrypoint.split('/').some((part) => part === '..' || part === '')) return false
+  }
+  if (runtime.type === 'python') {
+    if (!plain(runtime.python) || typeof runtime.python.entrypoint !== 'string'
+        || runtime.python.entrypoint.length === 0 || runtime.python.entrypoint.startsWith('/')
+        || runtime.python.entrypoint.split('/').some((part) => part === '..' || part === '')) return false
+  }
+  if (runtime.type === 'docker') {
+    if (!plain(runtime.docker) || typeof runtime.docker.image !== 'string'
+        || runtime.docker.image.trim().length === 0) return false
+    if (runtime.docker.digest !== undefined
+        && (typeof runtime.docker.digest !== 'string' || !/^sha256:[0-9a-f]{64}$/u.test(runtime.docker.digest))) return false
+  }
+  if (!new Set(['trusted', 'sandbox']).has(trust.mode)) return false
+  if (trust.permissions !== undefined && (!Array.isArray(trust.permissions)
+      || trust.permissions.some((value) => !new Set(['filesystem-read', 'filesystem-write', 'network', 'docker']).has(value)))) return false
+  if (manifest.capabilities !== undefined && !plain(manifest.capabilities)) return false
   return true
 }
 

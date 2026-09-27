@@ -1,9 +1,9 @@
-# HarnessEvoGym 平台化开发工作区
+# HarnessEvoGym Harbor 执行修复工作区
 
-- Purpose: 将 HarnessEvoGym 的 Algorithm、Environment 能力和独立 OfficeVal 评测做成可复用平台接口。
-- Branch: `dev/harness-evo-gym-platform`
+- Purpose: 在真正的 `lz-dev` 上完成 Harbor 任务环境的可运行执行器、逐题断点和插件兼容修复。
+- Branch: `lz-dev`
 - Status: stable
-- Base: `76925ccdadf0575705d694e007cb786e9d9d0ad6`
-- Key result: 接入 Population-compatible EvolutionAlgorithm Registry；统一重试边界；补齐环境能力兼容；独立评测支持配置、逐题落盘、输入指纹和 Resume。
-- Next step: 在新实验配置上运行 dry-run 或小规模真实评测；不要把独立评测结果当作 sealed-final 官方审计结果。
-- Verification: `npm test` 532 通过；`npm run check` 通过；`npm run test:eval` 14 通过。
+- Base: `8349c4742cbf9fa5feb07ac7fce434601107a9b5`
+- Key result: Harbor 已支持逐任务镜像、独立 verifier、资源传递、artifact 安全复制、Solver 故障分类和 Trial Checkpoint Resume；插件 SDK 清单校验与 Environment 能力接口已兼容。
+- Next step: 用真实 Harbor 任务做小规模、明确授权的 dry-run；不要直接启动大规模付费评测。
+- Verification: `npm run check` 通过；`npm run test:eval` 14/14；`npm test` 548/548；已推送 `origin/lz-dev`。

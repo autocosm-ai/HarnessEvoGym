@@ -215,6 +215,7 @@ export async function runDshSolver({
   task,
   name,
   timeoutMs,
+  resources,
   containerWorkspace = '/workspace',
 }) {
   const environment = runtimeEnvironment('/dsh-home', containerWorkspace)
@@ -251,6 +252,7 @@ export async function runDshSolver({
     secretEnvironment: modelAccess.secretEnvironment,
     inheritEnvironment: [],
     network: modelAccess.network,
+    ...(resources ? { resources } : {}),
     timeoutMs,
   })
   return {

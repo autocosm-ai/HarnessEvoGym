@@ -1142,11 +1142,99 @@ function validateOmegaUseOfficeValEnvironment({ id, spec, protocol }) {
   }
 }
 
+function harborMemoryMb(value, label) {
+  const text = expectText(value, label)
+  const match = text.match(/^([1-9]\d*)(b|k|kb|ki|m|mb|mi|g|gb|gi)$/iu)
+  if (!match) throw new ProtocolError(`${label} 必须是 Docker 支持的内存值，例如 512m 或 4g`)
+  const amount = Number(match[1])
+  const unit = match[2].toLowerCase()
+  const factor = unit === 'b' ? 1 / (1024 * 1024)
+    : ['k', 'kb', 'ki'].includes(unit) ? 1 / 1024
+      : ['g', 'gb', 'gi'].includes(unit) ? 1024 : 1
+  const megabytes = amount * factor
+  if (!Number.isFinite(megabytes) || megabytes < 16 || megabytes > 1_048_576) {
+    throw new ProtocolError(`${label} 超出 16MiB 到 1TiB 范围`)
+  }
+  return megabytes
+}
+
+function validateHarborEnvironment({ id, spec, protocol }) {
+  rejectUnknownConfiguration(spec, new Set(['protocol', 'source', 'task', 'runtime', 'docker', 'modelGateway', 'verifier', 'reward', 'feedback', 'solverFailurePolicy']), 'EnvironmentAdapter.spec')
+  const source = expectObject(spec.source, 'EnvironmentAdapter.spec.source')
+  const task = expectObject(spec.task, 'EnvironmentAdapter.spec.task')
+  const runtime = expectObject(spec.runtime, 'EnvironmentAdapter.spec.runtime')
+  const docker = expectObject(spec.docker, 'EnvironmentAdapter.spec.docker')
+  const resources = expectObject(docker.resources, 'EnvironmentAdapter.spec.docker.resources')
+  const verifier = expectObject(spec.verifier, 'EnvironmentAdapter.spec.verifier')
+  const verifierResources = expectObject(verifier.resources, 'EnvironmentAdapter.spec.verifier.resources')
+  const modelGateway = expectObject(spec.modelGateway, 'EnvironmentAdapter.spec.modelGateway')
+  const gatewayResources = expectObject(modelGateway.resources, 'EnvironmentAdapter.spec.modelGateway.resources')
+  const reward = expectObject(spec.reward, 'EnvironmentAdapter.spec.reward')
+  const feedback = expectObject(spec.feedback, 'EnvironmentAdapter.spec.feedback')
+  const solverFailurePolicy = spec.solverFailurePolicy ?? 'verified-candidate-terminal-v1'
+  if (!['pause', 'verified-candidate-terminal-v1'].includes(solverFailurePolicy)) {
+    throw new ProtocolError('Harbor solverFailurePolicy 无效')
+  }
+  rejectUnknownConfiguration(source, new Set(['tasksRoot', 'digest']), 'EnvironmentAdapter.spec.source')
+  rejectUnknownConfiguration(task, new Set(['workspacePath', 'maximumConcurrentTrials']), 'EnvironmentAdapter.spec.task')
+  rejectUnknownConfiguration(runtime, new Set(['imagePrefix']), 'EnvironmentAdapter.spec.runtime')
+  rejectUnknownConfiguration(docker, new Set(['binary', 'network', 'runAsCurrentUser', 'resources']), 'EnvironmentAdapter.spec.docker')
+  rejectUnknownConfiguration(resources, new Set(['cpus', 'memory', 'pids', 'timeoutSeconds']), 'EnvironmentAdapter.spec.docker.resources')
+  rejectUnknownConfiguration(verifier, new Set(['resources']), 'EnvironmentAdapter.spec.verifier')
+  rejectUnknownConfiguration(verifierResources, new Set(['cpus', 'memory', 'pids']), 'EnvironmentAdapter.spec.verifier.resources')
+  rejectUnknownConfiguration(modelGateway, new Set(['image', 'dockerfile', 'alias', 'port', 'egressNetwork', 'maximumRequestsPerRun', 'maximumConcurrentRequests', 'maximumUpstreamRetries', 'resources']), 'EnvironmentAdapter.spec.modelGateway')
+  rejectUnknownConfiguration(gatewayResources, new Set(['cpus', 'memory', 'pids']), 'modelGateway.resources')
+  rejectUnknownConfiguration(reward, new Set(['minimum', 'maximum', 'resolvedThreshold']), 'EnvironmentAdapter.spec.reward')
+  rejectUnknownConfiguration(feedback, new Set(['maximumTextBytesPerCase', 'maximumArtifactEntriesPerCase', 'maximumArtifactBytesPerCase', 'maximumHistoryEntries', 'maximumHistoryBytes']), 'EnvironmentAdapter.spec.feedback')
+
+  const digest = sha256Digest(source.digest, 'EnvironmentAdapter.spec.source.digest')
+  const workspacePath = expectText(task.workspacePath, 'EnvironmentAdapter.spec.task.workspacePath')
+  if (!workspacePath.startsWith('/') || workspacePath === '/' || workspacePath.includes(':') || workspacePath.includes(',') || posix.normalize(workspacePath) !== workspacePath) throw new ProtocolError('Harbor workspacePath 无效')
+  const reserved = ['/candidate', '/environment-assets', '/solver-output', '/tmp', '/run']
+  if (reserved.some((root) => workspacePath === root || workspacePath.startsWith(`${root}/`))) throw new ProtocolError('Harbor workspacePath 与保留挂载冲突')
+  const network = expectText(docker.network, 'EnvironmentAdapter.spec.docker.network')
+  if (network === 'host') throw new ProtocolError('Harbor Docker 禁止 host 网络')
+  const gatewayAlias = expectText(modelGateway.alias, 'EnvironmentAdapter.spec.modelGateway.alias')
+  if (!/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/u.test(gatewayAlias) || gatewayAlias === 'localhost') throw new ProtocolError('Model Gateway alias 无效')
+  const egressNetwork = expectText(modelGateway.egressNetwork, 'EnvironmentAdapter.spec.modelGateway.egressNetwork')
+  if (['host', 'none'].includes(egressNetwork)) throw new ProtocolError('Model Gateway egressNetwork 无效')
+  const minimum = expectNumber(reward.minimum, 'reward.minimum')
+  const maximum = expectNumber(reward.maximum, 'reward.maximum')
+  const resolvedThreshold = expectNumber(reward.resolvedThreshold, 'reward.resolvedThreshold')
+  if (minimum !== 0 || maximum !== 1 || resolvedThreshold !== 1) throw new ProtocolError('Harbor reward 必须固定为 0/1，resolvedThreshold=1')
+  const imagePrefix = expectText(runtime.imagePrefix, 'runtime.imagePrefix')
+  if (!/^[a-z0-9][a-z0-9._/-]{0,127}$/u.test(imagePrefix)) {
+    throw new ProtocolError('Harbor runtime.imagePrefix 格式无效')
+  }
+  const dockerMemoryMb = harborMemoryMb(resources.memory, 'docker.resources.memory')
+  const verifierMemoryMb = harborMemoryMb(verifierResources.memory, 'verifier.resources.memory')
+  const gatewayMemoryMb = harborMemoryMb(gatewayResources.memory, 'modelGateway.resources.memory')
+  return {
+    apiVersion: API_VERSION, kind: 'EnvironmentAdapter', id, protocol, solverFailurePolicy,
+    source: { tasksRoot: relativePath(source.tasksRoot, 'EnvironmentAdapter.spec.source.tasksRoot'), digest, revision: digest },
+    task: { workspacePath, maximumConcurrentTrials: expectNumber(task.maximumConcurrentTrials ?? 1, 'task.maximumConcurrentTrials', { integer: true, min: 1, max: 8 }) },
+    runtime: { imagePrefix },
+    docker: { binary: expectText(docker.binary, 'docker.binary'), network, runAsCurrentUser: expectBoolean(docker.runAsCurrentUser, 'docker.runAsCurrentUser'), resources: {
+      cpus: expectNumber(resources.cpus, 'docker.resources.cpus', { min: 0.1, max: 32 }), memory: expectText(resources.memory, 'docker.resources.memory'), memoryMb: dockerMemoryMb, pids: expectNumber(resources.pids, 'docker.resources.pids', { integer: true, min: 16, max: 4096 }), timeoutSeconds: expectNumber(resources.timeoutSeconds, 'docker.resources.timeoutSeconds', { integer: true, min: 1, max: 7200 }),
+    } },
+    verifier: { resources: { cpus: expectNumber(verifierResources.cpus, 'verifier.resources.cpus', { min: 0.1, max: 16 }), memory: expectText(verifierResources.memory, 'verifier.resources.memory'), memoryMb: verifierMemoryMb, pids: expectNumber(verifierResources.pids, 'verifier.resources.pids', { integer: true, min: 16, max: 1024 }) } },
+    modelGateway: { image: expectText(modelGateway.image, 'modelGateway.image'), dockerfile: relativePath(modelGateway.dockerfile, 'modelGateway.dockerfile'), alias: gatewayAlias, port: expectNumber(modelGateway.port, 'modelGateway.port', { integer: true, min: 1024, max: 65535 }), egressNetwork,
+      maximumRequestsPerRun: expectNumber(modelGateway.maximumRequestsPerRun, 'modelGateway.maximumRequestsPerRun', { integer: true, min: 1, max: 100000 }), maximumConcurrentRequests: expectNumber(modelGateway.maximumConcurrentRequests, 'modelGateway.maximumConcurrentRequests', { integer: true, min: 1, max: 64 }), maximumUpstreamRetries: expectNumber(modelGateway.maximumUpstreamRetries ?? 2, 'modelGateway.maximumUpstreamRetries', { integer: true, min: 0, max: MAXIMUM_UPSTREAM_RETRIES }), resources: {
+        cpus: expectNumber(gatewayResources.cpus, 'modelGateway.resources.cpus', { min: 0.1, max: 32 }), memory: expectText(gatewayResources.memory, 'modelGateway.resources.memory'), memoryMb: gatewayMemoryMb, pids: expectNumber(gatewayResources.pids, 'modelGateway.resources.pids', { integer: true, min: 16, max: 4096 }),
+      } },
+    reward: { minimum, maximum, resolvedThreshold },
+    feedback: { maximumTextBytesPerCase: expectNumber(feedback.maximumTextBytesPerCase, 'feedback.maximumTextBytesPerCase', { integer: true, min: 256, max: 1024 * 1024 }), maximumArtifactEntriesPerCase: expectNumber(feedback.maximumArtifactEntriesPerCase, 'feedback.maximumArtifactEntriesPerCase', { integer: true, min: 1, max: 10000 }), maximumArtifactBytesPerCase: expectNumber(feedback.maximumArtifactBytesPerCase, 'feedback.maximumArtifactBytesPerCase', { integer: true, min: 1024, max: 1024 * 1024 }), maximumHistoryEntries: expectNumber(feedback.maximumHistoryEntries, 'feedback.maximumHistoryEntries', { integer: true, min: 1, max: 100 }), maximumHistoryBytes: expectNumber(feedback.maximumHistoryBytes, 'feedback.maximumHistoryBytes', { integer: true, min: 1024, max: 1024 * 1024 }) },
+  }
+}
+
 export function validateEnvironmentAdapter(input) {
   assertApiObject(input, 'EnvironmentAdapter')
   const id = metadataId(input, 'EnvironmentAdapter')
   const spec = expectObject(input.spec, 'EnvironmentAdapter.spec')
   const protocol = expectText(spec.protocol, 'EnvironmentAdapter.spec.protocol')
+  if (protocol === 'harbor-task-v1') {
+    return validateHarborEnvironment({ id, spec, protocol })
+  }
   if (protocol === 'text-reasoning-deterministic-v1') {
     return validateTextReasoningEnvironment({ id, spec, protocol })
   }
