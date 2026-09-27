@@ -1,7 +1,7 @@
 .git
 **/.git
 .rsi
-.WorkTrees
+.worktrees
 node_modules
 **/node_modules
 .pnpm-store
