@@ -9,7 +9,7 @@
 | 本地分支 | `lz-dev` |
 | 远端分支 | `origin/lz-dev` |
 | 最新提交 | 以远端 `origin/lz-dev` 为准 |
-| 工作树 | `.WorkTrees/origin--lz-dev--开发主线` |
+| 工作树 | `.worktrees/origin--lz-dev--开发主线` |
 | 工作树状态 | 干净，已与远端同步 |
 | 项目定位 | Agent Harness 的 RSI 训练场研究预览版 |
 
