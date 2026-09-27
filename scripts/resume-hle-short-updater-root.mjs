@@ -30,12 +30,23 @@ import { loadPutnamRuntime as loadFrozenRuntime } from '../controller/src/runtim
 import { runProcess } from '../controller/src/subprocess.mjs'
 
 const DIRECT_ENV_MARKER = 'RSI_HLE_RECOVERY_DIRECT_ENV'
-const SCOPE_ROOT = '/mnt/data/hzy/03_dsh_rsi'
-const LEGACY_RUNTIME_ROOT = '/mnt/data/hzy/dsh-rsi-runtime'
-const RUNTIME_ROOT = join(SCOPE_ROOT, 'dsh-rsi-runtime')
-const SCRATCH_ROOT = join(SCOPE_ROOT, 's')
-const UPDATER_RUN_ROOT = join(SCOPE_ROOT, 'u')
-const GATEWAY_SOCKET_ROOT = join(SCOPE_ROOT, 'g')
+const REPOSITORY_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const SCOPE_ROOT = resolve(
+  process.env.RSI_HLE_SCOPE_ROOT ?? join(REPOSITORY_ROOT, '..', '.rsi'),
+)
+const LEGACY_RUNTIME_ROOT = process.env.RSI_HLE_LEGACY_RUNTIME_ROOT ?? null
+const RUNTIME_ROOT = resolve(
+  process.env.RSI_HLE_RUNTIME_ROOT ?? join(SCOPE_ROOT, 'runtime', 'hle-text-math'),
+)
+const SCRATCH_ROOT = resolve(
+  process.env.RSI_HLE_SCRATCH_ROOT ?? join(SCOPE_ROOT, 'scratch', 'hle-text-math'),
+)
+const UPDATER_RUN_ROOT = resolve(
+  process.env.RSI_HLE_UPDATER_RUN_ROOT ?? join(SCOPE_ROOT, 'updater-runs', 'hle-text-math'),
+)
+const GATEWAY_SOCKET_ROOT = resolve(
+  process.env.RSI_HLE_GATEWAY_SOCKET_ROOT ?? join(SCOPE_ROOT, 'gateway', 'hle-text-math'),
+)
 
 function withinScope(path) {
   const rel = relative(SCOPE_ROOT, resolve(path))
@@ -48,7 +59,17 @@ function requireScopedPath(path, name) {
   return resolved
 }
 
+function requireTrustedPath(path, name) {
+  const resolved = resolve(path)
+  const rel = relative(REPOSITORY_ROOT, resolved)
+  if (rel === '..' || rel.startsWith(`..${sep}`)) {
+    throw new ProtocolError(`${name} must stay below ${REPOSITORY_ROOT}`)
+  }
+  return resolved
+}
+
 function relocateRuntimePath(path) {
+  if (!LEGACY_RUNTIME_ROOT) return path
   if (path === LEGACY_RUNTIME_ROOT) return RUNTIME_ROOT
   if (typeof path === 'string' && path.startsWith(`${LEGACY_RUNTIME_ROOT}${sep}`)) {
     return join(RUNTIME_ROOT, path.slice(LEGACY_RUNTIME_ROOT.length + 1))
@@ -250,9 +271,10 @@ async function main() {
   ].includes(setting)) {
     throw new ProtocolError('Scoped HLE runner requires an approved validation-only setting')
   }
-  for (const option of ['--config', '--runtime', '--campaigns-root', '--source-root']) {
-    requireScopedPath(optionValue(args, option), option)
+  for (const option of ['--config', '--runtime', '--source-root']) {
+    requireTrustedPath(optionValue(args, option), option)
   }
+  requireScopedPath(optionValue(args, '--campaigns-root'), '--campaigns-root')
   await mkdir(GATEWAY_SOCKET_ROOT, { recursive: true, mode: 0o711 })
   await chmod(GATEWAY_SOCKET_ROOT, 0o711)
   await mkdir(UPDATER_RUN_ROOT, { recursive: true, mode: 0o711 })

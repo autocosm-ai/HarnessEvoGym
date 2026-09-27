@@ -92,7 +92,7 @@ Solver 是被评测对象：它一次只看到一道 solution-patched Lean 题�
 ## 不可变产物
 
 ```text
-/mnt/data/hzy/dsh-rsi-runtime/campaigns/<campaign-id>/
+../.rsi/runtime/putnambench-lean/campaigns/<campaign-id>/
   public/
     config.snapshot.json
     state.json

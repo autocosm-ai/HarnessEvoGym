@@ -9,14 +9,16 @@
 HLE 是 Hugging Face 门控数据。先在 Hugging Face 接受 `cais/hle` 的访问条件，再通过继承 FD 下载；不要把 token 放到命令行、环境变量或仓库：
 
 ```bash
+export RSI_RUNTIME_ROOT=../.rsi/runtime/hle-text-math
+
 python3 scripts/download-hle-text-math.py \
-  --output /mnt/data/hzy/dsh-rsi-runtime/datasets/hle-text-math/source/eligible.jsonl \
-  --hf-token-fd 3 3</secure/path/to/hf-token
+  --output "$RSI_RUNTIME_ROOT/datasets/hle-text-math/source/eligible.jsonl" \
+  --hf-token-fd 3 <path/to/hf-token-file>
 
 node benchmarks/hle-text-math/prepare-split.mjs \
-  --input /mnt/data/hzy/dsh-rsi-runtime/datasets/hle-text-math/source/eligible.jsonl \
+  --input "$RSI_RUNTIME_ROOT/datasets/hle-text-math/source/eligible.jsonl" \
   --control-root benchmarks/hle-text-math/.private \
-  --dataset-root /mnt/data/hzy/dsh-rsi-runtime/datasets/hle-text-math
+  --dataset-root "$RSI_RUNTIME_ROOT/datasets/hle-text-math"
 ```
 
 `.private/` 被 Git 忽略。准备脚本采用 write-once，不覆盖已有 manifest/store；要更换 seed 时应使用新的私有目录和 Campaign ID，避免无声改变已冻结实验。

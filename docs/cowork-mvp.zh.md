@@ -120,8 +120,8 @@ experiments/cowork-msa-rsi-linear-<mode>.json
 
 ```bash
 npm install
-export RSI_OFFICEVAL_DATASET_ROOT=/absolute/path/to/OmegaUse-OfficeVal-Dataset
-export RSI_OFFICEVAL_EVALUATOR_ROOT=/absolute/path/to/OmegaUse-OfficeVal
+export RSI_OFFICEVAL_DATASET_ROOT=../datasets/OmegaUse-OfficeVal-Dataset
+export RSI_OFFICEVAL_EVALUATOR_ROOT=../datasets/OmegaUse-OfficeVal
 export RSI_PROVIDER_BASE_URL=https://your-provider.example/v1
 read -rsp 'Provider API Key: ' RSI_PROVIDER_API_KEY && export RSI_PROVIDER_API_KEY
 

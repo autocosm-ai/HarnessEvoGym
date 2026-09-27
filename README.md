@@ -86,22 +86,23 @@ semantic validator, and Diff Guard enforce *where* it can write.
 | ----------------------- | ------------------------------------------------------------------ |
 | Harness Targets         | MSA Minimal Cowork, MSA Minimal Reasoning, DeepSeek Harness path   |
 | Updaters                | Isolated Codex CLI 0.149.1 and DeepSeek Harness                    |
-| Environments            | OmegaUse-OfficeVal, Harbor Task v1, synthetic text Reasoning, HLE/Putnam paths |
+| Environments            | OmegaUse-OfficeVal and HLE Text-only Math |
 | Population topologies   | Single, Independent, Mutualism, Competition, Combined              |
 | Module search           | Linear hill climb, progressive risk expansion, Docker strategy API |
 | Mutable risk ceilings   | Target-defined L1/L2/L3 with different files for every Harness     |
 | Reliability             | Provider retries, per-task checkpoints, explicit Resume, sealed Final |
 
-The real Cowork path uses
+The supported Cowork path uses
 [OmegaUse-OfficeVal](https://github.com/baidu-frontier-research/OmegaUse-OfficeVal).
 Of 100 upstream tasks, 91 have a registered Linux path:
 **55 feedback/train + 18 selection/validation + 18 one-time sealed final**.
 The Solver receives only the task and original Office inputs; scoring runs
 offline in a separate read-only verifier container.
 
-Synthetic text Reasoning is a connectivity test, not an HLE score. PI Agent
-files are adapter examples, not a completed integration. See
-[current boundaries](docs/architecture.md#implemented-paths-and-current-boundary) before reporting results.
+HLE is currently the text-only Math subset. Harbor, SWE-bench, PutnamBench, and
+Synthetic Text Reasoning remain experimental or compatibility paths and are not
+listed as stable environments. See [current boundaries](docs/architecture.md#implemented-paths-and-current-boundary)
+before reporting results.
 
 ## Five population modes
 
@@ -122,7 +123,7 @@ Population mode and module search are orthogonal. For example,
 Requirements: Linux, Docker, Node.js 20+, npm, and Git.
 
 ~~~bash
-git clone https://github.com/DeepThinkingZhouLiu/HarnessEvoGym.git
+git clone https://github.com/autocosm-ai/HarnessEvoGym.git
 cd HarnessEvoGym
 npm ci
 npm run check
@@ -177,8 +178,8 @@ Infrastructure failures become `PAUSED_INFRASTRUCTURE` and fail the command
 instead of masquerading as a zero-score success. `experiment resume` continues
 the same Population after the fault is repaired. Gateway request limits are
 currently scoped per Branch rather than as one Population-wide cost ceiling.
-Production HLE/PutnamBench retains its dedicated runtime and sealed broker; the
-public smoke suite is not a substitute for a production benchmark.
+HLE retains its dedicated runtime and sealed broker; the public smoke suite is
+not a substitute for a production benchmark.
 
 ## Registered five-mode Cowork suite
 
@@ -203,8 +204,8 @@ auditable runner is
 [`scripts/run-cowork-formal32-five-mode.mjs`](scripts/run-cowork-formal32-five-mode.mjs).
 
 ~~~bash
-export RSI_OFFICEVAL_DATASET_ROOT=/absolute/path/to/OmegaUse-OfficeVal-Dataset
-export RSI_OFFICEVAL_EVALUATOR_ROOT=/absolute/path/to/OmegaUse-OfficeVal
+export RSI_OFFICEVAL_DATASET_ROOT=../datasets/OmegaUse-OfficeVal-Dataset
+export RSI_OFFICEVAL_EVALUATOR_ROOT=../datasets/OmegaUse-OfficeVal
 export RSI_SUITE_MAX_CONCURRENT_MODES=2
 
 node scripts/run-cowork-formal32-five-mode.mjs

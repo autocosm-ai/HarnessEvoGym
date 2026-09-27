@@ -7,8 +7,8 @@ NODE_SHA256=14b342e71204f811bde6153be8e04b62aef63c236fef92b55f9c83154b409647
 PNPM_VERSION=11.7.0
 DEEPSEEK_HARNESS_REVISION=3289531e06e924abb790685f44baf67311f26ec9
 
-runtime_root=/mnt/data/hzy/dsh-rsi-runtime
-scratch_root=/dev/shm/dsh-rsi-hle
+runtime_root=
+scratch_root=
 repository_root=
 
 usage() {
@@ -16,8 +16,8 @@ usage() {
     'Usage: setup-hle-runtime.sh --repository-root PATH [options]' \
     '' \
     'Options:' \
-    '  --runtime-root PATH  Persistent runtime root (default: /mnt/data/hzy/dsh-rsi-runtime)' \
-    '  --scratch-root PATH  Local tmpfs root (default: /dev/shm/dsh-rsi-hle)' \
+    '  --runtime-root PATH  Persistent runtime root (default: ../.rsi/runtime/hle-text-math)' \
+    '  --scratch-root PATH  Local scratch root (default: ../.rsi/scratch/hle-text-math)' \
     '  --help'
 }
 
@@ -57,6 +57,12 @@ if [[ -z ${repository_root} || ! -f ${repository_root}/package.json ]]; then
 fi
 
 repository_root=$(realpath "$repository_root")
+if [[ -z $runtime_root ]]; then
+  runtime_root="${repository_root}/../.rsi/runtime/hle-text-math"
+fi
+if [[ -z $scratch_root ]]; then
+  scratch_root="${repository_root}/../.rsi/scratch/hle-text-math"
+fi
 runtime_root=$(realpath -m "$runtime_root")
 scratch_root=$(realpath -m "$scratch_root")
 is_within() {

@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
-import { isAbsolute, relative, resolve, sep } from 'node:path'
+import { dirname, isAbsolute, relative, resolve, sep } from 'node:path'
 
 import { mutationPolicyFromConfiguration } from './mutation.mjs'
 import { ProtocolError } from './protocol.mjs'
@@ -365,6 +365,50 @@ export function validatePutnamRuntime(input) {
   return normalized
 }
 
+function resolveRuntimePathValues(input, baseDirectory) {
+  const normalized = structuredClone(input)
+  const pathFields = [
+    ['paths', [
+      'persistentRoot', 'scratchRoot', 'datasetRoot', 'pnpmStore', 'buildHome',
+      'runtimePatch',
+    ]],
+    ['toolchain', [
+      'nodePath', 'pnpmPath', 'elanHome', 'lakePath', 'codexPath',
+    ]],
+  ]
+  for (const [section, names] of pathFields) {
+    for (const name of names) {
+      const value = normalized[section]?.[name]
+      if (typeof value === 'string' && !isAbsolute(value)) {
+        normalized[section][name] = resolve(baseDirectory, value)
+      }
+    }
+  }
+  return normalized
+}
+
+function portableRuntimeConfig(config, input, baseDirectory) {
+  const portable = structuredClone(config)
+  const pathFields = [
+    ['paths', [
+      'persistentRoot', 'scratchRoot', 'datasetRoot', 'pnpmStore', 'buildHome',
+      'runtimePatch',
+    ]],
+    ['toolchain', [
+      'nodePath', 'pnpmPath', 'elanHome', 'lakePath', 'codexPath',
+    ]],
+  ]
+  for (const [section, names] of pathFields) {
+    for (const name of names) {
+      const value = input?.[section]?.[name]
+      if (typeof value === 'string' && !isAbsolute(value)) {
+        portable[section][name] = relative(baseDirectory, resolve(baseDirectory, value)) || '.'
+      }
+    }
+  }
+  return portable
+}
+
 export async function loadPutnamRuntime(path) {
   const absolute = resolve(path)
   let input
@@ -373,9 +417,32 @@ export async function loadPutnamRuntime(path) {
   } catch (error) {
     throw new ProtocolError(`无法读取 PutnamBenchRuntime：${absolute}`, [error.message])
   }
-  const config = validatePutnamRuntime(input)
+  const relativePathFields = [
+    ['paths', [
+      'persistentRoot', 'scratchRoot', 'datasetRoot', 'pnpmStore', 'buildHome',
+      'runtimePatch',
+    ]],
+    ['toolchain', [
+      'nodePath', 'pnpmPath', 'elanHome', 'lakePath', 'codexPath',
+    ]],
+  ]
+  const absolutePathDetails = []
+  for (const [section, names] of relativePathFields) {
+    for (const name of names) {
+      if (typeof input?.[section]?.[name] === 'string'
+          && isAbsolute(input[section][name])) {
+        absolutePathDetails.push(`${section}.${name} 必须是相对 Runtime 配置文件的路径`)
+      }
+    }
+  }
+  if (absolutePathDetails.length > 0) {
+    throw new ProtocolError('Runtime 配置路径必须使用相对路径', absolutePathDetails)
+  }
+  const config = validatePutnamRuntime(resolveRuntimePathValues(input, dirname(absolute)))
+  // 指纹绑定配置语义，而不是绑定当前 checkout 的绝对目录；这样同一份仓库复制到另一台机器后仍可复用。
+  const fingerprintConfig = portableRuntimeConfig(config, input, dirname(absolute))
   const fingerprint = createHash('sha256')
-    .update(JSON.stringify(canonical(config)))
+    .update(JSON.stringify(canonical(fingerprintConfig)))
     .digest('hex')
   return { config, fingerprint, path: absolute }
 }

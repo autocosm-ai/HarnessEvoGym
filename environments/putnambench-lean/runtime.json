@@ -30,20 +30,20 @@
     "timeoutSeconds": 604800
   },
   "paths": {
-    "persistentRoot": "/mnt/data/hzy/dsh-rsi-runtime",
-    "scratchRoot": "/dev/shm/dsh-rsi",
-    "datasetRoot": "/mnt/data/hzy/dsh-rsi-runtime/datasets/PutnamBench",
-    "pnpmStore": "/mnt/data/hzy/dsh-rsi-runtime/pnpm-store",
-    "buildHome": "/mnt/data/hzy/dsh-rsi-runtime/build-home",
-    "runtimePatch": "/mnt/data/hzy/dsh-rsi-runtime/control/zcloud-max-headless.patch.yml"
+    "persistentRoot": "../../../.rsi/runtime/putnambench-lean",
+    "scratchRoot": "../../../.rsi/scratch/putnambench-lean",
+    "datasetRoot": "../../../.rsi/runtime/putnambench-lean/datasets/PutnamBench",
+    "pnpmStore": "../../../.rsi/runtime/putnambench-lean/pnpm-store",
+    "buildHome": "../../../.rsi/runtime/putnambench-lean/build-home",
+    "runtimePatch": "../../../.rsi/runtime/putnambench-lean/control/zcloud-max-headless.patch.yml"
   },
   "toolchain": {
     "nodeVersion": "24.19.0",
-    "nodePath": "/mnt/data/hzy/dsh-rsi-runtime/node-v24.19.0-linux-x64/bin/node",
+    "nodePath": "../../../.rsi/runtime/putnambench-lean/node-v24.19.0-linux-x64/bin/node",
     "pnpmVersion": "11.7.0",
-    "pnpmPath": "/mnt/data/hzy/dsh-rsi-runtime/pnpm-11.7.0/bin/pnpm",
-    "elanHome": "/mnt/data/hzy/dsh-rsi-runtime/elan",
-    "lakePath": "/mnt/data/hzy/dsh-rsi-runtime/elan/bin/lake",
+    "pnpmPath": "../../../.rsi/runtime/putnambench-lean/pnpm-11.7.0/bin/pnpm",
+    "elanHome": "../../../.rsi/runtime/putnambench-lean/elan",
+    "lakePath": "../../../.rsi/runtime/putnambench-lean/elan/bin/lake",
     "leanToolchain": "leanprover/lean4:v4.27.0",
     "bwrapPath": "/usr/bin/bwrap",
     "setprivPath": "/usr/bin/setpriv"

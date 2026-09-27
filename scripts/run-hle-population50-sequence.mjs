@@ -7,7 +7,9 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const REPOSITORY_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const SCOPE_ROOT = resolve(REPOSITORY_ROOT, '..')
+const SCOPE_ROOT = resolve(
+  process.env.RSI_HLE_SCOPE_ROOT ?? join(REPOSITORY_ROOT, '..', '.rsi'),
+)
 const CONFIG_ROOT = join(
   REPOSITORY_ROOT,
   'benchmarks',
@@ -21,15 +23,19 @@ const RUNTIME_PATH = join(
   'msa-codex-terra-high-runtime.json',
 )
 const RUNNER_PATH = join(REPOSITORY_ROOT, 'scripts', 'resume-hle-short-updater-root.mjs')
-const SOURCE_ROOT = join(SCOPE_ROOT, 'sources', 'msa-minimal-harness')
-const CAMPAIGNS_ROOT = join(SCOPE_ROOT, 'dsh-rsi-runtime', 'campaigns')
+const SOURCE_ROOT = join(REPOSITORY_ROOT, 'sources', 'msa-minimal-harness')
+const RUNTIME_ROOT = resolve(
+  process.env.RSI_HLE_RUNTIME_ROOT ?? join(SCOPE_ROOT, 'runtime', 'hle-text-math'),
+)
+const CAMPAIGNS_ROOT = join(RUNTIME_ROOT, 'campaigns')
 const OUTPUT_ROOT = join(
-  SCOPE_ROOT,
-  'dsh-rsi-runtime',
+  RUNTIME_ROOT,
   'experiments',
   'hle-math50-five-mode-terra-high',
 )
-const KEY_PATH = join(SCOPE_ROOT, 'zcloud.txt')
+const KEY_PATH = resolve(
+  process.env.RSI_PROVIDER_KEY_FILE ?? join(REPOSITORY_ROOT, '..', 'zcloud.txt'),
+)
 const RETRY_DELAY_MS = 60_000
 
 const CAMPAIGNS = Object.freeze([

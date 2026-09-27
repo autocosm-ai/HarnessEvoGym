@@ -81,7 +81,7 @@ DeepSeek 4 Flash 必须在 Provider Adapter 中使用服务端真实模型 ID；
 主表多个 Mode 必须导入同一份 Baseline Pack。启动脚本在同时运行多个 Mode 且没有配置公共 Pack 时会直接拒绝，避免五个 Mode 各自重跑出不同的 H0 轨迹和基线分数。
 
 ```bash
-RSI_BASELINE_PACK_PATH=/absolute/path/to/baseline-pack.json \
+RSI_BASELINE_PACK_PATH=../.rsi/baseline-pack.json \
 RSI_BASELINE_PACK_SHA256=<sha256> \
 RSI_SUITE_MAX_CONCURRENT_MODES=5 \
 RSI_SUITE_MAX_CONCURRENT_SOLVER_TRIALS=6 \
@@ -92,7 +92,7 @@ node scripts/run-cowork-main16-five-mode.mjs
 26 道训练集内晋升版本使用相同的公共 Pack 约束，入口是：
 
 ```bash
-RSI_BASELINE_PACK_PATH=/absolute/path/to/baseline-pack.json \
+RSI_BASELINE_PACK_PATH=../.rsi/baseline-pack.json \
 RSI_BASELINE_PACK_SHA256=<sha256> \
 RSI_SUITE_MAX_CONCURRENT_MODES=5 \
 RSI_SUITE_MAX_CONCURRENT_SOLVER_TRIALS=6 \

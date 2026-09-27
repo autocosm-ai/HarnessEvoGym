@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { isAbsolute, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 
@@ -12,7 +12,33 @@ import {
 } from '../src/runtime-config.mjs'
 import { ProtocolError } from '../src/protocol.mjs'
 
-function fixture() {
+function fixture({ relativePaths = false } = {}) {
+  const paths = relativePaths
+    ? {
+        persistentRoot: './runtime', scratchRoot: '../scratch', datasetRoot: './runtime/dataset',
+        pnpmStore: './runtime/store', buildHome: './runtime/build-home',
+        runtimePatch: './runtime/control/patch.yml',
+      }
+    : {
+        persistentRoot: '/runtime', scratchRoot: '/scratch', datasetRoot: '/runtime/dataset',
+        pnpmStore: '/runtime/store', buildHome: '/runtime/build-home',
+        runtimePatch: '/runtime/control/patch.yml',
+      }
+  const toolchain = relativePaths
+    ? {
+        nodeVersion: '24.19.0', nodePath: './runtime/node',
+        pnpmVersion: '11.7.0', pnpmPath: './runtime/pnpm',
+        elanHome: './runtime/elan', lakePath: './runtime/elan/bin/lake',
+        leanToolchain: 'leanprover/lean4:v4.27.0',
+        bwrapPath: '/usr/bin/bwrap', setprivPath: '/usr/bin/setpriv',
+      }
+    : {
+        nodeVersion: '24.19.0', nodePath: '/runtime/node',
+        pnpmVersion: '11.7.0', pnpmPath: '/runtime/pnpm',
+        elanHome: '/runtime/elan', lakePath: '/runtime/elan/bin/lake',
+        leanToolchain: 'leanprover/lean4:v4.27.0',
+        bwrapPath: '/usr/bin/bwrap', setprivPath: '/usr/bin/setpriv',
+      }
   return {
     apiVersion: 'harness-rsi/v1alpha1',
     kind: 'PutnamBenchRuntime',
@@ -31,18 +57,8 @@ function fixture() {
     gateway: { upstreamBaseUrl: 'https://api.zcloudapi.com/v1', requestTimeoutSeconds: 600 },
     verifier: { concurrency: 24, threadsPerProcess: 2, timeoutSeconds: 300 },
     testBroker: { timeoutSeconds: 604800 },
-    paths: {
-      persistentRoot: '/runtime', scratchRoot: '/scratch', datasetRoot: '/runtime/dataset',
-      pnpmStore: '/runtime/store', buildHome: '/runtime/build-home',
-      runtimePatch: '/runtime/control/patch.yml',
-    },
-    toolchain: {
-      nodeVersion: '24.19.0', nodePath: '/runtime/node',
-      pnpmVersion: '11.7.0', pnpmPath: '/runtime/pnpm',
-      elanHome: '/runtime/elan', lakePath: '/runtime/elan/bin/lake',
-      leanToolchain: 'leanprover/lean4:v4.27.0',
-      bwrapPath: '/usr/bin/bwrap', setprivPath: '/usr/bin/setpriv',
-    },
+    paths,
+    toolchain,
     identities: {
       updaterUser: 'dsh-rsi-updater', solverUser: 'dsh-rsi-solver',
       buildUser: 'dsh-rsi-build', verifierUser: 'dsh-rsi-verifier',
@@ -57,16 +73,24 @@ function fixture() {
 test('validates and fingerprints the complete frozen production runtime', async () => {
   const root = await mkdtemp(join(tmpdir(), 'runtime-config-'))
   const path = join(root, 'runtime.json')
-  const value = fixture()
+  const value = fixture({ relativePaths: true })
   await writeFile(path, JSON.stringify(value))
   const loaded = await loadPutnamRuntime(path)
-  assert.deepEqual(loaded.config, value)
+  assert.equal(loaded.config.paths.persistentRoot, join(root, 'runtime'))
+  assert.equal(loaded.config.paths.scratchRoot, join(root, '..', 'scratch'))
+  assert.equal(loaded.config.toolchain.nodePath, join(root, 'runtime', 'node'))
   assert.match(loaded.fingerprint, /^[a-f0-9]{64}$/u)
   assert.equal(
     combineCampaignFingerprint('a'.repeat(64), loaded.fingerprint, 'b'.repeat(64)),
     combineCampaignFingerprint('a'.repeat(64), loaded.fingerprint, 'b'.repeat(64)),
   )
   assert.throws(() => combineCampaignFingerprint('a'.repeat(64), loaded.fingerprint), /implementation/u)
+
+  const otherRoot = await mkdtemp(join(tmpdir(), 'runtime-config-other-'))
+  const otherPath = join(otherRoot, 'runtime.json')
+  await writeFile(otherPath, JSON.stringify(value))
+  const otherLoaded = await loadPutnamRuntime(otherPath)
+  assert.equal(otherLoaded.fingerprint, loaded.fingerprint)
 })
 
 test('Solver infrastructureRetries 与 Final 共用 0..10 的外层预算上限', () => {
@@ -84,6 +108,10 @@ test('Solver infrastructureRetries 与 Final 共用 0..10 的外层预算上限'
 
 test('repository HLE runtime freezes one-hour partitions and the low-effort judge', async () => {
   const path = fileURLToPath(new URL('../../environments/hle-text-math/runtime.json', import.meta.url))
+  const raw = JSON.parse(await readFile(path, 'utf8'))
+  assert.equal(isAbsolute(raw.paths.persistentRoot), false)
+  assert.equal(isAbsolute(raw.paths.datasetRoot), false)
+  assert.equal(isAbsolute(raw.toolchain.nodePath), false)
   const loaded = await loadPutnamRuntime(path)
   assert.equal(loaded.config.kind, 'HleTextMathRuntime')
   assert.equal(loaded.config.solver.initialConcurrency, 15)
@@ -104,6 +132,19 @@ test('repository HLE runtime freezes one-hour partitions and the low-effort judg
   ))
   const patch = await readFile(patchPath, 'utf8')
   assert.match(patch, /- id: session-title-llm\s+disabled: true/u)
+})
+
+test('rejects machine-specific absolute paths in Runtime JSON', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'runtime-relative-'))
+  const path = join(root, 'runtime.json')
+  const value = fixture({ relativePaths: true })
+  value.paths.persistentRoot = '/machine/specific/runtime'
+  await writeFile(path, JSON.stringify(value))
+  await assert.rejects(
+    () => loadPutnamRuntime(path),
+    (error) => error instanceof ProtocolError
+      && error.details.some((detail) => detail.includes('paths.persistentRoot')),
+  )
 })
 
 test('MSA runtime leaves Solver-owned model budgets unfrozen', async () => {

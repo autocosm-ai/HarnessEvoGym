@@ -17,10 +17,9 @@ Environment 定义题目与评分，EvolutionRecipe 组合五种 Population Mode
 | 组合                         | Branch 执行层                    | 环境与隔离                                                   | 搜索形式                         |
 |------------------------------|----------------------------------|--------------------------------------------------------------|----------------------------------|
 | MSA Cowork + OfficeVal      | 通用 Cowork Branch Driver         | Office 镜像、无网独立 Verifier、Docker internal network        | Recipe + SearchStrategy          |
-| MSA Text Reasoning smoke     | 同一 Cowork Branch Driver          | 固定文本题、受信精确匹配、Docker internal network                | 同一 Recipe + SearchStrategy      |
-| HZY Reasoning production    | 兼容 Reasoning Branch Driver       | 宿主独立 UID、bubblewrap、Unix gateway、sealed broker              | 旧 Campaign 配置映射到五种 Mode       |
+| MSA + HLE Text-only Math    | HLE Partition Runner              | 独立 UID、bubblewrap、Unix gateway、sealed broker                | Campaign 配置映射到五种 Mode     |
 
-Experiment 的 Chat Completions 网关生命周期在 `cowork-model-gateway.mjs`；HZY 生产 Reasoning 的 Responses/Unix-socket
+Experiment 的 Chat Completions 网关生命周期在 `cowork-model-gateway.mjs`；HLE 的 Responses/Unix-socket
 网关仍在 `model-gateway.mjs`。这两个文件分别对应 OpenAI Chat Completions Docker 隔离和
 OpenAI Responses/Anthropic Messages 宿主隔离，不是同一协议的重复实现。
 新 Experiment 可以用 `adapters.providers.solver/updater` 为两个角色独立选 Provider，
@@ -73,10 +72,10 @@ Factory 由可信启动代码在同一进程、校验和运行之前注册；CLI
 
 ## 运行目录
 
-生产 PutnamBench Campaign 的可变状态位于 Git 工作区之外。仓库、持久化根与临时根必须两两分离；sealed test 子树不会挂载进任何非可信阶段。默认开发机布局是：
+OfficeVal 与 HLE Campaign 的可变状态位于 Git 工作区之外。仓库、持久化根与临时根必须两两分离；sealed test 子树不会挂载进任何非可信阶段。Runtime JSON 只写相对路径，默认解析到仓库旁边的 `.rsi/`：
 
 ```text
-/mnt/data/hzy/03_dsh_rsi/dsh-rsi-runtime/
+../.rsi/runtime/hle-text-math/
   campaigns/<campaign-id>/
     public/                 # 可恢复状态、摘要、提案、不透明 test receipt
     private/                # 验证逐题结果、Trace 与 Checkpoint
@@ -85,12 +84,12 @@ Factory 由可信启动代码在同一进程、校验和运行之前注册；CLI
     report/                 # Campaign 关闭后才生成
   runtimes/<campaign-id>/   # 指向冻结评测实例的受信别名
   runtime-cache/v1/<sha256>/ # 经证明的内容寻址冻结构建
-  datasets/PutnamBench/     # 固定的数据与 mathlib 工程
+  datasets/                 # 固定的数据与评测输入
   trusted-baseline/         # 预构建的固定 Harness Source
   pnpm-store/               # root 持有的离线构建输入
   control/                  # 经字节校验的 runtime patch
 
-/mnt/data/hzy/03_dsh_rsi/s/
+../.rsi/scratch/hle-text-math/
   <campaign-id>/            # 可丢弃的 Updater 与评测工作区
 ```
 
@@ -108,7 +107,7 @@ Candidate 源码摘要、Benchmark、固定 Node/pnpm 版本、构建配方、�
 
 ## 变异边界
 
-MSA Cowork 和 Text Reasoning 的通用 Experiment 执行面使用
+OfficeVal 的通用 Experiment 执行面使用
 `MutationCatalog -> MutationPlan -> MutationLease -> full Diff Guard`。
 L1/L2/L3 是风险上限，Catalog Region 是某个 Target 自己的可搜索模块。策略只能返回
 Region ID，路径由 Controller 从受信 Target Adapter 中翻译。外部策略使用无网络、无挂载、
@@ -134,15 +133,15 @@ L1、L2、L3 是 Target Adapter 的语义，不应假设所有 Agent 目录相�
 
 Feedback Packet 应包含聚合指标、代表性成功/失败案例、Trajectory、Verifier 输出、成本、延迟和环境信息，但不提前写死失败因果。Updater 负责从跨案例证据中判断应该改变哪种策略或实现。
 
-当前 PutnamBench 策略使用一个自适应验证 Partition 与一个操作上隐藏的 Test Partition。只有验证集 Lean kernel verified count 严格增加才能晋升。每个点仍会测 Test，但 Test 不能影响晋升、回滚、重试、层级切换或停止。Candidate 只能影响解题过程，不能影响题目、最终评分、资源计量或晋升规则。
+当前 HLE 策略使用一个可反馈的 validation Partition 与一个操作上隐藏的 test Partition。只有 validation 分数严格增加才能晋升；test 不能影响晋升、回滚、重试、层级切换或停止。Candidate 只能影响解题过程，不能影响题目、最终评分、资源计量或晋升规则。
 
 ## Benchmark 与双层评测
 
-生产 Adapter 面向 PutnamBench-Lean。Manifest 固定数据集、Lean、mathlib、Harness Revision、模型契约，以及两个按完整年份切开的 Partition：500 道验证题和 172 道测试题。验证分数与 Trace 可以进入下一轮 Updater。主 Controller 只加载验证题 ID；只有独立 Broker 子进程会打开并校验测试 Manifest，并把逐题结果写进 sealed vault。Campaign 关闭前，父进程只能得到不透明完成回执。
+当前稳定评测 Adapter 面向 OmegaUse-OfficeVal 与 HLE Text-only Math。OfficeVal 使用隔离的 Office 工作区和独立 Verifier；HLE 固定数据集 revision、validation/test manifest 与 Judge。验证分数与 Trace 可以进入下一轮 Updater；测试题、答案和逐题结果只由 sealed Broker 处理，Campaign 关闭前父进程只能得到不透明完成回执。
 
 Solver 给出主定理的 proof replacement。独立可信重放把证明放回冻结题面模板，再交给固定 Lean kernel 编译；占位证明、新公理、改题面、危险文件类型和越界写入都会被拒绝。因此，模型可以在没有人工失败分类器的情况下选择变异，而正确性仍由客观内核裁定。
 
-通用标准结果与三 Partition API 仍可用于 Adapter 实验；SWE-bench YAML 目前只是契约占位，不属于已经实现的 PutnamBench 生产路径。
+通用标准结果与 Partition API 仍可用于 Adapter 实验；Harbor、SWE-bench、PutnamBench 与 Synthetic Text Reasoning 目前只是实验性或兼容路径，不属于稳定支持环境。
 
 ## 子模块更新语义
 
@@ -153,11 +152,9 @@ Solver 给出主定理的 proof replacement。独立可信重放把证明放回�
 共享控制平面现已包括：冻结 Manifest、可注册 Source Resolver、Source+Seed Candidate 实例化、
 可配置 L1/L2/L3 Diff 边界、Mutation Catalog/Plan/Lease、内置与沙箱 SearchStrategy、
 可注册 EvolutionAlgorithm、通用 Population/Branch 协议、单 Session 变异、Candidate 构建、逐题 Checkpoint、验证反馈、
-权限租约和实现/Runtime 证明。HZY 原有生产 Reasoning 链路继续提供仅子进程可见的
-sealed test、严格晋升/回滚、崩溃恢复、单写者锁、FD 凭据和关闭后的完整报告。
+权限租约和实现/Runtime 证明。HLE 链路继续提供仅子进程可见的 sealed test、严格晋升/回滚、崩溃恢复、单写者锁、FD 凭据和关闭后的完整报告。
 
-通用 Experiment 已证明 MSA Minimal 在 Cowork 和 Text Reasoning 两个 Environment 上共用
-五种 Mode 与 SearchStrategy。Text Reasoning 只是工程冒烟，HLE 生产评测仍使用其专用隔离链路；
+通用 Experiment 已证明 MSA Minimal 在 OfficeVal 上共用五种 Mode 与 SearchStrategy；HLE 使用专用的 sealed Partition Runner；
 通用 Population 遇到基础设施异常会 fail-closed 并写入 `PAUSED_INFRASTRUCTURE`。Cowork
 Population 已提供同 Controller Revision 下的跨进程 Resume，以及关闭后一次性 sealed Final；
 恢复会校验冻结 Bundle/Candidate，归档不完整产物，并继续累计失败尝试的资源账本。

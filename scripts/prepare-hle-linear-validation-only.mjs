@@ -2,9 +2,13 @@
 
 import { createHash } from 'node:crypto'
 import { chmod, mkdir, readFile, writeFile } from 'node:fs/promises'
-import { join, relative, resolve, sep } from 'node:path'
+import { dirname, join, relative, resolve, sep } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
-const SCOPE_ROOT = '/mnt/data/hzy/03_dsh_rsi'
+const REPOSITORY_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const SCOPE_ROOT = resolve(
+  process.env.RSI_HLE_SCOPE_ROOT ?? join(REPOSITORY_ROOT, '..', '.rsi'),
+)
 const INSTANCE_ID = /^hle_[a-f0-9]{24}$/u
 
 function scoped(path, label) {

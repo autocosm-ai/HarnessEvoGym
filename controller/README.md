@@ -18,6 +18,7 @@ Controller 是 RSI 系统的可信、确定性控制平面。Updater 负责开�
 | `src/factories.mjs`            | 按 Adapter Protocol 解析 Solver/Updater/Environment Driver  |
 | `src/runtimes/dsh.mjs`         | DSH Runtime 构建、Solver 与 Updater Session                 |
 | `src/environments/omegause-officeval.mjs` | OfficeVal Task、Submission、Verifier 与 Reward |
+| `src/hle-partition-runner.mjs`           | HLE Text-only Math 的 Solver、Judge 与 sealed Partition |
 | `src/model-gateway.mjs`        | Reasoning Responses/Unix-socket 网关与凭据隔离          |
 | `src/cowork-model-gateway.mjs` | Cowork Docker 内部网、一次性令牌、Usage 与清理    |
 | `src/feedback.mjs`             | feedback-only 脱敏反馈包                                    |
@@ -82,8 +83,8 @@ Dataset/Evaluator Revision、题目文件 SHA-256、Docker 和网关所需环境
 `ModelProviderAdapter` 统一声明上游协议、凭据环境变量名、兼容参数与模型目录；Experiment 分别选择 Solver/Updater 的模型。DSH Runtime 将它翻译为 `llm-pi-ai` 配置。其他 Agent Runtime 未来应读同一 Provider Adapter，不复制凭据管理逻辑。
 
 Solver、Updater 和 Environment 的“实现创建”已通过 `factories.mjs` 中带版本的 Driver
-Registry 隔离，不再在主编排循环写协议分支。当前已跑通 MSA Minimal +
-OmegaUse-OfficeVal；真正接 pi-agent 时，还需同时补它的 Adapter Schema、
+Registry 隔离，不再在主编排循环写协议分支。当前稳定评测路径是 MSA Minimal +
+OmegaUse-OfficeVal 与 HLE Text-only Math；真正接 pi-agent 时，还需同时补它的 Adapter Schema、
 Source/Materialization 生命周期和 Driver 注册，不是只注册一个函数就能运行。
 
 Driver 能执行和挂载工作区，因此必须作为受审查的 Controller 代码；只做搜索决策的外部
@@ -95,5 +96,5 @@ Strategy 才可以使用沙箱镜像。EvolutionAlgorithm 通过 `spec.algorithm
 
 Environment 可通过 `describeCapabilities()` 声明分区、反馈、隐藏测试、按题重试和
 Checkpoint 恢复能力。Final 执行据此决定能否按题重试；旧 Driver 的
-`supportsTaskInfrastructureRetries` 保持兼容。OfficeVal 支持按题恢复，Text Reasoning
-冒烟环境暂不支持，不会再把它误报为可复用逐题结果。
+`supportsTaskInfrastructureRetries` 保持兼容。OfficeVal 支持按题恢复，HLE 使用自己的
+sealed Partition Runner；其他实验性环境不会被误报为稳定可复用的逐题结果。

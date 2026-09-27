@@ -34,20 +34,20 @@
     "timeoutSeconds": 7200
   },
   "paths": {
-    "persistentRoot": "/mnt/data/hzy/03_dsh_rsi/dsh-rsi-runtime",
-    "scratchRoot": "/dev/shm/dsh-rsi-hle",
-    "datasetRoot": "/mnt/data/hzy/03_dsh_rsi/dsh-rsi-runtime/datasets/hle-text-math",
-    "pnpmStore": "/mnt/data/hzy/03_dsh_rsi/dsh-rsi-runtime/pnpm-store",
-    "buildHome": "/mnt/data/hzy/03_dsh_rsi/dsh-rsi-runtime/build-home",
-    "runtimePatch": "/mnt/data/hzy/03_dsh_rsi/dsh-rsi-runtime/control/hle-dashscope-qwen38-max-headless.patch.yml"
+    "persistentRoot": "../../../.rsi/runtime/hle-text-math",
+    "scratchRoot": "../../../.rsi/scratch/hle-text-math",
+    "datasetRoot": "../../../.rsi/runtime/hle-text-math/datasets/hle-text-math",
+    "pnpmStore": "../../../.rsi/runtime/hle-text-math/pnpm-store",
+    "buildHome": "../../../.rsi/runtime/hle-text-math/build-home",
+    "runtimePatch": "../../../.rsi/runtime/hle-text-math/control/hle-dashscope-qwen38-max-headless.patch.yml"
   },
   "toolchain": {
     "nodeVersion": "24.19.0",
-    "nodePath": "/mnt/data/hzy/03_dsh_rsi/dsh-rsi-runtime/node-v24.19.0-linux-x64/bin/node",
+    "nodePath": "../../../.rsi/runtime/hle-text-math/node-v24.19.0-linux-x64/bin/node",
     "pnpmVersion": "11.7.0",
-    "pnpmPath": "/mnt/data/hzy/03_dsh_rsi/dsh-rsi-runtime/pnpm-11.7.0/bin/pnpm",
-    "elanHome": "/mnt/data/hzy/03_dsh_rsi/dsh-rsi-runtime/elan",
-    "lakePath": "/mnt/data/hzy/03_dsh_rsi/dsh-rsi-runtime/elan/bin/lake",
+    "pnpmPath": "../../../.rsi/runtime/hle-text-math/pnpm-11.7.0/bin/pnpm",
+    "elanHome": "../../../.rsi/runtime/hle-text-math/elan",
+    "lakePath": "../../../.rsi/runtime/hle-text-math/elan/bin/lake",
     "leanToolchain": "unused-for-hle",
     "bwrapPath": "/usr/bin/bwrap",
     "setprivPath": "/usr/bin/setpriv"

@@ -18,11 +18,10 @@ combine population coordination with module search.
 | Composition                 | Branch execution                 | Environment isolation                                      | Search                         |
 |-----------------------------|----------------------------------|------------------------------------------------------------|--------------------------------|
 | MSA Cowork + OfficeVal      | Generic Cowork Branch Driver     | Office runtime, offline Verifier, Docker internal network  | Recipe + SearchStrategy        |
-| MSA Text Reasoning smoke    | Same Cowork Branch Driver        | Pinned text tasks, exact verifier, Docker internal network | Same Recipe + SearchStrategy   |
-| HZY Reasoning production    | Compatibility Reasoning Driver   | Distinct UIDs, bubblewrap, Unix gateway, sealed broker     | Legacy config mapped to modes  |
+| MSA + HLE Text-only Math    | HLE Partition Runner             | Distinct UIDs, bubblewrap, Unix gateway, sealed broker     | Campaign mapped to modes       |
 
 Experiment Chat Completions gateway lifecycle is implemented by
-`cowork-model-gateway.mjs`; the HZY production Reasoning Responses/Unix-socket
+`cowork-model-gateway.mjs`; the HLE Responses/Unix-socket
 gateway remains in `model-gateway.mjs`. They
 serve different provider and isolation contracts rather than duplicating one
 protocol.
@@ -76,10 +75,10 @@ pin Source Revision
 
 ## Runtime layout
 
-The production PutnamBench campaign keeps mutable state outside the Git checkout. Repository, persistent root, and scratch root must be pairwise disjoint; the sealed-test subtree is never mounted into an untrusted phase. The default deployment uses:
+OfficeVal and HLE campaigns keep mutable state outside the Git checkout. The repository, persistent root, and scratch root must be pairwise disjoint; the sealed-test subtree is never mounted into an untrusted phase. Runtime JSON uses relative paths and resolves them beside the repository into `.rsi/`:
 
 ```text
-/mnt/data/hzy/03_dsh_rsi/dsh-rsi-runtime/
+../.rsi/runtime/hle-text-math/
   campaigns/<campaign-id>/
     public/                 # resumable state, summaries, proposals, opaque receipts
     private/                # validation records, traces, and per-task checkpoints
@@ -88,12 +87,12 @@ The production PutnamBench campaign keeps mutable state outside the Git checkout
     report/                 # emitted only after campaign closure
   runtimes/<campaign-id>/   # trusted aliases for frozen evaluation instances
   runtime-cache/v1/<sha256>/ # attested, content-addressed frozen builds
-  datasets/PutnamBench/     # pinned source and mathlib project
+  datasets/                 # pinned data and evaluation inputs
   trusted-baseline/         # prebuilt pinned Harness source
   pnpm-store/               # root-owned offline build inputs
   control/                  # attested runtime patch
 
-/mnt/data/hzy/03_dsh_rsi/s/
+../.rsi/scratch/hle-text-math/
   <campaign-id>/            # disposable Updater/evaluation workspaces
 ```
 
@@ -145,15 +144,15 @@ L1, L2, and L3 are Target Adapter semantics rather than universal directories. A
 
 A Feedback Packet contains aggregate metrics, representative successes and failures, trajectories, verifier outputs, cost, latency, and environment facts without prescribing a fixed causal taxonomy. The Updater infers the change from evidence across cases.
 
-The implemented PutnamBench policy uses one adaptive validation partition and one operationally hidden test partition. Promotion is based exclusively on a strict increase in validation Lean-kernel verified count. Test is measured for every point but cannot affect promotion, rollback, retries, level changes, or stopping. A Candidate may affect task-solving behavior but never tasks, final scoring, resource accounting, or promotion rules.
+The implemented HLE policy uses one feedback validation partition and one operationally hidden test partition. Promotion is based exclusively on a strict validation increase. Test cannot affect promotion, rollback, retries, level changes, or stopping. A Candidate may affect task-solving behavior but never tasks, final scoring, resource accounting, or promotion rules.
 
 ## Benchmark and two-level evaluation
 
-The production adapter targets PutnamBench-Lean. Its manifest pins the dataset, Lean, mathlib, Harness revision, model contract, and two whole-year partitions: 500 validation problems and 172 test problems. Validation score and traces are available to the next Updater session. The main Controller loads validation IDs only; a dedicated broker child alone opens and validates the test manifest and writes per-task results to the sealed vault. Before closure the parent receives only an opaque completion receipt.
+The stable adapters target OmegaUse-OfficeVal and HLE Text-only Math. OfficeVal uses isolated Office workspaces and a separate verifier; HLE pins the dataset revision, validation/test manifests, and judge. Before closure the parent receives only an opaque sealed-Broker completion receipt.
 
 The Solver proposes a replacement for the theorem proof. A separate trusted replay reconstructs that proof in the frozen source template and asks the pinned Lean kernel to compile it. It rejects placeholders, new axioms, changed statements, unsafe file types, and out-of-bound writes. Thus the model chooses mutations without a human-authored failure classifier while correctness remains objective.
 
-The generic normalized-result and three-partition APIs remain available for adapter experiments, and the SWE-bench YAML is still a contract stub; it is not part of the implemented PutnamBench production path.
+The generic normalized-result and partition APIs remain available for adapter experiments. Harbor, SWE-bench, PutnamBench, and Synthetic Text Reasoning remain experimental or compatibility paths rather than stable environments.
 
 ## Submodule update semantics
 
@@ -166,11 +165,10 @@ Source-plus-Seed Candidate materialization, configurable L1/L2/L3 diff
 enforcement, Mutation Catalog/Plan/Lease, registered EvolutionAlgorithm, builtin and sandboxed SearchStrategy,
 generic Population/Branch protocols, one-session mutations, Candidate builds,
 per-task checkpoints, validation feedback, permission leases, and
-implementation/runtime attestation. The existing HZY production-Reasoning path
-continues to provide child-only sealed tests, strict promotion and rollback,
+implementation/runtime attestation. The HLE path provides child-only sealed tests, strict promotion and rollback,
 crash recovery, single-writer locking, FD-only credentials, and post-closure
 reports. Generic Experiments prove that MSA Minimal can reuse all five modes and
-one SearchStrategy across Cowork and text Reasoning. They fail closed into
+one SearchStrategy on OfficeVal; HLE uses its dedicated sealed Partition Runner. They fail closed into
 `PAUSED_INFRASTRUCTURE`. Cowork Populations support same-Controller-revision
 cross-process resume and one-time sealed final after closure. Resume revalidates
 the frozen Bundle and Candidates, archives incomplete artifacts, and retains the

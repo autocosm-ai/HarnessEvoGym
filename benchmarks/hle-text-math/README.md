@@ -9,14 +9,16 @@ The evaluated Solver baseline is the pinned DSH `minimal` preset in restricted-m
 HLE is gated on Hugging Face. Accept the `cais/hle` access terms first, then download through an inherited file descriptor. Do not put the token in the command line, environment, or repository:
 
 ```bash
+export RSI_RUNTIME_ROOT=../.rsi/runtime/hle-text-math
+
 python3 scripts/download-hle-text-math.py \
-  --output /mnt/data/hzy/dsh-rsi-runtime/datasets/hle-text-math/source/eligible.jsonl \
-  --hf-token-fd 3 3</secure/path/to/hf-token
+  --output "$RSI_RUNTIME_ROOT/datasets/hle-text-math/source/eligible.jsonl" \
+  --hf-token-fd 3 <path/to/hf-token-file>
 
 node benchmarks/hle-text-math/prepare-split.mjs \
-  --input /mnt/data/hzy/dsh-rsi-runtime/datasets/hle-text-math/source/eligible.jsonl \
+  --input "$RSI_RUNTIME_ROOT/datasets/hle-text-math/source/eligible.jsonl" \
   --control-root benchmarks/hle-text-math/.private \
-  --dataset-root /mnt/data/hzy/dsh-rsi-runtime/datasets/hle-text-math
+  --dataset-root "$RSI_RUNTIME_ROOT/datasets/hle-text-math"
 ```
 
 The `.private/` directory is ignored by Git. Preparation is write-once; use a fresh private directory and campaign ID to change the seed instead of silently changing a frozen experiment.

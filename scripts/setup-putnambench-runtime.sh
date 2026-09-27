@@ -12,8 +12,8 @@ LEAN_TOOLCHAIN=leanprover/lean4:v4.27.0
 PUTNAMBENCH_REVISION=dfb0a47a1c1ec3a10f2a9acfdf41a2043920f33c
 DEEPSEEK_HARNESS_REVISION=3289531e06e924abb790685f44baf67311f26ec9
 
-runtime_root=/mnt/data/hzy/dsh-rsi-runtime
-scratch_root=/dev/shm/dsh-rsi
+runtime_root=
+scratch_root=
 repository_root=
 
 usage() {
@@ -21,8 +21,8 @@ usage() {
     'Usage: setup-putnambench-runtime.sh --repository-root PATH [options]' \
     '' \
     'Options:' \
-    '  --runtime-root PATH       Persistent runtime root (default: /mnt/data/hzy/dsh-rsi-runtime)' \
-    '  --scratch-root PATH       Local tmpfs scratch root (default: /dev/shm/dsh-rsi)' \
+    '  --runtime-root PATH       Persistent runtime root (default: ../.rsi/runtime/putnambench-lean)' \
+    '  --scratch-root PATH       Local scratch root (default: ../.rsi/scratch/putnambench-lean)' \
     '  Egress isolation is mandatory and is always installed for untrusted UIDs.' \
     '  --help'
 }
@@ -63,6 +63,12 @@ if [[ -z ${repository_root} || ! -f ${repository_root}/package.json ]]; then
 fi
 
 repository_root=$(realpath "$repository_root")
+if [[ -z $runtime_root ]]; then
+  runtime_root="${repository_root}/../.rsi/runtime/putnambench-lean"
+fi
+if [[ -z $scratch_root ]]; then
+  scratch_root="${repository_root}/../.rsi/scratch/putnambench-lean"
+fi
 runtime_root=$(realpath -m "$runtime_root")
 scratch_root=$(realpath -m "$scratch_root")
 is_within() {
