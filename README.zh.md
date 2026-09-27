@@ -111,6 +111,10 @@ Updater 可以分析失败原因、提出假设、修改代码并做自检；Con
 
 配置文件、数据集和运行产物互相分离。任何密钥都通过运行时 FD 注入，不写入配置、日志、Trace 或 Candidate。
 
+Codex/Claude Code 的宿主 CLI 安装目录也不写入仓库。运行前设置
+`RSI_*_DISTRIBUTION_ROOT`、`RSI_NODE_BINARY`、`RSI_BWRAP_PATH` 和
+`RSI_SETPRIV_PATH`；Controller 会在真正启动 Updater 前解析并核验这些路径、版本和 distribution 摘要。
+
 ## 快速开始
 
 需要 Linux、Docker、Node.js 20+、npm 和 Git。

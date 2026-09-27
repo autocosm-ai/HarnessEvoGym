@@ -143,7 +143,7 @@ export function createClaudeCodeUpdaterDriver({
         })
         const invocation = buildUpdaterInvocation({
           backend: 'claude-code-cli',
-          nodeBinary: updater.runtime.nodeBinary,
+          nodeBinary: runtime.nodeBinary,
           updaterRuntime: runtime.distributionRoot,
           claudeCodePath: runtime.executable,
           claudeCodeDistributionRoot: runtime.distributionRoot,
@@ -169,8 +169,8 @@ export function createClaudeCodeUpdaterDriver({
           outputRoot: options.outputDirectory,
           evolutionLogPath,
           peerLogs: [],
-          bwrapPath: updater.runtime.bwrapPath,
-          setprivPath: updater.runtime.setprivPath,
+          bwrapPath: runtime.bwrapPath,
+          setprivPath: runtime.setprivPath,
           preserveSupplementaryGroups: true,
           baseEnv: {
             PATH: '/usr/local/bin:/usr/bin:/bin',

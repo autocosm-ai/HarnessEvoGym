@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { createReadStream } from 'node:fs'
 import { lstat, readFile, readdir, realpath } from 'node:fs/promises'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { ProtocolError } from './protocol.mjs'
 import { runProcess } from './process.mjs'
@@ -12,6 +12,18 @@ export const EXECUTION_PATHS = Object.freeze([
   'controller/src', 'docker', 'strategies', 'scripts', 'package.json', 'package-lock.json',
 ])
 const hash = (value) => createHash('sha256').update(value).digest('hex')
+const HOST_PATH_REFERENCE = /^\$\{([A-Z][A-Z0-9_]*)\}(\/.*)?$/u
+
+function resolveHostRuntimePath(value, label) {
+  if (isAbsolute(value)) return value
+  const match = HOST_PATH_REFERENCE.exec(value)
+  if (!match) throw new ResumeCompatibilityError(`${label} 不是有效的主机路径引用`)
+  const root = process.env[match[1]]
+  if (!root || !isAbsolute(root)) {
+    throw new ResumeCompatibilityError(`${label} 所需环境变量未设置为绝对路径`, [match[1]])
+  }
+  return match[2] ? resolve(root, `.${match[2]}`) : root
+}
 
 export class ResumeCompatibilityError extends ProtocolError {
   constructor(message, details = []) {
@@ -35,7 +47,10 @@ export async function binaryContentIdentity(path) {
 export async function captureRuntimeInputs(bundle) {
   const hostBinaries = {}
   for (const key of ['nodeBinary', 'bwrapPath', 'setprivPath']) {
-    if (bundle.updater.runtime?.[key]) hostBinaries[key] = await binaryContentIdentity(bundle.updater.runtime[key])
+    if (bundle.updater.runtime?.[key]) {
+      const pathValue = resolveHostRuntimePath(bundle.updater.runtime[key], `Runtime.${key}`)
+      hostBinaries[key] = await binaryContentIdentity(pathValue)
+    }
   }
   // 只摘要实际 Endpoint；不读取 API Key，Endpoint 中即使有敏感信息也不落正文。
   const providerEndpoints = {}

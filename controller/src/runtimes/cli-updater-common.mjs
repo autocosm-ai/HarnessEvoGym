@@ -1,13 +1,25 @@
 import { createHash } from 'node:crypto'
 import { createReadStream } from 'node:fs'
 import { lstat, readdir, realpath } from 'node:fs/promises'
-import { join, relative, sep } from 'node:path'
+import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 
 import { ProtocolError, readJsonFile } from '../protocol.mjs'
 import { runProcess } from '../subprocess.mjs'
 import { UPDATER_SANDBOX_PATHS } from '../updater-runner.mjs'
 
 const REPORT_MAXIMUM_BYTES = 256 * 1024
+const HOST_PATH_REFERENCE = /^\$\{([A-Z][A-Z0-9_]*)\}(\/.*)?$/u
+
+function resolveHostRuntimePath(value, label) {
+  if (isAbsolute(value)) return value
+  const match = HOST_PATH_REFERENCE.exec(value)
+  if (!match) throw new ProtocolError(`${label} 不是绝对路径或有效的主机路径引用`)
+  const root = process.env[match[1]]
+  if (!root || !isAbsolute(root)) {
+    throw new ProtocolError(`${label} 所需环境变量未设置为绝对路径`, [match[1]])
+  }
+  return match[2] ? resolve(root, `.${match[2]}`) : root
+}
 
 function inside(parent, child) {
   const rel = relative(parent, child)
@@ -67,16 +79,24 @@ export async function inspectCliUpdaterRuntime(runtime, {
   versionArgs,
   expectedVersionOutput,
 }) {
+  const resolvedRuntime = {
+    ...runtime,
+    executable: resolveHostRuntimePath(runtime.executable, `${label} executable`),
+    distributionRoot: resolveHostRuntimePath(runtime.distributionRoot, `${label} distribution`),
+    nodeBinary: resolveHostRuntimePath(runtime.nodeBinary, `${label} Node runtime`),
+    bwrapPath: resolveHostRuntimePath(runtime.bwrapPath, `${label} Bubblewrap`),
+    setprivPath: resolveHostRuntimePath(runtime.setprivPath, `${label} setpriv`),
+  }
   const [executable, distributionRoot] = await Promise.all([
-    realpath(runtime.executable),
-    realpath(runtime.distributionRoot),
+    realpath(resolvedRuntime.executable),
+    realpath(resolvedRuntime.distributionRoot),
   ])
   await Promise.all([
     regularPath(executable, `${label} executable`),
     regularPath(distributionRoot, `${label} distribution`, 'directory'),
-    regularPath(runtime.nodeBinary, `${label} Node runtime`),
-    regularPath(runtime.bwrapPath, `${label} Bubblewrap`),
-    regularPath(runtime.setprivPath, `${label} setpriv`),
+    regularPath(resolvedRuntime.nodeBinary, `${label} Node runtime`),
+    regularPath(resolvedRuntime.bwrapPath, `${label} Bubblewrap`),
+    regularPath(resolvedRuntime.setprivPath, `${label} setpriv`),
   ])
   if (!inside(distributionRoot, executable)) {
     throw new ProtocolError(`${label} executable 不在固定 distribution 内`)
@@ -96,7 +116,7 @@ export async function inspectCliUpdaterRuntime(runtime, {
     ])
   }
   const version = await checkedProcess({
-    command: versionCommand(executable),
+    command: versionCommand(executable, resolvedRuntime),
     args: versionArgs(executable),
     cwd: distributionRoot,
     env: { PATH: '/usr/local/bin:/usr/bin:/bin', LANG: 'C.UTF-8', LC_ALL: 'C.UTF-8' },
@@ -112,6 +132,9 @@ export async function inspectCliUpdaterRuntime(runtime, {
   return Object.freeze({
     executable,
     distributionRoot,
+    nodeBinary: resolvedRuntime.nodeBinary,
+    bwrapPath: resolvedRuntime.bwrapPath,
+    setprivPath: resolvedRuntime.setprivPath,
     version: runtime.version,
     distributionDigest: actualDigest,
   })

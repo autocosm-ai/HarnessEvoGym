@@ -61,10 +61,12 @@ function validateRuntime(raw, label) {
   }
 }
 
-function absoluteRuntimePath(value, label) {
+const HOST_PATH_REFERENCE = /^\$\{[A-Z][A-Z0-9_]*\}(?:\/[A-Za-z0-9._+-]+)*$/u
+
+function hostRuntimePath(value, label) {
   const pathValue = expectText(value, label)
-  if (!isAbsolute(pathValue) || pathValue.includes('\0')) {
-    throw new ProtocolError(`${label} 必须是绝对路径`)
+  if (pathValue.includes('\0') || (!isAbsolute(pathValue) && !HOST_PATH_REFERENCE.test(pathValue))) {
+    throw new ProtocolError(`${label} 必须是绝对路径或 ${'${ENV_NAME}'} 主机路径引用`)
   }
   return pathValue
 }
@@ -84,11 +86,11 @@ function validateCodexUpdaterRuntime(raw, label) {
     throw new ProtocolError(`${label}.version 必须是固定语义版本`)
   }
   return {
-    executable: absoluteRuntimePath(runtime.executable, `${label}.executable`),
-    distributionRoot: absoluteRuntimePath(runtime.distributionRoot, `${label}.distributionRoot`),
-    nodeBinary: absoluteRuntimePath(runtime.nodeBinary, `${label}.nodeBinary`),
-    bwrapPath: absoluteRuntimePath(runtime.bwrapPath, `${label}.bwrapPath`),
-    setprivPath: absoluteRuntimePath(runtime.setprivPath, `${label}.setprivPath`),
+    executable: hostRuntimePath(runtime.executable, `${label}.executable`),
+    distributionRoot: hostRuntimePath(runtime.distributionRoot, `${label}.distributionRoot`),
+    nodeBinary: hostRuntimePath(runtime.nodeBinary, `${label}.nodeBinary`),
+    bwrapPath: hostRuntimePath(runtime.bwrapPath, `${label}.bwrapPath`),
+    setprivPath: hostRuntimePath(runtime.setprivPath, `${label}.setprivPath`),
     package: expectText(runtime.package, `${label}.package`),
     version,
     distributionDigest: sha256Digest(runtime.distributionDigest, `${label}.distributionDigest`),
@@ -113,11 +115,11 @@ function validateClaudeCodeUpdaterRuntime(raw, label) {
     throw new ProtocolError(`${label}.version 必须是固定语义版本`)
   }
   return {
-    executable: absoluteRuntimePath(runtime.executable, `${label}.executable`),
-    distributionRoot: absoluteRuntimePath(runtime.distributionRoot, `${label}.distributionRoot`),
-    nodeBinary: absoluteRuntimePath(runtime.nodeBinary, `${label}.nodeBinary`),
-    bwrapPath: absoluteRuntimePath(runtime.bwrapPath, `${label}.bwrapPath`),
-    setprivPath: absoluteRuntimePath(runtime.setprivPath, `${label}.setprivPath`),
+    executable: hostRuntimePath(runtime.executable, `${label}.executable`),
+    distributionRoot: hostRuntimePath(runtime.distributionRoot, `${label}.distributionRoot`),
+    nodeBinary: hostRuntimePath(runtime.nodeBinary, `${label}.nodeBinary`),
+    bwrapPath: hostRuntimePath(runtime.bwrapPath, `${label}.bwrapPath`),
+    setprivPath: hostRuntimePath(runtime.setprivPath, `${label}.setprivPath`),
     package: expectText(runtime.package, `${label}.package`),
     version,
     distributionDigest: sha256Digest(runtime.distributionDigest, `${label}.distributionDigest`),

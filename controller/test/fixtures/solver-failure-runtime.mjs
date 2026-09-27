@@ -133,6 +133,10 @@ export async function runtimeFixture(t, { cases = ['valid'], modes = new Map() }
   const outputRoot = join(repositoryRoot, '.rsi', 'solver-failure-fixtures')
   await mkdir(outputRoot, { recursive: true })
   const root = await mkdtemp(join(outputRoot, 'fixture-'))
+  // 生产 Adapter 使用主机路径环境变量；离线 fixture 绑定当前测试进程的真实工具，避免把机器路径写进配置。
+  process.env.RSI_NODE_BINARY ??= process.execPath
+  process.env.RSI_BWRAP_PATH ??= '/usr/bin/bwrap'
+  process.env.RSI_SETPRIV_PATH ??= '/usr/bin/setpriv'
   const bundle = await loadExperimentBundle(join(repositoryRoot, 'experiments/cowork-msa-main16-codex-single-in-sample.json'), repositoryRoot)
   const candidate = join(root, 'fixture-candidate')
   await copyRegularTree(join(repositoryRoot, 'targets/msa-minimal/cowork-v1'), candidate)

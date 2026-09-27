@@ -104,7 +104,7 @@ test('Codex Updater 固定官方 distribution、版本与内容摘要', async ()
 
   const config = await readConfigFile(resolve(repositoryRoot, 'adapters/updaters/codex-cli.yml'))
   config.spec.runtime.executable = 'codex'
-  assert.throws(() => validateUpdaterAdapter(config), /必须是绝对路径/u)
+  assert.throws(() => validateUpdaterAdapter(config), /绝对路径或.*主机路径引用/u)
 })
 
 test('Claude Code Updater 与 Solver 可以绑定不同 Provider', async () => {

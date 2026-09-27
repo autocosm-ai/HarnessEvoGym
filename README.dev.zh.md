@@ -64,6 +64,7 @@ npm run test:eval
 ## 重要设计决定
 
 - 仓库配置不写入机器专属的 `/mnt/...` 路径；Runtime 配置统一使用相对路径，加载时解析为当前机器路径。
+- CLI Updater 的宿主安装目录通过 `RSI_*` 环境变量注入；仓库内 Adapter 不再写死 `/home/ubuntu` 等机器路径。
 - Controller、Evaluator、数据划分、凭据和 sealed test 属于信任根，Candidate 与 Updater 不得修改或读取它们。
 - 基础设施故障暂停运行，不能被记成 Candidate 的真实零分。
 - 已提交的逐题结果可以在 Resume 时复用；半成品必须归档后重新执行。

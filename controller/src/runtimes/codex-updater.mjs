@@ -47,7 +47,7 @@ export function createCodexUpdaterDriver({
   async function ensureRuntime() {
     runtimePromise ??= inspectCliUpdaterRuntime(updater.runtime, {
       label: 'Codex',
-      versionCommand: () => updater.runtime.nodeBinary,
+      versionCommand: (_executable, runtime) => runtime.nodeBinary,
       versionArgs: (executable) => [executable, '--version'],
       expectedVersionOutput: (version) => `codex-cli ${version}`,
     })
@@ -138,7 +138,7 @@ export function createCodexUpdaterDriver({
         })
         const invocation = buildUpdaterInvocation({
           backend: 'codex-cli',
-          nodeBinary: updater.runtime.nodeBinary,
+          nodeBinary: runtime.nodeBinary,
           updaterRuntime: runtime.distributionRoot,
           codexPath: runtime.executable,
           codexDistributionRoot: runtime.distributionRoot,
@@ -165,8 +165,8 @@ export function createCodexUpdaterDriver({
           outputRoot: options.outputDirectory,
           evolutionLogPath,
           peerLogs: [],
-          bwrapPath: updater.runtime.bwrapPath,
-          setprivPath: updater.runtime.setprivPath,
+          bwrapPath: runtime.bwrapPath,
+          setprivPath: runtime.setprivPath,
           // 本 Driver 在普通宿主用户下运行，setgroups 对非 root 不可用；
           // UID/GID 已核验为当前身份，保留附加组不扩大空根 Bubblewrap 的挂载边界。
           preserveSupplementaryGroups: true,
