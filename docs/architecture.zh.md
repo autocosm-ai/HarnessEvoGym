@@ -45,6 +45,18 @@ Updater 内部仍无需固定的失败分析器、提案器或构建器。它在
 修改和检查。SearchStrategy 是 Controller 侧的“搜索哪个模块”算法，不负责自然语言归因，
 也不帮 Updater 写代码。
 
+## Server API 与 Core Engine
+
+运行控制与实验执行现在分成两层。`server/` 是薄的 Server API：它校验仓库内的相对
+Experiment 路径，创建可持久化 Run Descriptor，提供状态、Resume/Cancel、事件和版本
+摘要接口；它不接受任意 shell 命令，也不拥有 Solver/Updater 权限。
+
+`controller/src/` 继续是 Core Engine：现有 Controller、Environment、Solver、Updater、
+Population Store 和 Checkpoint 都留在这里，由 Server API 通过受信 CLI 启动。当前实现用
+子进程承载一次 Core Engine Run，Run 状态和事件先落到本地文件；后续可以把同一门面替换
+成独立 Worker/队列，而不改变 API 契约。认证、租户隔离、数据库和公网部署尚未属于这
+个本地 Server API 的承诺。
+
 EvolutionAlgorithm 与 SearchStrategy 的职责分开：Algorithm 决定种群如何运行，Strategy
 决定下一步搜索哪里。Recipe 可以通过可选的 `spec.algorithm` 选择已注册的 Algorithm；未声明时
 保持 `population-v1`，所以旧配置不需要迁移。Algorithm Driver 必须实现

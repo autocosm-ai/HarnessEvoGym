@@ -217,6 +217,15 @@ claim. A formal comparison should preregister multiple seeds/trials and report
 reward, Solver/Updater tokens, wall time, infrastructure failures, and the
 one-time sealed-final result.
 
+## Server API / Core Engine
+
+The repository now separates run control from experiment execution: `server/`
+owns Run creation, status, Resume/Cancel, event streaming, and version summaries;
+`controller/src/` remains the Core Engine for Controller, Environment, Solver,
+Updater, Checkpoint, and trusted experiment execution. The API accepts only
+repository-relative Experiment paths and never arbitrary shell commands. See
+[`server/README.zh.md`](server/README.zh.md) for the local entry point.
+
 ## Build your own composition
 
 - Add a **Target** when you want to evolve a new Harness. Define its Source,

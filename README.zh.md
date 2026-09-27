@@ -19,7 +19,7 @@
   <img alt="研究预览版" src="https://img.shields.io/badge/status-research_preview-f4a261?style=flat-square" />
   <img alt="MIT License" src="https://img.shields.io/badge/controller-MIT-4c8bf5?style=flat-square" />
   <img alt="五种 Population Mode" src="https://img.shields.io/badge/population_modes-5-8b5cf6?style=flat-square" />
-  <img alt="549 tests" src="https://img.shields.io/badge/tests-549%20Node%20%2B%2014%20Python-20a36a?style=flat-square" />
+  <img alt="554 tests" src="https://img.shields.io/badge/tests-554%20Node%20%2B%2014%20Python-20a36a?style=flat-square" />
 </p>
 
 > **一句话定位**：HarnessEvoGym 是一个面向 Agent Harness 的 RSI（Recursive Self-Improvement）训练场。它让 Updater 修改 Candidate，让 Solver 在真实任务环境中验证修改，再由 Controller 决定保留、回退、暂停或恢复。
@@ -164,6 +164,7 @@ export RSI_PROVIDER_API_KEY
 ```text
 controller/                  信任根：调度、权限、晋升、回滚、Resume
 controller/src/environments  OfficeVal 与 HLE 的环境执行器
+server/                      Server API 与 Core Engine 生命周期边界
 adapters/                    Target、Environment、Updater、Provider、Strategy 配置
 benchmarks/                  数据划分、任务清单和运行手册
 experiments/                 可复现实验配方
@@ -171,6 +172,12 @@ scripts/                     Runtime 准备、Smoke 和正式运行入口
 eval/                        独立 OfficeVal 泛化评测兼容工具
 README.dev.zh.md             开发日志与工程状态
 ```
+
+### Server API / Core Engine
+
+仓库现在把运行控制拆成两层：`server/` 只负责创建 Run、查询状态、Resume/Cancel、读取事件和版本摘要；
+`controller/src/` 继续作为 Core Engine，负责 Controller、Environment、Solver、Updater、Checkpoint 和真实实验执行。
+Server API 不接受任意 shell 命令，Experiment 只能引用仓库内的相对路径。启动方式见 [`server/README.zh.md`](server/README.zh.md)。
 
 ## 如何扩展
 

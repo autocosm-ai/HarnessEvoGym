@@ -18,6 +18,7 @@
 ### 控制平面
 
 - Target、Environment、Updater、SearchStrategy、EvolutionRecipe 和 EvolutionAlgorithm 已拆成独立协议。
+- `server/` 已建立 Server API / Core Engine 边界：API 管 Run 生命周期，Core Engine 继续承载现有 Controller、Environment、Solver、Updater 与 Checkpoint。
 - 五种 Population Mode 已接入通用 Cowork 编排：`single`、`independent`、`mutualism`、`competition`、`combined`。
 - Mutation Catalog、Mutation Plan、Mutation Lease 和完整 Diff Guard 已落地。
 - Candidate 晋升、回退、冻结、审计和运行身份校验已接入 Controller。
@@ -50,7 +51,7 @@
 ```text
 npm run check       通过
 npm run test:eval   14/14 通过
-npm test            549/549 通过
+npm test            554/554 通过
 ```
 
 修改 Runtime 路径和文档后，需要重新执行：
@@ -72,6 +73,7 @@ npm run test:eval
 
 ## 待完成
 
+- 将 Server API 的进程启动替换为可恢复的独立 Worker/队列，并补齐认证、租户隔离和持久化数据库。
 - 为 HLE 和 Office 各补一个真实的小规模端到端 Smoke，并纳入 CI 级别的离线替身测试。
 - 将 Environment 能力声明、Runtime 路径和错误分类进一步收敛到统一协议。
 - 为外部插件提供独立进程沙箱和版本锁定流程。
