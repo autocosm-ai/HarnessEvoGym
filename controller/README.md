@@ -24,6 +24,7 @@ Controller 是 RSI 系统的可信、确定性控制平面。Updater 负责开�
 | `src/feedback.mjs`             | feedback-only 脱敏反馈包                                    |
 | `src/protocol.mjs`             | Benchmark、Policy、Solver Result 和 Ledger 协议              |
 | `src/evaluator.mjs`            | 配对指标、Bootstrap 与晋升 Gate                             |
+| `src/evaluation-profile.mjs`   | 评测身份、Resume/Final/Fork/Exploratory 复用规则             |
 | `src/orchestrator.mjs`         | Future Reasoning 单分支进化、Git 保留/回滚                 |
 | `src/population-orchestrator.mjs` | Reasoning 五种种群模式和同步 Wave                    |
 | `src/cowork-orchestrator.mjs`  | Cowork Champion/Proposal、晋升/回滚和一次性 Final       |

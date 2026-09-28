@@ -62,6 +62,12 @@ same facade can later be backed by a recoverable Worker or queue without
 changing the HTTP contract. Authentication, tenant isolation, a database, and
 public deployment are not yet part of this local Server API guarantee.
 
+Evaluation identity and result-reuse rules are documented in
+[Evaluation Run Modes](evaluation-modes.md). `resume` and official `sealed-final` runs
+still require an exact execution and evaluation identity. Changing the model, provider,
+budget, or timeout requires a `fork` or `exploratory` identity; old results are never
+silently presented as results for the new configuration.
+
 Recipes may select a registered Algorithm through optional `spec.algorithm`.
 When omitted, the compatibility default is `population-v1`. An Algorithm Driver
 implements `initialize`, `run`, `resume`, `report`, and `freezeBaseline`, and exposes

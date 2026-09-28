@@ -3,6 +3,7 @@ import test from 'node:test'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { evaluateBenchmark } from '../src/evaluator.mjs'
+import { createEvaluationIdentity } from '../src/evaluation-profile.mjs'
 import {
   readJsonFile,
   readResultFile,
@@ -78,6 +79,23 @@ test('selection 配对指标产生可晋升决策', async () => {
   assert.equal(report.partitions.selection.deltas.costUsd.relative, 0.1)
   assert.equal(report.decision.mode, 'promotion')
   assert.equal(report.decision.eligible, true)
+})
+
+test('Evaluation Report 记录评测模式和冻结身份摘要', async () => {
+  const fixture = await loadFixture()
+  const evaluationIdentity = createEvaluationIdentity({
+    mode: 'exploratory',
+    runId: fixture.run.id,
+    evaluation: { benchmark: fixture.benchmark.id, model: 'gpt-5.6-terra', timeoutSeconds: 3600 },
+  })
+  const report = evaluateBenchmark({
+    ...fixture,
+    partitions: ['selection'],
+    evaluationMode: 'exploratory',
+    evaluationIdentity,
+  })
+  assert.equal(report.metadata.evaluationMode, 'exploratory')
+  assert.equal(report.metadata.evaluationIdentityDigest, evaluationIdentity.identityDigest)
 })
 
 test('feedback 配对指标可按配置直接决定训练集内晋升', async () => {

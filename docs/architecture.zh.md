@@ -57,6 +57,10 @@ Population Store 和 Checkpoint 都留在这里，由 Server API 通过受信 CL
 成独立 Worker/队列，而不改变 API 契约。认证、租户隔离、数据库和公网部署尚未属于这
 个本地 Server API 的承诺。
 
+评测身份与结果复用规则见[《评测运行模式》](evaluation-modes.zh.md)。同一个 Run 的
+`resume` 和正式 `sealed-final` 继续严格要求执行内容与评测参数一致；需要换模型、Provider、
+预算或超时时，应创建 `fork` 或 `exploratory` 身份，旧结果不会被悄悄当成新配置的结果。
+
 EvolutionAlgorithm 与 SearchStrategy 的职责分开：Algorithm 决定种群如何运行，Strategy
 决定下一步搜索哪里。Recipe 可以通过可选的 `spec.algorithm` 选择已注册的 Algorithm；未声明时
 保持 `population-v1`，所以旧配置不需要迁移。Algorithm Driver 必须实现
