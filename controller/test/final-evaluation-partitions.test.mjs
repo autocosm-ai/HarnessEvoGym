@@ -69,3 +69,15 @@ test('Final 参数在领取 Claim/访问题目之前校验；基础设施失败�
     /infrastructure exhausted/u)
   assert.equal(calls.length, 1)
 })
+
+test('公共 Final Runner 拒绝缺题，不能把不完整结果交给平均分计算', async () => {
+  const { options } = fixture()
+  await assert.rejects(
+    runFinalEvaluationPartitions({
+      ...options,
+      policy: finalEvaluationPolicy({ finalOnly: true }),
+      expectedInstanceIdsByPartition: { final: ['missing-final-task'] },
+    }),
+    /结果不完整/u,
+  )
+})

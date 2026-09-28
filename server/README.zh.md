@@ -28,6 +28,7 @@ HTTP 请求中传来的任意命令，也不会把 Provider 密钥写入 Run Des
 - `GET /healthz`
 - `GET /version`、`GET /v1/version`
 - `POST /v1/runs`
+- `POST /v1/runs/:runId/fork`，从 Parent Population 的 Checkpoint 创建新 Run（请求体可选 `runId`、`checkpoint`、`experimentPath`）
 - `GET /v1/runs`、`GET /v1/runs/:runId`
 - `POST /v1/runs/:runId/actions`，动作是 `refresh`、`resume`、`cancel`
 - `GET /v1/runs/:runId/events`，可用 `Accept: text/event-stream` 获取 SSE

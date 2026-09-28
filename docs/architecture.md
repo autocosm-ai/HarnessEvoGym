@@ -69,14 +69,13 @@ budget, or timeout requires a `fork` or `exploratory` identity; old results are 
 silently presented as results for the new configuration.
 
 Recipes may select a registered Algorithm through optional `spec.algorithm`.
-When omitted, the compatibility default is `population-v1`. An Algorithm Driver
-implements `initialize`, `run`, `resume`, `report`, and `freezeBaseline`, and exposes
-the current run's `PopulationStore` as `store`. State, checkpoint and report formats
-must remain Population-compatible. Factories are registered by trusted code in
-the same process before validation/run/resume; the CLI does not dynamically load
-external modules. The default algorithm accepts no extra `configuration` keys.
-This is an extension point for existing Population contracts, not a claim that
-arbitrary topology/state formats or operator-generation algorithms are implemented.
+When omitted, the compatibility default is `population-v1`. New algorithms can
+use the SDK v2 `initialize`, `step`, `resume`, `report`, and `freezeBaseline`
+lifecycle with their own RunStore and versioned Checkpoint state; they do not
+have to pretend to be a `PopulationStore`. The legacy Population v1 driver keeps
+its `run` and Branch/budget state contract for existing Cowork recipes.
+Factories are registered by trusted code in the same process before
+validation/run/resume; the CLI does not dynamically execute untrusted modules.
 
 ## One evolution round
 

@@ -59,6 +59,7 @@ function route(pathname) {
   if (parts[0] !== 'v1') return null
   if (parts.length === 2 && parts[1] === 'runs') return { name: 'runs' }
   if (parts.length === 3 && parts[1] === 'runs') return { name: 'run', runId: parts[2] }
+  if (parts.length === 4 && parts[1] === 'runs' && parts[3] === 'fork') return { name: 'fork', runId: parts[2] }
   if (parts.length === 4 && parts[1] === 'runs' && parts[3] === 'actions') return { name: 'actions', runId: parts[2] }
   if (parts.length === 4 && parts[1] === 'runs' && parts[3] === 'events') return { name: 'events', runId: parts[2] }
   if (parts.length === 4 && parts[1] === 'runs' && parts[3] === 'versions') return { name: 'versions', runId: parts[2] }
@@ -100,6 +101,15 @@ export function createServer({ engine, versionInfo } = {}) {
       }
       if (target.name === 'runs' && request.method === 'POST') {
         return jsonResponse(response, 202, await engine.createRun(await body(request)))
+      }
+      if (target.name === 'fork' && request.method === 'POST') {
+        const input = await body(request)
+        for (const field of ['runId', 'checkpoint', 'experimentPath']) {
+          if (input[field] !== undefined && input[field] !== null && typeof input[field] !== 'string') {
+            throw new ProtocolError(`${field} 必须是字符串或 null`)
+          }
+        }
+        return jsonResponse(response, 202, await engine.forkRun(target.runId, input))
       }
       if (target.name === 'run' && request.method === 'GET') return jsonResponse(response, 200, await engine.getRun(target.runId))
       if (target.name === 'actions' && request.method === 'POST') {

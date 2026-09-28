@@ -177,14 +177,16 @@ README.dev.zh.md             开发日志与工程状态
 
 仓库现在把运行控制拆成两层：`server/` 只负责创建 Run、查询状态、Resume/Cancel、读取事件和版本摘要；
 `controller/src/` 继续作为 Core Engine，负责 Controller、Environment、Solver、Updater、Checkpoint 和真实实验执行。
-Server API 不接受任意 shell 命令，Experiment 只能引用仓库内的相对路径。启动方式见 [`server/README.zh.md`](server/README.zh.md)。
+Server API 不接受任意 shell 命令，Experiment 只能引用仓库内的相对路径；Population Run
+还可以通过 `POST /v1/runs/:runId/fork` 从已提交 Checkpoint 创建新 Run，并重新计算 Baseline。
+启动方式见 [`server/README.zh.md`](server/README.zh.md)。
 
 ## 如何扩展
 
 - **新 Harness**：实现 Target Adapter，声明 Source、CandidateSeed、Validator 和 Mutation Catalog。
 - **新任务领域**：实现 Environment Adapter，提供任务物化、隔离工作区、Verifier、指标和数据划分。
 - **新搜索策略**：实现 SearchStrategy，只返回受信 Catalog 中的 Region ID 和父 Candidate。
-- **新进化算法**：注册兼容 Population State、Branch、Budget、Checkpoint 和 Resume 契约的 EvolutionAlgorithm。
+- **新进化算法**：优先实现 SDK Algorithm v2 的 `initialize/step/resume/report` 生命周期，算法可以保存自己的种群、Beam 或搜索树状态；现有 Population v1 继续兼容。
 - **新 Updater**：实现 Updater Adapter，保留完整 Coding Agent Session，由 Controller 管理可写权限。
 
 完整接口、协议边界、测试矩阵和 PR 要求见 [`CONTRIBUTING.md`](CONTRIBUTING.md)。

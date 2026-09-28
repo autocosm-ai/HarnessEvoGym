@@ -204,6 +204,7 @@ export class PopulationOrchestrator {
     progress = () => {},
     frozenConfig = null,
     secretValues = [],
+    forkProvenance = null,
   }) {
     const populationConfig = loadedCampaign?.recipe?.spec?.population
       ?? loadedCampaign?.config?.controller_config
@@ -230,6 +231,7 @@ export class PopulationOrchestrator {
     this.baselinePack = this.frozenConfig?.experiment?.baselinePack ?? null
     this.configDigest = loadedCampaign.configDigest ?? null
     this.secretValues = secretValues
+    this.forkProvenance = forkProvenance === null ? null : structuredClone(forkProvenance)
     this.store = new PopulationStore(campaignsRoot, campaignId)
     this.handles = new Map()
     this.coordinationContexts = new Map()
@@ -240,6 +242,16 @@ export class PopulationOrchestrator {
       this.handles.set(branchId, Promise.resolve(this.createBranch({
         branchId,
         branchesRoot: this.store.branchesRoot,
+        ...(this.forkProvenance?.seeds?.[branchId]
+          ? {
+              seedWorkspace: this.forkProvenance.seeds[branchId].workspace,
+              seedMetadata: {
+                parentRunId: this.forkProvenance.parentRunId,
+                parentCheckpoint: this.forkProvenance.checkpoint,
+                parentCandidateId: this.forkProvenance.seeds[branchId].candidateId,
+              },
+            }
+          : {}),
       })).then((handle) => {
         const driver = handle?.orchestrator
           ? createReasoningBranchDriver({
@@ -289,6 +301,14 @@ export class PopulationOrchestrator {
       checkpoints: [],
       branchCheckpoints: [],
       ...(this.baselinePack === null ? {} : { baselinePack: structuredClone(this.baselinePack) }),
+      ...(this.forkProvenance === null ? {} : {
+        fork: {
+          mode: 'fork',
+          parentRunId: this.forkProvenance.parentRunId,
+          parentCheckpoint: this.forkProvenance.checkpoint,
+          parentConsumedBudget: this.forkProvenance.parentConsumedBudget,
+        },
+      }),
       final: null,
       events: [{
         sequence: 1,

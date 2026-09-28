@@ -25,6 +25,9 @@ function fakeEngine() {
   return {
     async listRuns() { return [run] },
     async createRun(input) { return { ...run, experimentPath: input.experimentPath } },
+    async forkRun(parentRunId, input) {
+      return { ...run, runId: input.runId ?? 'fork-run-001', operation: 'fork', parentRunId }
+    },
     async getRun(runId) { assert.equal(runId, run.runId); return run },
     async controlRun(runId, action) { return { ...run, runId, action } },
     async getEvents() { return [{ sequence: 1, type: 'run.started', runId: run.runId }] },
@@ -48,6 +51,16 @@ test('Server API 暴露健康、版本、Run、事件和版本查询', async () 
     })
     assert.equal(created.status, 202)
     assert.equal((await created.json()).experimentPath, 'experiments/demo.json')
+
+    const fork = await fetch(`${base}/v1/runs/demo-run-001/fork`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ runId: 'fork-run-001', checkpoint: 'checkpoints/budget-4.json' }),
+    })
+    const forkBody = await fork.json()
+    assert.equal(fork.status, 202)
+    assert.equal(forkBody.operation, 'fork')
+    assert.equal(forkBody.parentRunId, 'demo-run-001')
 
     const status = await fetch(`${base}/v1/runs/demo-run-001`)
     assert.equal((await status.json()).status, 'running')

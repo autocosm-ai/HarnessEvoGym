@@ -1,6 +1,8 @@
 import { describe, it, before } from 'node:test'
 import assert from 'node:assert/strict'
-import { resolve, dirname } from 'node:path'
+import { mkdtemp } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { resolve, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
   loadPluginManifest,
@@ -8,7 +10,9 @@ import {
   findPlugin,
   listRegisteredPlugins,
   createPluginDriver,
+  registerPlugin,
 } from '../src/plugin-loader.mjs'
+import { createGenericEvolutionAlgorithmDriver, FileAlgorithmRunStore } from '../src/generic-algorithm.mjs'
 import { registeredDriverProtocols } from '../src/factories.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -111,5 +115,29 @@ describe('Plugin Loader', () => {
     })
     const hardTasks = await hardDriver.listTasks('training')
     assert.ok(hardTasks.every((t) => t.input.operation === 'square-sum'))
+  })
+
+  it('Plugin Loader 可以把 Algorithm v2 插件接入通用 Registry', async () => {
+    const storeRoot = await mkdtemp(join(tmpdir(), 'harness-plugin-algorithm-'))
+    registerPlugin({
+      identity: { name: 'fixture-algorithm', version: '0.1.0' },
+      protocol: { kind: 'algorithm', version: 'v2', implementation: 'fixture-algorithm-v2' },
+      runtime: { type: 'node', node: { entrypoint: 'index.mjs' } },
+      trust: { mode: 'trusted' },
+    }, (options) => ({
+      store: options.store,
+      checkpointCodec: { version: 'v1', encode: (value) => value, decode: (value) => value },
+      async initialize({ state }) { return state },
+      async step({ state }) { return { state: { ...state, status: 'completed' }, done: true } },
+      async resume({ state }) { return state },
+      async report({ state }) { return state },
+      async freezeBaseline({ state }) { return state },
+    }))
+    const driver = createGenericEvolutionAlgorithmDriver({
+      algorithm: 'fixture-algorithm-v2',
+      options: { store: new FileAlgorithmRunStore(join(storeRoot, 'run')) },
+    })
+    assert.equal(typeof driver.step, 'function')
+    assert.equal(driver.store.root.endsWith('/run'), true)
   })
 })

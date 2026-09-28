@@ -60,6 +60,7 @@ import { assertEvolutionAlgorithmAvailable, createEvolutionAlgorithmDriver } fro
 import { supportsTaskInfrastructureRetries } from './environment-capabilities.mjs'
 import { PopulationStore } from './population-store.mjs'
 import { acquireCampaignLock } from './campaign-lock.mjs'
+import { preparePopulationFork } from './population-fork.mjs'
 import {
   assertExecutionIdentity, captureExecutionIdentity, captureRuntimeInputs,
   evolutionFingerprint, EXECUTION_PATHS, ResumeCompatibilityError,
@@ -562,16 +563,23 @@ export async function buildExperimentRuntime({ repositoryRoot, experimentPath })
   }
 }
 
-async function materializeH0({ context, runRoot }) {
+async function materializeH0({ context, runRoot, seedWorkspace = null, seedMetadata = null }) {
   const candidateRoot = join(runRoot, 'candidates', 'h0')
   const workspace = join(candidateRoot, 'workspace')
   await mkdir(candidateRoot, { recursive: true })
-  const composition = await materializeCandidate({
-    repositoryRoot: context.repositoryRoot,
-    target: context.bundle.target,
-    sourceRoot: context.targetSourceRoot,
-    destination: workspace,
-  })
+  const composition = seedWorkspace === null
+    ? await materializeCandidate({
+        repositoryRoot: context.repositoryRoot,
+        target: context.bundle.target,
+        sourceRoot: context.targetSourceRoot,
+        destination: workspace,
+      })
+    : {
+        kind: 'population-fork-checkpoint',
+        ...seedMetadata,
+        source: 'trusted-parent-candidate-copy',
+        workspace: await copyRegularTree(seedWorkspace, workspace),
+      }
   await Promise.all([
     mkdir(join(workspace, '.rsi-context'), { recursive: true }),
     mkdir(join(workspace, '.rsi-output'), { recursive: true }),
@@ -580,6 +588,9 @@ async function materializeH0({ context, runRoot }) {
     maximumFileBytes: context.bundle.target.mutation.limits.maximumFileBytes,
     maximumTreeEntries: context.bundle.target.mutation.limits.maximumTreeEntries,
   })
+  if (seedWorkspace !== null && treeDigest(snapshot) !== seedMetadata?.parentCandidateDigest) {
+    throw new ProtocolError('Fork Seed 在校验和复制之间发生变化，拒绝启动')
+  }
   const semanticReport = await validateCandidate({ workspace, target: context.bundle.target })
   if (!semanticReport.valid) {
     throw new ProtocolError(
@@ -1288,6 +1299,8 @@ export function createCoworkBranchEvolutionDriver({
   branchId,
   runRootOverride = null,
   expectedBundleDigest = null,
+  seedWorkspace = null,
+  seedMetadata = null,
   onEvent = () => {},
 }, {
   contextFactory = createContext,
@@ -1379,7 +1392,7 @@ export function createCoworkBranchEvolutionDriver({
     await context.searchStrategy.preflight()
     for (const instanceId of context.bundle.benchmark.allInstanceIds) await environment.taskLayout(instanceId)
     await context.updaterDriver.ensureRuntime()
-    champion = await materializeH0({ context, runRoot })
+    champion = await materializeH0({ context, runRoot, seedWorkspace, seedMetadata })
     materializedCandidates = new Map([[champion.id, champion]])
     mutationCatalog = mutationCatalogForModuleSearch(
       context.bundle.target,
@@ -2577,6 +2590,7 @@ export async function runPopulationEvolution({
   runId = createRunId('cowork-population'),
   onEvent = () => {},
   baselineOnly = false,
+  forkProvenance = null,
 }) {
   safeRunId(runId)
   const controllerRevision = await trustedControllerRevision(repositoryRoot)
@@ -2606,6 +2620,7 @@ export async function runPopulationEvolution({
     recipe: bundle.recipe,
     configDigest: frozenBundle.digest,
     fingerprint: evolutionFingerprint({ executionIdentity, configDigest: frozenBundle.digest }),
+    ...(forkProvenance === null ? {} : { forkProvenance }),
   }
   const release = await acquireCampaignLock({
     campaignsRoot: populationsRoot,
@@ -2620,9 +2635,11 @@ export async function runPopulationEvolution({
         campaignsRoot: populationsRoot,
         campaignId: runId,
         frozenConfig,
+        forkProvenance,
         secretValues: secretValuesFromEnvironment(requiredSecrets(bundle)),
         progress: (event) => onEvent({ stage: event.type, ...event, message: event.type }),
         createBranch({ branchId, branchesRoot }) {
+          const seed = forkProvenance?.seeds?.[branchId]
           return createCoworkBranchEvolutionDriver({
             repositoryRoot,
             experimentPath,
@@ -2630,6 +2647,15 @@ export async function runPopulationEvolution({
             branchId,
             runRootOverride: join(branchesRoot, branchId, 'run'),
             expectedBundleDigest: frozenBundle.digest,
+            ...(seed === undefined ? {} : {
+              seedWorkspace: seed.workspace,
+              seedMetadata: {
+                parentRunId: forkProvenance.parentRunId,
+                parentCheckpoint: forkProvenance.checkpoint,
+                parentCandidateId: seed.candidateId,
+                parentCandidateDigest: seed.digest,
+              },
+            }),
             onEvent,
           })
         },
@@ -2661,6 +2687,46 @@ export async function runPopulationEvolution({
   } finally {
     await release()
   }
+}
+
+/**
+ * 从已提交的 Population Budget Checkpoint 派生一个全新的 Run。
+ *
+ * Fork 不复制旧分数，也不修改父 Run；它只把 Checkpoint 中每个 Branch 的
+ * Champion Workspace 作为新 Run 的 H0 Seed，并重新执行 Baseline。这样换模型、
+ * Provider、资源或评测参数时，旧分数不会被误当成新配置的结果。
+ */
+export async function forkPopulationEvolution({
+  repositoryRoot,
+  parentRunDirectory,
+  checkpointPath = null,
+  experimentPath = null,
+  runId = createRunId('cowork-fork'),
+  onEvent = () => {},
+}) {
+  safeRunId(runId)
+  const prepared = await preparePopulationFork({
+    repositoryRoot,
+    parentRunDirectory,
+    checkpointPath,
+    experimentPath,
+    runId,
+  })
+  const bundle = await loadExperimentBundle(prepared.experimentPath, repositoryRoot)
+  if (bundle.recipe.spec.population.concurrency.n_branches !== Object.keys(prepared.provenance.seeds).length) {
+    throw new ProtocolError('Fork 当前要求保留 Parent 的 Branch 数量；不允许静默丢弃或新增 Seed')
+  }
+  if (bundle.experiment.baselinePack !== null) {
+    throw new ProtocolError('Fork 必须重测 Baseline，请移除新 Experiment 的 baselinePack 引用')
+  }
+  onEvent({ stage: 'fork-prepared', message: `从 ${prepared.provenance.parentRunId} 派生 ${runId}` })
+  return await runPopulationEvolution({
+    repositoryRoot,
+    experimentPath: prepared.experimentPath,
+    runId,
+    onEvent,
+    forkProvenance: prepared.provenance,
+  })
 }
 
 /** 从已冻结的 Population + Branch 检查点恢复 Cowork 实验。 */
@@ -3239,6 +3305,10 @@ async function finalizeCoworkRun({
       outputPath: (id, partition) => resultPath(runRoot, generation, id,
         partition === 'feedback' ? `feedback-final-${finalAttemptId}` : `final-${finalAttemptId}`),
       policy: evaluationPolicy,
+      expectedInstanceIdsByPartition: Object.fromEntries(
+        evaluationPolicy.partitions.map((partition) => [partition,
+          context.bundle.benchmark.partitions[partition].instanceIds]),
+      ),
       onEvent,
     })
     const report = evaluateBenchmark({

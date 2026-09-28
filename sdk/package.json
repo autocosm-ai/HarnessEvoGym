@@ -9,6 +9,7 @@
     "./solver": "./interfaces/solver.mjs",
     "./updater": "./interfaces/updater.mjs",
     "./algorithm": "./interfaces/algorithm.mjs",
+    "./algorithm-v2": "./interfaces/algorithm-v2.mjs",
     "./evaluator": "./interfaces/evaluator.mjs",
     "./schema": "./schema/plugin-v1.schema.json"
   },

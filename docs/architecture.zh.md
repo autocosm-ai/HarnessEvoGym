@@ -61,14 +61,13 @@ Population Store 和 Checkpoint 都留在这里，由 Server API 通过受信 CL
 `resume` 和正式 `sealed-final` 继续严格要求执行内容与评测参数一致；需要换模型、Provider、
 预算或超时时，应创建 `fork` 或 `exploratory` 身份，旧结果不会被悄悄当成新配置的结果。
 
-EvolutionAlgorithm 与 SearchStrategy 的职责分开：Algorithm 决定种群如何运行，Strategy
+EvolutionAlgorithm 与 SearchStrategy 的职责分开：Algorithm 决定搜索如何运行，Strategy
 决定下一步搜索哪里。Recipe 可以通过可选的 `spec.algorithm` 选择已注册的 Algorithm；未声明时
-保持 `population-v1`，所以旧配置不需要迁移。Algorithm Driver 必须实现
-`initialize`、`run`、`resume`、`report` 和 `freezeBaseline`，并通过 `store` 暴露
-当前 Run 的 `PopulationStore`。状态、Checkpoint 和报告须兼容已有 Population 格式。
-Factory 由可信启动代码在同一进程、校验和运行之前注册；CLI 不会动态加载外部模块。
-默认算法不接受额外 `configuration` 字段，参数仍放在 Recipe.population。
-这提供了现有 Population 契约内的扩展入口，任意拓扑/状态格式和算子生成算法尚未实现。
+保持 `population-v1`，所以旧配置不需要迁移。新算法可以使用 SDK v2 的
+`initialize`、`step`、`resume`、`report` 和 `freezeBaseline`，通过通用 RunStore 保存自己的
+状态和版本化 Checkpoint，不再要求伪装成 `PopulationStore`。旧 Population v1 仍保留
+`run` 与既有 Branch/Budget 状态契约，确保历史 Cowork Recipe 兼容。算法由可信启动代码注册；
+CLI 不会动态执行未审查模块。
 
 ## 一轮进化
 

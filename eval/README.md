@@ -1,5 +1,10 @@
 # 独立 OfficeVal 评测
 
+> 兼容性说明：正式 Controller 评测现在统一经过 `controller/src/evaluation-runner.mjs`。
+> 本目录保留为历史 OfficeVal 兼容工具，方便复现实验和迁移旧结果；它不是新的通用
+> Environment 插件，也不提供 HLE 评测入口。新的环境应实现 Environment Adapter，并由
+> Controller 的公共 Runner 调度。
+
 这是 MSA Cowork 候选的兼容评测工具：复制冻结候选，在副本内替换带请求级重试的
 `model.py`；逐题复制数据，Solver 和离线 Verifier 在容器中工作。
 它不替代 Controller 的 sealed-final 审计链，也不支持 HLE 或任意 Solver。

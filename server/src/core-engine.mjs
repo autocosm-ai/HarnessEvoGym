@@ -52,6 +52,9 @@ function publicDescriptor(descriptor) {
     runId: descriptor.runId,
     status: descriptor.status,
     operation: descriptor.operation,
+    parentRunId: descriptor.parentRunId ?? null,
+    parentCheckpoint: descriptor.parentCheckpoint ?? null,
+    evaluationMode: descriptor.evaluationMode ?? 'standard',
     experimentPath: descriptor.experimentPath,
     population: descriptor.population,
     runRoot: descriptor.runRoot,
@@ -253,6 +256,90 @@ export class CoreEngine {
     }
     await this.event(runId, 'run.queued', { operation: 'run' })
     await this.startProcess(descriptor, ['experiment', 'run', '--config', absolute])
+    return publicDescriptor(await this.readDescriptor(runId))
+  }
+
+  /**
+   * 从一个已经存在的 Population Run 的 Checkpoint 创建新 Run。
+   *
+   * Server 只负责记录父子关系并启动受信 Controller；Checkpoint 的完整性、
+   * Candidate Workspace 复制和新 Baseline 重算由 Controller 的 fork 入口负责。
+   */
+  async forkRun(
+    parentRunId,
+    {
+      runId = createRunId('server-fork'),
+      checkpoint = null,
+      experimentPath = null,
+    } = {},
+  ) {
+    assertRunId(parentRunId)
+    assertRunId(runId)
+    if (parentRunId === runId) throw new ProtocolError('Fork Run ID 不能和 Parent Run 相同')
+    const parent = await this.readDescriptor(parentRunId)
+    if (parent.population !== true) throw new ProtocolError('只有 Population Run 才能 Fork')
+    const parentRoot = resolveInside(this.repositoryRoot, parent.runRoot, 'Parent Run Root')
+    await assertPathKind(parentRoot, 'Parent Run Root')
+
+    const selectedExperiment = experimentPath ?? parent.experimentPath
+    const { absolute: experimentAbsolute, bundle } = await this.validateExperiment(selectedExperiment)
+    let checkpointArgument = null
+    if (checkpoint !== null && checkpoint !== undefined) {
+      if (typeof checkpoint !== 'string' || checkpoint.length === 0 || checkpoint.startsWith('/')) {
+        throw new ProtocolError('checkpoint 必须是 Parent Run 内的相对路径')
+      }
+      const checkpointAbsolute = resolveInside(parentRoot, checkpoint, 'Fork Checkpoint')
+      await assertPathKind(checkpointAbsolute, 'Fork Checkpoint', 'file')
+      checkpointArgument = relative(parentRoot, checkpointAbsolute).replaceAll('\\', '/')
+    }
+
+    const descriptorPath = this.descriptorPath(runId)
+    try {
+      await assertPathKind(descriptorPath, 'Server Run Descriptor', 'file')
+      throw new ProtocolError(`Run 已存在：${runId}`)
+    } catch (error) {
+      if (!(error instanceof ProtocolError) || !/不存在/u.test(error.message)) throw error
+    }
+    const runRoot = await this.expectedRunRoot(runId, bundle)
+    const descriptor = {
+      apiVersion: 'harness-evo-gym/v1',
+      kind: 'CoreEngineRun',
+      runId,
+      status: 'queued',
+      operation: 'fork',
+      parentRunId,
+      parentCheckpoint: checkpointArgument,
+      evaluationMode: 'fork',
+      experimentPath: relative(this.repositoryRoot, experimentAbsolute).replaceAll('\\', '/'),
+      runRoot: relative(this.repositoryRoot, runRoot).replaceAll('\\', '/'),
+      population: true,
+      pid: null,
+      createdAt: now(this.clock),
+      updatedAt: now(this.clock),
+    }
+    try {
+      await this.createDescriptor(descriptor)
+    } catch (error) {
+      if (error.code === 'EEXIST') throw new ProtocolError(`Run 已存在：${runId}`)
+      throw error
+    }
+    await this.event(runId, 'run.queued', {
+      operation: 'fork',
+      parentRunId,
+      parentCheckpoint: checkpointArgument,
+    })
+    const args = [
+      'experiment',
+      'fork',
+      '--run',
+      parentRoot,
+      '--run-id',
+      runId,
+      '--config',
+      relative(this.repositoryRoot, experimentAbsolute).replaceAll('\\', '/'),
+    ]
+    if (checkpointArgument !== null) args.push('--checkpoint', checkpointArgument)
+    await this.startProcess(descriptor, args)
     return publicDescriptor(await this.readDescriptor(runId))
   }
 

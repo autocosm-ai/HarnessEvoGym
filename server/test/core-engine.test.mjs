@@ -83,3 +83,50 @@ test('Core Engine 只用仓库内 Experiment 启动受信 CLI，并可取消子�
   await engine.controlRun('api-run-001', 'cancel')
   assert.equal(child !== null, true)
 })
+
+test('Core Engine 可以从 Population Run 创建新的 Fork Run，并保留父子关系', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'harness-server-fork-'))
+  const calls = []
+  const engine = new CoreEngine({
+    repositoryRoot: REPOSITORY_ROOT,
+    runsRoot: join(root, 'runs'),
+    processFactory: (executable, args) => {
+      calls.push({ executable, args })
+      const handlers = new Map()
+      return {
+        pid: 4343,
+        stdout: new PassThrough(),
+        stderr: new PassThrough(),
+        once(name, callback) { handlers.set(name, callback) },
+        on() {},
+        kill(signal) { handlers.get('close')?.(null, signal) },
+      }
+    },
+  })
+  await engine.writeDescriptor({
+    apiVersion: 'harness-evo-gym/v1',
+    kind: 'CoreEngineRun',
+    runId: 'parent-pop-001',
+    status: 'completed',
+    operation: 'run',
+    experimentPath: 'experiments/reasoning-msa-progressive-strict-smoke.json',
+    runRoot: 'controller/test/fixtures',
+    population: true,
+    pid: null,
+    createdAt: '2026-09-28T00:00:00.000Z',
+    updatedAt: '2026-09-28T00:00:00.000Z',
+  })
+  const fork = await engine.forkRun('parent-pop-001', {
+    runId: 'fork-pop-001',
+  })
+  assert.equal(fork.operation, 'fork')
+  assert.equal(fork.parentRunId, 'parent-pop-001')
+  assert.equal(fork.evaluationMode, 'fork')
+  assert.deepEqual(calls[0].args.slice(1, 4), ['experiment', 'fork', '--run'])
+  assert.equal(calls[0].args.includes('--run-id'), true)
+  assert.equal(calls[0].args.includes('fork-pop-001'), true)
+  await assert.rejects(
+    engine.forkRun('parent-pop-001', { runId: 'fork-pop-002', checkpoint: '/etc/passwd' }),
+    /checkpoint 必须是 Parent Run 内的相对路径/u,
+  )
+})

@@ -8,6 +8,7 @@ import {
   registerSolverDriver,
   registerUpdaterDriver,
 } from './factories.mjs'
+import { registerGenericEvolutionAlgorithm } from './generic-algorithm.mjs'
 
 /**
  * Plugin 注册表，按协议类型分类存储
@@ -81,6 +82,9 @@ export function registerPlugin(manifest, factory) {
   if (registrar && /^[a-z0-9]+(?:-[a-z0-9]+)*-v[0-9]+$/u.test(protocolName)) {
     registrar(protocolName, (options) => buildPluginDriver(manifest, factory, kind, options))
   }
+  if (kind === 'algorithm' && /^[a-z0-9]+(?:-[a-z0-9]+)*-v[0-9]+$/u.test(protocolName)) {
+    registerGenericEvolutionAlgorithm(protocolName, (options) => buildPluginDriver(manifest, factory, kind, options))
+  }
   registry.set(protocolName, {
     manifest,
     factory,
@@ -104,7 +108,7 @@ function buildPluginDriver(manifest, factory, kind, options) {
     environment: ['preflight', 'runCandidatePartition'],
     solver: ['ensureRuntime', 'run', 'usage'],
     updater: ['ensureRuntime', 'stageContext', 'run', 'usage'],
-    algorithm: ['initialize', 'run', 'resume', 'report', 'freezeBaseline'],
+    algorithm: ['initialize', 'step', 'resume', 'report', 'freezeBaseline'],
     evaluator: ['validateManifest', 'evaluate', 'formatReport'],
   }
   for (const method of requiredMethods[kind] ?? []) {

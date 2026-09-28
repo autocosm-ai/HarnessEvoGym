@@ -223,7 +223,9 @@ The repository now separates run control from experiment execution: `server/`
 owns Run creation, status, Resume/Cancel, event streaming, and version summaries;
 `controller/src/` remains the Core Engine for Controller, Environment, Solver,
 Updater, Checkpoint, and trusted experiment execution. The API accepts only
-repository-relative Experiment paths and never arbitrary shell commands. See
+repository-relative Experiment paths and never arbitrary shell commands. A Population Run
+can also be forked from a committed Checkpoint through `POST /v1/runs/:runId/fork`; the new
+Run recomputes its Baseline. See
 [`server/README.zh.md`](server/README.zh.md) for the local entry point.
 
 ## Build your own composition
@@ -235,9 +237,11 @@ repository-relative Experiment paths and never arbitrary shell commands. See
 - Add a **SearchStrategy** when you want a new Region-selection algorithm. It
   may return Region IDs, never file paths or credentials.
 - Register an **EvolutionAlgorithm** to customize population orchestration.
-  Drivers currently share the existing PopulationStore, state schema, and
-  Branch/budget contracts. Registration is programmatic in a trusted launcher;
-  arbitrary external algorithms and state formats are not supported.
+  New algorithms should use the SDK v2 `initialize/step/resume/report` lifecycle
+  and their own RunStore/Checkpoint state (for example a genetic population, a
+  beam, or an MCTS tree). The existing Population v1 contract remains available
+  for Cowork compatibility. Registration is programmatic in a trusted launcher;
+  arbitrary untrusted modules are not automatically installed or executed.
 - Add an **EvolutionRecipe** when you want to recombine an existing population
   topology, branch count, budget, sharing rule, and search strategy.
 
