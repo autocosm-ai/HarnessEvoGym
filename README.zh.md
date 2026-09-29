@@ -1,3 +1,21 @@
+<table align="center">
+  <tr>
+    <td align="center">
+      <a href="https://github.com/PKU-DAIR">
+        <img src="docs/assets/logos/pku-dair.png" width="88" alt="PKU-DAIR 标志" />
+      </a><br />
+      <sub><b>北京大学 DCAI 团队</b><br />PKU-DAIR</sub>
+    </td>
+    <td width="36"></td>
+    <td align="center">
+      <a href="https://github.com/autocosm-ai">
+        <img src="docs/assets/logos/autocosm-ai.png" width="88" alt="AutoCosm.AI 标志" />
+      </a><br />
+      <sub><b>AutoCosm.AI</b><br />开源项目</sub>
+    </td>
+  </tr>
+</table>
+
 <p align="center">
   <img src="docs/assets/harness-evo-gym-hero-v2.png" width="100%" alt="HarnessEvoGym：多个 Agent Harness 在受控环境中围绕 Controller 进行可审计进化。" />
 </p>

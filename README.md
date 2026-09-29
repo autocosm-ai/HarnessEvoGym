@@ -1,3 +1,21 @@
+<table align="center">
+  <tr>
+    <td align="center">
+      <a href="https://github.com/PKU-DAIR">
+        <img src="docs/assets/logos/pku-dair.png" width="88" alt="PKU-DAIR logo" />
+      </a><br />
+      <sub><b>PKU-DAIR</b><br />Peking University</sub>
+    </td>
+    <td width="36"></td>
+    <td align="center">
+      <a href="https://github.com/autocosm-ai">
+        <img src="docs/assets/logos/autocosm-ai.png" width="88" alt="AutoCosm.AI logo" />
+      </a><br />
+      <sub><b>AutoCosm.AI</b><br />Open Source</sub>
+    </td>
+  </tr>
+</table>
+
 <p align="center">
   <img src="docs/assets/harness-evo-gym-hero-v2.png" width="100%" alt="HarnessEvoGym evolves multiple agent harnesses around a trusted controller." />
 </p>
