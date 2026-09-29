@@ -1,29 +1,17 @@
-<table align="center">
-  <tr>
-    <td align="center">
-      <a href="https://github.com/OpenDCAI">
-        <img src="docs/assets/logos/opendcai.png" width="88" alt="OpenDCAI logo" />
-      </a><br />
-      <sub><b>Peking University DCAI</b><br />OpenDCAI</sub>
-    </td>
-    <td width="36"></td>
-    <td align="center">
-      <a href="https://github.com/autocosm-ai">
-        <img src="docs/assets/logos/autocosm-ai.png" width="88" alt="AutoCosm.AI logo" />
-      </a><br />
-      <sub><b>AutoCosm.AI</b><br />Open Source</sub>
-    </td>
-  </tr>
-</table>
-
-<p align="center">
-  <img src="docs/assets/harness-evo-gym-hero-v2.png" width="100%" alt="HarnessEvoGym evolves multiple agent harnesses around a trusted controller." />
-</p>
-
 <h1 align="center">HarnessEvoGym</h1>
 
 <p align="center">
   <strong>A trusted, reproducible gym for evolving agent harnesses—not just their prompts.</strong>
+</p>
+
+<p align="center">
+  HarnessEvoGym turns harness self-improvement into an experiment you can inspect:<br />
+  choose <strong>what evolves</strong>, <strong>where it works</strong>, and <strong>how evolution searches</strong> as independent components,<br />
+  while a frozen Controller owns permissions, evaluation, promotion, rollback, and lineage.
+</p>
+
+<p align="center">
+  <sub>A collaboration between <a href="https://github.com/OpenDCAI"><img src="docs/assets/logos/opendcai.png" height="16" alt="OpenDCAI" /></a> <strong>Peking University DCAI / OpenDCAI</strong> and <a href="https://github.com/autocosm-ai"><img src="docs/assets/logos/autocosm-ai.png" height="16" alt="AutoCosm.AI" /></a> <strong>AutoCosm.AI</strong></sub>
 </p>
 
 <p align="center">
@@ -40,23 +28,20 @@
   <img alt="Node and Python tests" src="https://img.shields.io/badge/tests-Node_%2B_Python-20a36a?style=flat-square" />
 </p>
 
-HarnessEvoGym turns harness self-improvement into an experiment you can inspect:
-choose **what evolves**, **where it works**, and **how evolution searches** as
-independent components, while a frozen Controller owns permissions, evaluation,
-promotion, rollback, and lineage.
+---
+
+**Core capabilities**
+
+| What you control | How it works |
+| --- | --- |
+| **Target** | Choose which harness evolves: MSA Minimal Cowork, MSA Minimal Reasoning, or DeepSeek Harness path |
+| **Environment** | Validate on real tasks: OmegaUse-OfficeVal or HLE Text-only Math |
+| **Evolution** | Five population modes (single, independent, mutualism, competition, combined) + pluggable search strategies |
+| **Trust** | Controller, evaluator, hidden split, credentials, and promotion policy stay outside the Candidate write set |
 
 ~~~
 Target × Environment × EvolutionAlgorithm × EvolutionRecipe
 ~~~
-
-This separation lets the same population algorithm evolve an MSA Minimal Cowork
-agent on real Office tasks, exercise a Reasoning pipeline, or accept a new
-Harness and Benchmark through adapters—without moving the evaluator into the
-mutable system.
-
-<p align="center">
-  <img src="docs/assets/harness-evo-gym-loop-v2.png" width="100%" alt="The HarnessEvoGym candidate, environment, solver, verifier, and updater loop." />
-</p>
 
 ## Why this exists
 
@@ -77,6 +62,16 @@ HarnessEvoGym makes those boundaries executable:
 
 ## The model
 
+One Candidate generation follows this loop:
+
+<p align="center">
+  <img src="docs/assets/harness-evo-gym-loop-v2.png" width="720" alt="The HarnessEvoGym candidate, environment, solver, verifier, and updater loop." />
+</p>
+
+<p align="center">
+  <sub><em>Champion → Region selection → MutationLease → Updater edits Candidate → Diff validation → Solver runs tasks → Verifier scores → promotion gates decide</em></sub>
+</p>
+
 | Layer                | Owns                                                                    | Does not own                         |
 | -------------------- | ----------------------------------------------------------------------- | ------------------------------------ |
 | **Target**           | Harness source, H0 seed, runtime, validator, and mutable Region catalog | Tasks, scores, or promotion rules    |
@@ -84,60 +79,36 @@ HarnessEvoGym makes those boundaries executable:
 | **Evolution Recipe** | Population mode, branches, budget, sharing, and module search           | Harness-specific file paths          |
 | **Controller**       | Scheduling, MutationLease, Diff Guard, lineage, promotion, and rollback | A mutable solution strategy           |
 
-One Candidate generation follows:
-
-~~~
-Champion
-  -> SearchStrategy selects Target Region IDs
-  -> Controller issues a MutationLease
-  -> Updater diagnoses failures and edits one Candidate
-  -> Controller recomputes and validates the full diff
-  -> Solver runs feedback + selection tasks
-  -> strict gates promote the Candidate, or retain the Champion
-~~~
-
-The prompt tells the Updater *why* and *how* to improve. The MutationLease,
-semantic validator, and Diff Guard enforce *where* it can write.
+The prompt tells the Updater *why* and *how* to improve. The MutationLease, semantic validator, and Diff Guard enforce *where* it can write.
 
 ## What works today
 
-| Capability              | Implemented                                                        |
-| ----------------------- | ------------------------------------------------------------------ |
-| Harness Targets         | MSA Minimal Cowork, MSA Minimal Reasoning, DeepSeek Harness path   |
-| Updaters                | Isolated Codex CLI, Claude Code CLI, and DeepSeek Harness          |
-| Environments            | OmegaUse-OfficeVal and HLE Text-only Math |
-| Population topologies   | Single, Independent, Mutualism, Competition, Combined              |
-| Module search           | Linear hill climb, progressive risk expansion, Docker strategy API |
-| Mutable risk ceilings   | Target-defined L1/L2/L3 with different files for every Harness     |
-| Reliability             | Provider retries, per-task checkpoints, explicit Resume, sealed Final |
+**Environments**
 
-The supported Cowork path uses
-[OmegaUse-OfficeVal](https://github.com/baidu-frontier-research/OmegaUse-OfficeVal).
-Of 100 upstream tasks, 91 have a registered Linux path:
-**55 feedback/train + 18 selection/validation + 18 one-time sealed final**.
-The Solver receives only the task and original Office inputs; scoring runs
-offline in a separate read-only verifier container.
+- **OmegaUse-OfficeVal**: 91 Linux-compatible tasks (55 feedback/train + 18 selection/validation + 18 sealed final). Solver receives only task description and original Office inputs; scoring runs offline in a separate read-only verifier container.
+- **HLE Text-only Math**: Text-only Math subset with fixed revision, stratified sampling, and sealed test rules. Runtime and sealed broker are independent; see [current boundaries](docs/architecture.md#implemented-paths-and-current-boundary).
 
-HLE is currently the text-only Math subset. Harbor, SWE-bench, PutnamBench, and
-Synthetic Text Reasoning remain experimental or compatibility paths and are not
-listed as stable environments. See [current boundaries](docs/architecture.md#implemented-paths-and-current-boundary)
-before reporting results.
+**Targets and Updaters**
 
-## Five population modes
+| Target | Updater options | Search space |
+| --- | --- | --- |
+| MSA Minimal Cowork | Isolated Codex CLI, Claude Code CLI | L1 prompt/skills + L2 agent loop/tool runtime |
+| MSA Minimal Reasoning | Isolated Codex CLI, Claude Code CLI | L1 prompt/skills + L2 agent loop/tool runtime |
+| DeepSeek Harness path | DeepSeek Harness | DeepSeek-specific modules |
 
-| Mode              | Branch behavior                                             |
-| ----------------- | ----------------------------------------------------------- |
-| `single`          | One Branch receives the entire Candidate budget             |
-| `independent`     | Multiple Branches search without sharing history            |
-| `mutualism`       | Independent search plus read-only peer evolution evidence   |
-| `competition`     | Branches compete for an additional Candidate budget pool    |
-| `combined`        | Peer evidence sharing plus budget competition               |
+**Population and search**
 
-Population mode and module search are orthogonal. For example,
-`combined + linear-hill-climb` and
-`combined + progressive-risk-expansion` are both valid recipes.
+| Capability | Options |
+| --- | --- |
+| Population topologies | Single, Independent, Mutualism, Competition, Combined |
+| Module search | Linear hill climb, progressive risk expansion, Docker strategy API |
+| Reliability | Provider retries, per-task checkpoints, explicit Resume, sealed Final |
+
+Harbor, SWE-bench, PutnamBench, and Synthetic Text Reasoning remain experimental or compatibility paths and are not listed as stable environments. See [current boundaries](docs/architecture.md#implemented-paths-and-current-boundary) before reporting results.
 
 ## Quick start
+
+**Install and validate**
 
 Requirements: Linux, Docker, Node.js 20+, npm, and Git.
 
@@ -147,16 +118,19 @@ cd HarnessEvoGym
 npm ci
 npm run check
 npm test
+npm run test:eval
 ~~~
 
-Validate a complete composition without calling a model:
+**Validate a composition without calling a model**
 
 ~~~bash
 npm run rsi -- experiment validate \
   --config experiments/reasoning-msa-progressive-strict-smoke.json
 ~~~
 
-Real runs inject credentials only at runtime:
+**Run with runtime credentials**
+
+Real runs inject credentials only at runtime. Never write a real key into an Experiment, Adapter, Candidate, trace, or Git.
 
 ~~~bash
 export RSI_PROVIDER_BASE_URL=https://provider.example/v1
@@ -172,104 +146,41 @@ npm run rsi -- experiment run \
 unset RSI_PROVIDER_API_KEY
 ~~~
 
-Never write a real key into an Experiment, Adapter, Candidate, trace, or Git.
-For OfficeVal dataset setup, task images, Resume, and sealed Final, use the
-[Cowork runbook](docs/cowork-mvp.md).
+For OfficeVal dataset setup, task images, Resume, and sealed Final, see the [Cowork runbook](docs/cowork-mvp.md). For HLE setup, see [HLE Text-only Math runbook](benchmarks/hle-text-math/README.zh.md).
 
-For hidden-test scores only, use `experiment finalize --run <run> --final-only`.
-For cross-mode comparisons, `experiment finalize-suite --config <shared-final.json>`
-evaluates one shared H0 and each frozen champion without retraining. The new suite
-supports identity-locked task resume, persistent retry limits, and explicit reasoning-only
-response compatibility. Existing `finalize` rules are unchanged.
-See [shared final evaluation](docs/shared-final-suite.zh.md).
-This skips feedback replay, keeps H0/the Champion frozen, and leaves the
-train–test generalization gap unset. OmegaUse Final retries an uncommitted task
-up to five additional times for observed upstream stream/transport errors or
-transient HTTP errors (5/10/20/40/60-second backoff; configurable with
-`--infrastructure-retries 0..10`, default 5). Failed workspaces are archived; committed
-results, including valid zero scores, are never rerun. Authentication errors,
-candidate errors, verifier failures and low scores do not trigger retries.
-This is bounded retry within the same Final claim, not cross-process Final
-resume. Exhaustion still fails without fabricating scores or unsealing Final
-again. Other environments retain their previous behavior.
+## Population modes and extension points
 
-Infrastructure failures become `PAUSED_INFRASTRUCTURE` and fail the command
-instead of masquerading as a zero-score success. `experiment resume` continues
-the same Population after the fault is repaired. Gateway request limits are
-currently scoped per Branch rather than as one Population-wide cost ceiling.
-HLE retains its dedicated runtime and sealed broker; the public smoke suite is
-not a substitute for a production benchmark.
+**Five population modes**
 
-## Registered five-mode Cowork suite
+| Mode | Branch behavior |
+| --- | --- |
+| `single` | One Branch receives the entire Candidate budget |
+| `independent` | Multiple Branches search without sharing history |
+| `mutualism` | Independent search plus read-only peer evolution evidence |
+| `competition` | Branches compete for an additional Candidate budget pool |
+| `combined` | Peer evidence sharing plus budget competition |
 
-The repository includes a fixed formal training configuration:
+Population mode and module search are orthogonal. For example, `combined + linear-hill-climb` and `combined + progressive-risk-expansion` are both valid recipes.
 
-| Setting                 | Value                                                     |
-| ----------------------- | --------------------------------------------------------- |
-| Target / Solver         | MSA Minimal Cowork, full 12-step runtime                  |
-| Updater                 | Isolated Codex CLI                                         |
-| Solver + Updater model  | `gpt-5.6-terra`, high reasoning, 8192 output tokens       |
-| Search space            | L1 prompt/skills + L2 agent loop/tool runtime             |
-| Search strategy         | `linear-hill-climb`                                       |
-| Candidate budget        | 32 per Mode                                               |
-| Branches                | Single = 1; the other four Modes = 2                      |
-| Suite concurrency       | Up to 2 Modes; up to 2 Office tasks per Branch            |
-| Data                    | 55 feedback + 18 selection; sealed final remains unopened |
-| Seed / trials           | One preregistered seed, one trial per task                |
+**Extend the platform**
 
-The five Experiments live under
-[`experiments/cowork-msa-rsi-formal32-codex-*.json`](experiments/), and the
-auditable runner is
-[`scripts/run-cowork-formal32-five-mode.mjs`](scripts/run-cowork-formal32-five-mode.mjs).
+- Add a **Target** when you want to evolve a new Harness. Define its Source, CandidateSeed, Solver Driver, semantic Validator, and Mutation Catalog.
+- Add an **Environment** when you want a new task domain. Define task materialization, isolation, verifier, Result protocol, split, and metric.
+- Add a **SearchStrategy** when you want a new Region-selection algorithm. It may return Region IDs, never file paths or credentials.
+- Register an **EvolutionAlgorithm** to customize population orchestration. New algorithms should use the SDK v2 `initialize/step/resume/report` lifecycle and their own RunStore/Checkpoint state. The existing Population v1 contract remains available for Cowork compatibility.
+- Add an **EvolutionRecipe** when you want to recombine an existing population topology, branch count, budget, sharing rule, and search strategy.
 
-~~~bash
-export RSI_OFFICEVAL_DATASET_ROOT=../datasets/OmegaUse-OfficeVal-Dataset
-export RSI_OFFICEVAL_EVALUATOR_ROOT=../datasets/OmegaUse-OfficeVal
-export RSI_SUITE_MAX_CONCURRENT_MODES=2
+The full file map, protocols, extension checklist, and test matrix are in the [Contributor guide](CONTRIBUTING.md).
 
-node scripts/run-cowork-formal32-five-mode.mjs
-~~~
+## Advanced topics
 
-This is a complete RSI configuration, not yet a publication-grade statistical
-claim. A formal comparison should preregister multiple seeds/trials and report
-reward, Solver/Updater tokens, wall time, infrastructure failures, and the
-one-time sealed-final result.
+**Registered five-mode Cowork suite**: The repository includes a fixed formal training configuration (32 Candidates per Mode, `linear-hill-climb`, MSA Minimal Cowork + OfficeVal). See [`experiments/cowork-msa-rsi-formal32-codex-*.json`](experiments/) and [`scripts/run-cowork-formal32-five-mode.mjs`](scripts/run-cowork-formal32-five-mode.mjs).
 
-## Server API / Core Engine
+**Shared final evaluation**: For cross-mode comparisons, `experiment finalize-suite` evaluates one shared H0 and each frozen champion without retraining. See [shared final evaluation](docs/shared-final-suite.zh.md).
 
-The repository now separates run control from experiment execution: `server/`
-owns Run creation, status, Resume/Cancel, event streaming, and version summaries;
-`controller/src/` remains the Core Engine for Controller, Environment, Solver,
-Updater, Checkpoint, and trusted experiment execution. The API accepts only
-repository-relative Experiment paths and never arbitrary shell commands. A Population Run
-can also be forked from a committed Checkpoint through `POST /v1/runs/:runId/fork`; the new
-Run recomputes its Baseline. See
-[`server/README.zh.md`](server/README.zh.md) for the local entry point.
+**Server API / Core Engine**: `server/` owns Run creation, status, Resume/Cancel, event streaming, and version summaries; `controller/src/` remains the Core Engine for trusted experiment execution. A Population Run can be forked from a committed Checkpoint through `POST /v1/runs/:runId/fork`. See [`server/README.zh.md`](server/README.zh.md).
 
-## Build your own composition
-
-- Add a **Target** when you want to evolve a new Harness. Define its Source,
-  CandidateSeed, Solver Driver, semantic Validator, and Mutation Catalog.
-- Add an **Environment** when you want a new task domain. Define task
-  materialization, isolation, verifier, Result protocol, split, and metric.
-- Add a **SearchStrategy** when you want a new Region-selection algorithm. It
-  may return Region IDs, never file paths or credentials.
-- Register an **EvolutionAlgorithm** to customize population orchestration.
-  New algorithms should use the SDK v2 `initialize/step/resume/report` lifecycle
-  and their own RunStore/Checkpoint state (for example a genetic population, a
-  beam, or an MCTS tree). The existing Population v1 contract remains available
-  for Cowork compatibility. Registration is programmatic in a trusted launcher;
-  arbitrary untrusted modules are not automatically installed or executed.
-- Add an **EvolutionRecipe** when you want to recombine an existing population
-  topology, branch count, budget, sharing rule, and search strategy.
-
-The full file map, protocols, extension checklist, and test matrix are in the
-[Contributor guide](CONTRIBUTING.md).
-
-The standalone [OfficeVal evaluator](eval/README.md) accepts candidate/task/model
-configuration and can resume completed task scores. It is a compatibility runner,
-separate from the Controller's sealed-final audit chain. Verify changes with
-`npm test`, `npm run check`, and `npm run test:eval`.
+**Standalone evaluator**: The standalone [OfficeVal evaluator](eval/README.md) accepts candidate/task/model configuration and can resume completed task scores. It is a compatibility runner, separate from the Controller's sealed-final audit chain.
 
 ## Trust and reproducibility
 
