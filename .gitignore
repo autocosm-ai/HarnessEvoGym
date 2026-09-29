@@ -5,7 +5,7 @@
 /benchmarks/hle-text-math/.private/
 
 # 本地 Worktree 与生成报告
-/.WorkTrees/
+/.worktrees/
 /docs/repo-report/
 
 # 凭据与本地覆盖

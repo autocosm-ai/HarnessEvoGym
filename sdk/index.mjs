@@ -8,6 +8,7 @@ export { EnvironmentDriver } from './interfaces/environment.mjs'
 export { SolverDriver } from './interfaces/solver.mjs'
 export { UpdaterDriver } from './interfaces/updater.mjs'
 export { EvolutionAlgorithmDriver } from './interfaces/algorithm.mjs'
+export { EvolutionAlgorithmDriverV2 } from './interfaces/algorithm-v2.mjs'
 export { Evaluator } from './interfaces/evaluator.mjs'
 
 /**

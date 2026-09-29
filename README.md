@@ -1,3 +1,21 @@
+<table align="center">
+  <tr>
+    <td align="center">
+      <a href="https://github.com/PKU-DAIR">
+        <img src="docs/assets/logos/pku-dair.png" width="88" alt="PKU-DAIR logo" />
+      </a><br />
+      <sub><b>PKU-DAIR</b><br />Peking University</sub>
+    </td>
+    <td width="36"></td>
+    <td align="center">
+      <a href="https://github.com/autocosm-ai">
+        <img src="docs/assets/logos/autocosm-ai.png" width="88" alt="AutoCosm.AI logo" />
+      </a><br />
+      <sub><b>AutoCosm.AI</b><br />Open Source</sub>
+    </td>
+  </tr>
+</table>
+
 <p align="center">
   <img src="docs/assets/harness-evo-gym-hero-v2.png" width="100%" alt="HarnessEvoGym evolves multiple agent harnesses around a trusted controller." />
 </p>
@@ -217,6 +235,17 @@ claim. A formal comparison should preregister multiple seeds/trials and report
 reward, Solver/Updater tokens, wall time, infrastructure failures, and the
 one-time sealed-final result.
 
+## Server API / Core Engine
+
+The repository now separates run control from experiment execution: `server/`
+owns Run creation, status, Resume/Cancel, event streaming, and version summaries;
+`controller/src/` remains the Core Engine for Controller, Environment, Solver,
+Updater, Checkpoint, and trusted experiment execution. The API accepts only
+repository-relative Experiment paths and never arbitrary shell commands. A Population Run
+can also be forked from a committed Checkpoint through `POST /v1/runs/:runId/fork`; the new
+Run recomputes its Baseline. See
+[`server/README.zh.md`](server/README.zh.md) for the local entry point.
+
 ## Build your own composition
 
 - Add a **Target** when you want to evolve a new Harness. Define its Source,
@@ -226,9 +255,11 @@ one-time sealed-final result.
 - Add a **SearchStrategy** when you want a new Region-selection algorithm. It
   may return Region IDs, never file paths or credentials.
 - Register an **EvolutionAlgorithm** to customize population orchestration.
-  Drivers currently share the existing PopulationStore, state schema, and
-  Branch/budget contracts. Registration is programmatic in a trusted launcher;
-  arbitrary external algorithms and state formats are not supported.
+  New algorithms should use the SDK v2 `initialize/step/resume/report` lifecycle
+  and their own RunStore/Checkpoint state (for example a genetic population, a
+  beam, or an MCTS tree). The existing Population v1 contract remains available
+  for Cowork compatibility. Registration is programmatic in a trusted launcher;
+  arbitrary untrusted modules are not automatically installed or executed.
 - Add an **EvolutionRecipe** when you want to recombine an existing population
   topology, branch count, budget, sharing rule, and search strategy.
 

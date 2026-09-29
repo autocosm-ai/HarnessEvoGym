@@ -1,3 +1,21 @@
+<table align="center">
+  <tr>
+    <td align="center">
+      <a href="https://github.com/PKU-DAIR">
+        <img src="docs/assets/logos/pku-dair.png" width="88" alt="PKU-DAIR 标志" />
+      </a><br />
+      <sub><b>北京大学 DCAI 团队</b><br />PKU-DAIR</sub>
+    </td>
+    <td width="36"></td>
+    <td align="center">
+      <a href="https://github.com/autocosm-ai">
+        <img src="docs/assets/logos/autocosm-ai.png" width="88" alt="AutoCosm.AI 标志" />
+      </a><br />
+      <sub><b>AutoCosm.AI</b><br />开源项目</sub>
+    </td>
+  </tr>
+</table>
+
 <p align="center">
   <img src="docs/assets/harness-evo-gym-hero-v2.png" width="100%" alt="HarnessEvoGym：多个 Agent Harness 在受控环境中围绕 Controller 进行可审计进化。" />
 </p>
@@ -19,7 +37,7 @@
   <img alt="研究预览版" src="https://img.shields.io/badge/status-research_preview-f4a261?style=flat-square" />
   <img alt="MIT License" src="https://img.shields.io/badge/controller-MIT-4c8bf5?style=flat-square" />
   <img alt="五种 Population Mode" src="https://img.shields.io/badge/population_modes-5-8b5cf6?style=flat-square" />
-  <img alt="549 tests" src="https://img.shields.io/badge/tests-549%20Node%20%2B%2014%20Python-20a36a?style=flat-square" />
+  <img alt="554 tests" src="https://img.shields.io/badge/tests-554%20Node%20%2B%2014%20Python-20a36a?style=flat-square" />
 </p>
 
 > **一句话定位**：HarnessEvoGym 是一个面向 Agent Harness 的 RSI（Recursive Self-Improvement）训练场。它让 Updater 修改 Candidate，让 Solver 在真实任务环境中验证修改，再由 Controller 决定保留、回退、暂停或恢复。
@@ -164,6 +182,7 @@ export RSI_PROVIDER_API_KEY
 ```text
 controller/                  信任根：调度、权限、晋升、回滚、Resume
 controller/src/environments  OfficeVal 与 HLE 的环境执行器
+server/                      Server API 与 Core Engine 生命周期边界
 adapters/                    Target、Environment、Updater、Provider、Strategy 配置
 benchmarks/                  数据划分、任务清单和运行手册
 experiments/                 可复现实验配方
@@ -172,12 +191,20 @@ eval/                        独立 OfficeVal 泛化评测兼容工具
 README.dev.zh.md             开发日志与工程状态
 ```
 
+### Server API / Core Engine
+
+仓库现在把运行控制拆成两层：`server/` 只负责创建 Run、查询状态、Resume/Cancel、读取事件和版本摘要；
+`controller/src/` 继续作为 Core Engine，负责 Controller、Environment、Solver、Updater、Checkpoint 和真实实验执行。
+Server API 不接受任意 shell 命令，Experiment 只能引用仓库内的相对路径；Population Run
+还可以通过 `POST /v1/runs/:runId/fork` 从已提交 Checkpoint 创建新 Run，并重新计算 Baseline。
+启动方式见 [`server/README.zh.md`](server/README.zh.md)。
+
 ## 如何扩展
 
 - **新 Harness**：实现 Target Adapter，声明 Source、CandidateSeed、Validator 和 Mutation Catalog。
 - **新任务领域**：实现 Environment Adapter，提供任务物化、隔离工作区、Verifier、指标和数据划分。
 - **新搜索策略**：实现 SearchStrategy，只返回受信 Catalog 中的 Region ID 和父 Candidate。
-- **新进化算法**：注册兼容 Population State、Branch、Budget、Checkpoint 和 Resume 契约的 EvolutionAlgorithm。
+- **新进化算法**：优先实现 SDK Algorithm v2 的 `initialize/step/resume/report` 生命周期，算法可以保存自己的种群、Beam 或搜索树状态；现有 Population v1 继续兼容。
 - **新 Updater**：实现 Updater Adapter，保留完整 Coding Agent Session，由 Controller 管理可写权限。
 
 完整接口、协议边界、测试矩阵和 PR 要求见 [`CONTRIBUTING.md`](CONTRIBUTING.md)。

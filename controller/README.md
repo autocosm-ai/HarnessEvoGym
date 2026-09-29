@@ -11,6 +11,8 @@ Controller 是 RSI 系统的可信、确定性控制平面。Updater 负责开�
 | `src/mutation-catalog.mjs`     | Target Region Catalog、Strategy Plan 校验与单轮 Lease       |
 | `src/search-strategy.mjs`      | 内置策略 Registry 与无网络 Docker JSON 策略协议          |
 | `src/evolution-algorithm.mjs`  | Evolution Algorithm Registry 与 Population 生命周期适配  |
+| `src/generic-algorithm.mjs`    | 不依赖 PopulationStore 的 Algorithm v2 Host、RunStore 与 Checkpoint |
+| `src/population-fork.mjs`      | 校验 Parent Checkpoint/Candidate，并准备新的 Fork Run Seed |
 | `src/candidate.mjs`            | Tree Snapshot、Digest、Diff Guard、Manifest、Mutation Report |
 | `src/path-policy.mjs`          | 安全相对路径、Glob、只读优先级和扩展名策略                  |
 | `src/docker.mjs`               | 无 Shell 的 Docker CLI、资源与权限限制                      |
@@ -24,6 +26,8 @@ Controller 是 RSI 系统的可信、确定性控制平面。Updater 负责开�
 | `src/feedback.mjs`             | feedback-only 脱敏反馈包                                    |
 | `src/protocol.mjs`             | Benchmark、Policy、Solver Result 和 Ledger 协议              |
 | `src/evaluator.mjs`            | 配对指标、Bootstrap 与晋升 Gate                             |
+| `src/evaluation-profile.mjs`   | 评测身份、Resume/Final/Fork/Exploratory 复用规则             |
+| `src/evaluation-runner.mjs`    | OfficeVal/HLE 共用的 Candidate 调度、重试参数和完整性 Gate |
 | `src/orchestrator.mjs`         | Future Reasoning 单分支进化、Git 保留/回滚                 |
 | `src/population-orchestrator.mjs` | Reasoning 五种种群模式和同步 Wave                    |
 | `src/cowork-orchestrator.mjs`  | Cowork Champion/Proposal、晋升/回滚和一次性 Final       |
@@ -89,10 +93,10 @@ Source/Materialization 生命周期和 Driver 注册，不是只注册一个函�
 
 Driver 能执行和挂载工作区，因此必须作为受审查的 Controller 代码；只做搜索决策的外部
 Strategy 才可以使用沙箱镜像。EvolutionAlgorithm 通过 `spec.algorithm` 选择已注册实现；
-未声明时使用 `population-v1`，保证旧 Recipe 兼容。新的 Algorithm 必须实现
-`initialize`、`run`、`resume`、`report`、`freezeBaseline`，暴露当前 Run 的
-`PopulationStore`，并保持既有状态、预算、Checkpoint 和报告契约。需在可信启动脚本内
-注册，恢复时也须加载同一实现；CLI 不自动安装或加载外部算法。
+未声明时使用 `population-v1`，保证旧 Recipe 兼容。新的 Algorithm 可以实现 SDK v2 的
+`initialize`、`step`、`resume`、`report`、`freezeBaseline`，使用自己的 RunStore、状态和
+版本化 Checkpoint；现有 Cowork Population 继续使用 v1 的 Branch/Budget 契约。需在可信
+启动脚本内注册，恢复时也须加载同一实现；CLI 不自动安装或执行未审查模块。
 
 Environment 可通过 `describeCapabilities()` 声明分区、反馈、隐藏测试、按题重试和
 Checkpoint 恢复能力。Final 执行据此决定能否按题重试；旧 Driver 的

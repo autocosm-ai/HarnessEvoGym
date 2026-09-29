@@ -8,6 +8,7 @@ import { inside, prepareFinalSuiteEntry } from './final-suite-entry.mjs'
 import { digest, readOptionalJson, saveSuiteJson } from './final-suite-store.mjs'
 import { ProtocolError, readJsonFile, readResultFile, validateResultRecords } from './protocol.mjs'
 import { validateInfrastructureRetries } from './trial-infrastructure-retry.mjs'
+import { runEvaluationPartition } from './evaluation-runner.mjs'
 
 const ID = /^[a-z0-9][a-z0-9_-]{0,79}$/u
 export function validateSharedFinalConfig(value) {
@@ -73,17 +74,26 @@ export async function executeSharedFinalJobs({ root, jobs, config, onEvent = () 
       await saveSuiteJson(path, { label: job.label, status: 'running', candidate: job.candidate,
         outputPath: job.outputPath, startedAt: new Date().toISOString() })
       onEvent({ stage: 'final-suite-start', message: `${job.label} 开始/继续隐藏题，已提交题不重跑` })
-      const result = await job.environment.runCandidatePartition({
-        ...job.candidate, partition: 'final', model: job.model, seeds: job.seeds,
-        outputPath: job.outputPath, infrastructureRetries: config.infrastructureRetries,
-        retryReasoningOnly: config.retryReasoningOnly, strictFinalCheckpoints: true,
+      const expected = job.benchmark.partitions.final.instanceIds
+      const resultMap = await runEvaluationPartition({
+        environment: job.environment,
+        candidates: [job.candidate],
+        partition: 'final',
+        model: job.model,
+        seeds: job.seeds,
+        outputPath: () => job.outputPath,
+        expectedInstanceIds: expected,
+        infrastructureRetries: config.infrastructureRetries,
+        retryReasoningOnly: config.retryReasoningOnly,
+        strictFinalCheckpoints: true,
         maximumConcurrentTrials: config.maximumConcurrentTrialsPerEntry,
+        maximumConcurrency: 1,
         onInfrastructureRetry: ({ retry, maximumRetries }) => onEvent({
           stage: 'final-suite-retry', message: `${job.label} 当前题重试 ${retry}/${maximumRetries}（受持久化总预算限制）`,
         }),
       })
       // Environment 保证完整分区；再验证分母，绝不输出缺题平均数。
-      const expected = job.benchmark.partitions.final.instanceIds
+      const result = resultMap.get(job.candidate.candidateId)
       if (result.size !== expected.length || expected.some((id) => !result.has(id))) {
         throw new ProtocolError('Final 结果缺题，不能生成完整分数')
       }

@@ -1,4 +1,5 @@
 import { ProtocolError } from './protocol.mjs'
+import { normalizeEvaluationMode, validateEvaluationIdentity } from './evaluation-profile.mjs'
 
 function round(value, digits = 6) {
   if (value === null || value === undefined || !Number.isFinite(value)) return value
@@ -508,6 +509,8 @@ export function evaluateBenchmark({
   partitions,
   evolutionLedger = null,
   allowSealed = false,
+  evaluationMode = null,
+  evaluationIdentity = null,
 }) {
   if (!run?.id || !run?.baselineRevision || !run?.candidateRevision) {
     throw new ProtocolError('Evaluation Report 必须记录 Run、Baseline Revision 与 Candidate Revision')
@@ -521,6 +524,24 @@ export function evaluateBenchmark({
       throw new ProtocolError('未解锁的结果文件包含 sealed Final Instance', [
         `检测到 ${leakedIds.size} 个 Final Instance；请使用独立的进化期结果文件`,
       ])
+    }
+  }
+  let evaluationMetadata = {}
+  if (evaluationMode !== null || evaluationIdentity !== null) {
+    if (evaluationIdentity === null) {
+      throw new ProtocolError('指定 evaluationMode 时必须同时提供已冻结的 evaluationIdentity')
+    }
+    const identity = validateEvaluationIdentity(evaluationIdentity)
+    const mode = normalizeEvaluationMode(evaluationMode ?? identity.mode)
+    if (identity.mode !== mode) {
+      throw new ProtocolError('evaluationMode 与 evaluationIdentity.mode 不一致')
+    }
+    if (mode === 'sealed-final' && !allowSealed) {
+      throw new ProtocolError('sealed-final 模式必须显式 allowSealed，不能绕过 Final 保护')
+    }
+    evaluationMetadata = {
+      evaluationMode: mode,
+      evaluationIdentityDigest: identity.identityDigest,
     }
   }
   const partitionReports = {}
@@ -566,6 +587,7 @@ export function evaluateBenchmark({
       baselineRevision: run.baselineRevision,
       candidateRevision: run.candidateRevision,
       primaryMetric: policy.primaryMetric,
+      ...evaluationMetadata,
     },
     source: benchmark.source,
     requestedPartitions: [...partitions],
