@@ -1,10 +1,10 @@
 <table align="center">
   <tr>
     <td align="center">
-      <a href="https://github.com/PKU-DAIR">
-        <img src="docs/assets/logos/pku-dair.png" width="88" alt="PKU-DAIR logo" />
+      <a href="https://github.com/OpenDCAI">
+        <img src="docs/assets/logos/opendcai.png" width="88" alt="OpenDCAI logo" />
       </a><br />
-      <sub><b>PKU-DAIR</b><br />Peking University</sub>
+      <sub><b>Peking University DCAI</b><br />OpenDCAI</sub>
     </td>
     <td width="36"></td>
     <td align="center">
