@@ -51,7 +51,7 @@ test('重试耗尽保留原故障，不返回空结果或伪造零分；默认�
 })
 
 test('只对可信上游暂态错误重试，认证、配置、Verifier、Candidate 和低分不重试', async () => {
-  for (const status of [429, 500, 502, 503, 504]) {
+  for (const status of [429, 500, 502, 503, 504, 524]) {
     assert.equal(isRetryableTrialInfrastructure(failure({
       category: 'provider', code: 'upstream-unavailable', request: { httpStatus: status },
     })), true)

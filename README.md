@@ -167,7 +167,7 @@ Population mode and module search are orthogonal. For example, `combined + linea
 - Add a **Target** when you want to evolve a new Harness. Define its Source, CandidateSeed, Solver Driver, semantic Validator, and Mutation Catalog.
 - Add an **Environment** when you want a new task domain. Define task materialization, isolation, verifier, Result protocol, split, and metric.
 - Add a **SearchStrategy** when you want a new Region-selection algorithm. It may return Region IDs, never file paths or credentials.
-- Register an **EvolutionAlgorithm** to customize population orchestration. New algorithms should use the SDK v2 `initialize/step/resume/report` lifecycle and their own RunStore/Checkpoint state. The existing Population v1 contract remains available for Cowork compatibility.
+- Register an **EvolutionAlgorithm** to customize population orchestration. Population Recipes currently accept trusted drivers that preserve the PopulationStore/Branch/Budget contract. Independent algorithms can use the SDK v2 `initialize/step/resume/report` lifecycle and their own RunStore/Checkpoint state through `harness-rsi algorithm run`; this generic path is not yet wired into the standard Experiment Recipe or Server Run API.
 - Add an **EvolutionRecipe** when you want to recombine an existing population topology, branch count, budget, sharing rule, and search strategy.
 
 The full file map, protocols, extension checklist, and test matrix are in the [Contributor guide](CONTRIBUTING.md).

@@ -104,3 +104,14 @@ test('通用 Algorithm Runner 拒绝不受限的步数和非法 Checkpoint Codec
   const invalid = { ...driver(join(root, 'bad')), checkpointCodec: { version: 'v1' } }
   await assert.rejects(() => runGenericEvolution({ driver: invalid }), /CheckpointCodec/u)
 })
+
+test('FileAlgorithmRunStore 并发追加事件仍保持唯一序号并限制事件大小', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'harness-generic-events-'))
+  const store = new FileAlgorithmRunStore(join(root, 'run'))
+  await store.initialize({ state: { status: 'active' } })
+  const records = await Promise.all(Array.from({ length: 20 }, (_, index) =>
+    store.appendEvent({ type: 'step', index })))
+  assert.deepEqual(records.map((record) => record.sequence).sort((a, b) => a - b),
+    Array.from({ length: 20 }, (_, index) => index + 1))
+  await assert.rejects(() => store.appendEvent({ value: 'x'.repeat(10_000) }), /字节上限/u)
+})

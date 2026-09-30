@@ -134,10 +134,10 @@ export function validateHarborTaskToml(input, taskRoot, { workspacePath = '/app'
   const verifier = object(document.verifier, 'Harbor task.toml.verifier')
   const agent = object(document.agent, 'Harbor task.toml.agent')
   const environment = object(document.environment, 'Harbor task.toml.environment')
-  rejectUnknown(metadata, new Set(['category', 'tags']), 'Harbor task.toml.metadata')
-  rejectUnknown(verifier, new Set(['environment_mode', 'timeout_sec']), 'Harbor task.toml.verifier')
-  rejectUnknown(agent, new Set(['timeout_sec']), 'Harbor task.toml.agent')
-  rejectUnknown(environment, new Set(['build_timeout_sec', 'cpus', 'memory_mb', 'storage_mb', 'gpus', 'allow_internet']), 'Harbor task.toml.environment')
+  rejectUnknown(metadata, new Set(['name', 'difficulty', 'category', 'tags']), 'Harbor task.toml.metadata')
+  rejectUnknown(verifier, new Set(['environment_mode', 'timeout_sec', 'timeout_seconds']), 'Harbor task.toml.verifier')
+  rejectUnknown(agent, new Set(['timeout_sec', 'timeout_seconds']), 'Harbor task.toml.agent')
+  rejectUnknown(environment, new Set(['build_timeout_sec', 'build_timeout_seconds', 'cpus', 'memory_mb', 'storage_mb', 'gpus', 'allow_internet']), 'Harbor task.toml.environment')
   if (metadata.category !== undefined && typeof metadata.category !== 'string') {
     throw new ProtocolError('Harbor metadata.category 必须是字符串')
   }
@@ -172,13 +172,13 @@ export function validateHarborTaskToml(input, taskRoot, { workspacePath = '/app'
     }),
     verifier: Object.freeze({
       environmentMode,
-      timeoutSeconds: validateTimeout(verifier.timeout_sec, 'Harbor verifier.timeout_sec'),
+      timeoutSeconds: validateTimeout(verifier.timeout_sec ?? verifier.timeout_seconds, 'Harbor verifier.timeout_sec'),
     }),
     agent: Object.freeze({
-      timeoutSeconds: validateTimeout(agent.timeout_sec, 'Harbor agent.timeout_sec'),
+      timeoutSeconds: validateTimeout(agent.timeout_sec ?? agent.timeout_seconds, 'Harbor agent.timeout_sec'),
     }),
     environment: Object.freeze({
-      buildTimeoutSeconds: validateTimeout(environment.build_timeout_sec, 'Harbor environment.build_timeout_sec', 600),
+      buildTimeoutSeconds: validateTimeout(environment.build_timeout_sec ?? environment.build_timeout_seconds, 'Harbor environment.build_timeout_sec', 600),
       cpus: resourceNumber(environment.cpus, 'Harbor environment.cpus', 1, 64, false, 0.1),
       memoryMb: resourceNumber(environment.memory_mb, 'Harbor environment.memory_mb', 2048, 262144),
       storageMb: resourceNumber(environment.storage_mb, 'Harbor environment.storage_mb', 10240, 1048576),

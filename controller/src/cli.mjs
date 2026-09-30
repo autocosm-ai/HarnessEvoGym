@@ -3,8 +3,14 @@
 import { resolve } from 'node:path'
 import { loadExperimentBundle, validateAnyAdapter } from './adapters.mjs'
 import { assertEvolutionAlgorithmAvailable } from './evolution-algorithm.mjs'
-import { readConfigFile, REPOSITORY_ROOT } from './config.mjs'
+import { assertPathKind, readConfigFile, REPOSITORY_ROOT, resolveInside } from './config.mjs'
 import { evaluateBenchmark } from './evaluator.mjs'
+import { autoRegisterPlugin } from './plugin-loader.mjs'
+import {
+  createGenericEvolutionAlgorithmDriver,
+  FileAlgorithmRunStore,
+  runGenericEvolution,
+} from './generic-algorithm.mjs'
 import {
   buildExperimentRuntime,
   finalizeEvolution,
@@ -43,6 +49,7 @@ const HELP = `HarnessEvoGym Controller
   harness-rsi experiment fork --run <population-run> [--checkpoint <checkpoint.json>] [--config <experiment.json>] [--run-id <id>]
   harness-rsi experiment finalize --run <single-run | population-run> [--recover-infrastructure] [--final-only] [--infrastructure-retries 0..10]
   harness-rsi experiment finalize-suite --config <shared-final.json> [--resume] [--validate-only]
+  harness-rsi algorithm run --plugin <plugin-dir> --algorithm <id> --run-root <relative-dir> [--steps <n>] [--resume] [--resume-checkpoint <name>] [--baseline-only]
   harness-rsi benchmark validate --config <benchmark.json> [--output <report.json>]
   harness-rsi evaluate compare \\
     --benchmark <benchmark.json> \\
@@ -77,6 +84,8 @@ const HELP = `HarnessEvoGym Controller
   - experiment fork 从已提交 Budget Checkpoint 派生新 Run，只复用 Candidate Workspace 作为新 H0 Seed，并重新执行 Baseline；旧分数不会复制。
   - experiment finalize / finalize-suite 是允许解锁 Cowork sealed final 的受控入口。
   - finalize-suite 只测一次共享 H0 和各 Population 冻结冠军；--resume 不重做已提交题。
+  - algorithm run 用受信 Algorithm v2 插件运行独立搜索；RunStore、状态和 Checkpoint 都保存在 --run-root。
+    --resume 只恢复已有 Run；--resume-checkpoint 可在恢复时显式选择一个不可变 Checkpoint。
   - --recover-infrastructure 只能在 Population 上次失败且从未访问 sealed final 时使用，并且只能恢复一次。
   - --final-only 只评测隐藏题，不重新回放训练题；OmegaUse Final 默认追加重试 5 次，最多允许 10 次。
   - Provider 密钥只从运行时环境变量读取，不写入 Experiment 或 .rsi 产物。
@@ -336,6 +345,68 @@ async function finalizeSuiteCommand(args) {
   if (!['completed', 'validated'].includes(result.status)) process.exitCode = 2
 }
 
+function positiveIntegerOption(options, name, fallback, { max = 100_000 } = {}) {
+  if (!options.has(name)) return fallback
+  const value = Number(options.get(name))
+  if (!Number.isSafeInteger(value) || value < 0 || value > max) {
+    throw new ProtocolError(`--${name} 必须是 0-${max} 的整数`)
+  }
+  return value
+}
+
+async function genericAlgorithmRunCommand(args) {
+  const { options, flags } = parseOptions(args, {
+    valueOptions: new Set([
+      'plugin', 'algorithm', 'run-root', 'steps', 'context', 'initial-state',
+      'configuration', 'resume-checkpoint', 'checkpoint-prefix', 'output',
+    ]),
+    booleanFlags: new Set(['resume', 'baseline-only']),
+  })
+  const pluginRoot = resolveInside(REPOSITORY_ROOT, requiredValue(options, 'plugin'), 'Plugin 路径')
+  await assertPathKind(pluginRoot, 'Plugin 目录', 'directory')
+  await autoRegisterPlugin(pluginRoot)
+
+  const algorithmId = requiredValue(options, 'algorithm')
+  const algorithm = options.has('configuration')
+    ? { id: algorithmId, configuration: await readJsonFile(resolveInside(
+      REPOSITORY_ROOT, options.get('configuration'), 'Algorithm configuration 路径')) }
+    : algorithmId
+  const runRoot = resolveInside(REPOSITORY_ROOT, requiredValue(options, 'run-root'), 'Algorithm Run Root')
+  const context = options.has('context')
+    ? await readJsonFile(resolveInside(REPOSITORY_ROOT, options.get('context'), 'Algorithm context 路径'))
+    : {}
+  const initialState = options.has('initial-state')
+    ? await readJsonFile(resolveInside(REPOSITORY_ROOT, options.get('initial-state'), 'Algorithm initial state 路径'))
+    : undefined
+  const steps = positiveIntegerOption(options, 'steps', 1)
+  const store = new FileAlgorithmRunStore(runRoot)
+  const driver = createGenericEvolutionAlgorithmDriver({ algorithm, options: { store } })
+  const result = await runGenericEvolution({
+    driver,
+    ...(initialState === undefined ? {} : { initialState }),
+    context,
+    maxSteps: steps,
+    resume: flags.has('resume'),
+    baselineOnly: flags.has('baseline-only'),
+    ...(options.has('resume-checkpoint') ? { resumeCheckpoint: options.get('resume-checkpoint') } : {}),
+    ...(options.has('checkpoint-prefix') ? { checkpointPrefix: options.get('checkpoint-prefix') } : {}),
+    metadata: {
+      algorithm,
+      checkpointCodecVersion: driver.checkpointCodec.version,
+    },
+  })
+  await emit({
+    apiVersion: 'harness-rsi/v1alpha1',
+    kind: 'AlgorithmRunReport',
+    algorithm: algorithmId,
+    runRoot: runRoot === REPOSITORY_ROOT ? '.' : runRoot.replace(`${REPOSITORY_ROOT}/`, ''),
+    status: result.state.status ?? null,
+    steps: result.steps,
+    complete: result.complete,
+    report: result.report,
+  }, options.get('output'))
+}
+
 async function validateBenchmarkCommand(args) {
   const { options } = parseOptions(args, {
     valueOptions: new Set(['config', 'output']),
@@ -440,6 +511,7 @@ async function main() {
   if (group === 'experiment' && action === 'fork') return await forkExperimentCommand(args)
   if (group === 'experiment' && action === 'finalize') return await evolveFinalizeCommand(args)
   if (group === 'experiment' && action === 'finalize-suite') return await finalizeSuiteCommand(args)
+  if (group === 'algorithm' && action === 'run') return await genericAlgorithmRunCommand(args)
   if (group === 'runtime' && action === 'build') return await buildRuntimeCommand(args)
   if (group === 'benchmark' && action === 'validate') return await validateBenchmarkCommand(args)
   if (group === 'evaluate' && action === 'compare') return await compareCommand(args)

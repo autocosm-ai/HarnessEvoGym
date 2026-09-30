@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process'
-import { appendFile, mkdir, open, readFile, readdir } from 'node:fs/promises'
+import { appendFile, mkdir, open, readFile, readdir, stat } from 'node:fs/promises'
 import { dirname, join, relative, resolve } from 'node:path'
 
 import { assertEvolutionAlgorithmAvailable } from '../../controller/src/evolution-algorithm.mjs'
@@ -10,6 +10,8 @@ import { createRunId } from '../../controller/src/cowork-orchestrator.mjs'
 
 const RUN_ID_PATTERN = /^[a-z0-9][a-z0-9._-]{2,119}$/u
 const MAX_EVENT_BYTES = 8 * 1024
+const MAX_SERVER_EVENTS = 100_000
+const MAX_EVENT_LOG_BYTES = 64 * 1024 * 1024
 
 function assertRunId(value) {
   if (typeof value !== 'string' || !RUN_ID_PATTERN.test(value)) {
@@ -20,6 +22,47 @@ function assertRunId(value) {
 
 function isObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
+function safeEventDetails(value, label = '事件详情', seen = new Set()) {
+  if (!isObject(value)) throw new ProtocolError(`${label} 必须是 JSON 对象`)
+  const prototype = Object.getPrototypeOf(value)
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new ProtocolError(`${label} 必须是普通 JSON 对象`)
+  }
+  if (seen.has(value)) throw new ProtocolError(`${label} 不能包含循环引用`)
+  seen.add(value)
+  const output = {}
+  for (const key of Object.keys(value)) {
+    if (typeof key !== 'string' || /[\u0000-\u001f\u007f]/u.test(key)) {
+      throw new ProtocolError(`${label} 含有非法字段名`)
+    }
+    const item = value[key]
+    if (item === null || typeof item === 'string' || typeof item === 'boolean') output[key] = item
+    else if (typeof item === 'number' && Number.isFinite(item)) output[key] = item
+    else if (Array.isArray(item)) {
+      output[key] = item.map((entry, index) => safeEventValue(entry, `${label}.${key}[${index}]`, seen))
+    } else if (isObject(item)) {
+      output[key] = safeEventDetails(item, `${label}.${key}`, seen)
+    } else {
+      throw new ProtocolError(`${label}.${key} 必须是 JSON 值`)
+    }
+  }
+  seen.delete(value)
+  return output
+}
+
+function safeEventValue(value, label, seen) {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return value
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (Array.isArray(value)) {
+    if (seen.has(value)) throw new ProtocolError(`${label} 不能包含循环引用`)
+    seen.add(value)
+    const result = value.map((entry, index) => safeEventValue(entry, `${label}[${index}]`, seen))
+    seen.delete(value)
+    return result
+  }
+  return safeEventDetails(value, label, seen)
 }
 
 function now(clock) {
@@ -71,6 +114,7 @@ function terminalFromCoreState(state) {
   const status = state.status ?? state.metadata?.status
   if (['CLOSED', 'REPORTED', 'completed'].includes(status)) return 'completed'
   if (['PAUSED_INFRASTRUCTURE', 'paused', 'PAUSED'].includes(status)) return 'paused'
+  if (['FAILED', 'failed'].includes(status)) return 'failed'
   if (['EVOLVING', 'active', 'running'].includes(status)) return 'running'
   return null
 }
@@ -78,8 +122,15 @@ function terminalFromCoreState(state) {
 async function readJsonLines(pathValue) {
   try {
     await assertPathKind(pathValue, 'Run event log', 'file')
+    const info = await stat(pathValue)
+    if (info.size > MAX_EVENT_LOG_BYTES) {
+      throw new ProtocolError(`Run event log 超过 ${MAX_EVENT_LOG_BYTES} 字节上限`)
+    }
     const text = await readFile(pathValue, 'utf8')
     return text.split(/\r?\n/u).filter(Boolean).map((line, index) => {
+      if (Buffer.byteLength(line, 'utf8') > MAX_EVENT_BYTES) {
+        throw new ProtocolError(`Run event log 第 ${index + 1} 行超过 ${MAX_EVENT_BYTES} 字节上限`)
+      }
       try {
         return JSON.parse(line)
       } catch (error) {
@@ -117,6 +168,9 @@ export class CoreEngine {
     this.clock = clock
     this.processes = new Map()
     this.eventTails = new Map()
+    this.eventSequences = new Map()
+    this.coreEventTails = new Map()
+    this.controlTails = new Map()
     this.descriptorTails = new Map()
   }
 
@@ -165,21 +219,38 @@ export class CoreEngine {
   }
 
   async event(runId, type, details = {}) {
+    assertRunId(runId)
+    if (typeof type !== 'string' || type.length === 0 || /[\u0000\r\n]/u.test(type)) {
+      throw new ProtocolError('Run 事件类型必须是安全的非空字符串')
+    }
+    const safeDetails = safeEventDetails(details)
     const previous = this.eventTails.get(runId) ?? Promise.resolve()
     const append = async () => {
       const pathValue = this.eventsPath(runId)
       await mkdir(dirname(pathValue), { recursive: true })
-      const events = await readJsonLines(pathValue)
+      let sequence = this.eventSequences.get(runId)
+      if (sequence === undefined) {
+        const events = await readJsonLines(pathValue)
+        sequence = events.at(-1)?.sequence ?? 0
+      }
+      if (sequence >= MAX_SERVER_EVENTS) {
+        throw new ProtocolError(`Run 事件数量超过上限 ${MAX_SERVER_EVENTS}，请归档后再继续`)
+      }
       const record = {
+        ...safeDetails,
         apiVersion: 'harness-evo-gym/v1',
         kind: 'RunEvent',
-        sequence: events.length + 1,
+        sequence: sequence + 1,
         runId,
         type,
         at: now(this.clock),
-        ...details,
       }
-      await appendFile(pathValue, `${JSON.stringify(record)}\n`, 'utf8')
+      const serialized = JSON.stringify(record)
+      if (Buffer.byteLength(serialized, 'utf8') > MAX_EVENT_BYTES) {
+        throw new ProtocolError(`Run 事件超过 ${MAX_EVENT_BYTES} 字节上限`)
+      }
+      await appendFile(pathValue, `${serialized}\n`, 'utf8')
+      this.eventSequences.set(runId, record.sequence)
       return record
     }
     const current = previous.then(append, append)
@@ -192,10 +263,12 @@ export class CoreEngine {
   }
 
   async updateDescriptor(runId, patch) {
-    const descriptor = await this.readDescriptor(runId)
-    const next = { ...descriptor, ...patch, updatedAt: now(this.clock) }
-    await this.writeDescriptor(next)
-    return next
+    return await this.withDescriptorLock(runId, async () => {
+      const descriptor = await this.readDescriptor(runId)
+      const next = { ...descriptor, ...patch, updatedAt: now(this.clock) }
+      await writeJsonFile(this.descriptorPath(runId), next)
+      return next
+    })
   }
 
   async validateExperiment(experimentPath) {
@@ -255,7 +328,7 @@ export class CoreEngine {
       throw error
     }
     await this.event(runId, 'run.queued', { operation: 'run' })
-    await this.startProcess(descriptor, ['experiment', 'run', '--config', absolute])
+    await this.startProcess(descriptor, ['experiment', 'run', '--config', absolute, '--run-id', runId])
     return publicDescriptor(await this.readDescriptor(runId))
   }
 
@@ -283,6 +356,7 @@ export class CoreEngine {
 
     const selectedExperiment = experimentPath ?? parent.experimentPath
     const { absolute: experimentAbsolute, bundle } = await this.validateExperiment(selectedExperiment)
+    if (bundle.experiment.recipePath === null) throw new ProtocolError('Fork 目标必须是 Population Experiment')
     let checkpointArgument = null
     if (checkpoint !== null && checkpoint !== undefined) {
       if (typeof checkpoint !== 'string' || checkpoint.length === 0 || checkpoint.startsWith('/')) {
@@ -363,8 +437,13 @@ export class CoreEngine {
       return
     }
     this.processes.set(descriptor.runId, child)
-    await this.updateDescriptor(descriptor.runId, { status: 'running', pid: child.pid ?? null })
-    await this.event(descriptor.runId, 'run.started', { pid: child.pid ?? null })
+    let settled = false
+    let ready
+    const markSettled = () => {
+      if (settled) return false
+      settled = true
+      return true
+    }
 
     const onOutput = (chunk) => {
       const text = String(chunk).trim()
@@ -383,31 +462,52 @@ export class CoreEngine {
       }).catch(() => {})
     })
     child.once('error', (error) => {
-      this.processes.delete(descriptor.runId)
-      void this.updateDescriptor(descriptor.runId, {
+      if (!markSettled()) return
+      void Promise.resolve().then(() => ready).then(() => this.updateDescriptor(descriptor.runId, {
         status: 'failed',
         pid: null,
         error: publicMessage(error.message, this.repositoryRoot),
         completedAt: now(this.clock),
-      }).then(() => this.event(descriptor.runId, 'run.failed', {
+      })).then(() => this.event(descriptor.runId, 'run.failed', {
         message: publicMessage(error.message, this.repositoryRoot),
-      })).catch(() => {})
+      })).finally(() => {
+        if (this.processes.get(descriptor.runId) === child) this.processes.delete(descriptor.runId)
+      }).catch(() => {})
     })
     child.once('close', (code, signal) => {
-      this.processes.delete(descriptor.runId)
-      void this.readDescriptor(descriptor.runId).then((current) => {
+      if (!markSettled()) return
+      void Promise.resolve().then(() => ready).then(() => this.readDescriptor(descriptor.runId)).then(async (current) => {
         const cancelled = current.status === 'cancelling'
+        let mapped = null
+        let stateError = null
+        if (code === 0 && !cancelled) {
+          try { mapped = terminalFromCoreState(await this.readCoreState(current)) }
+          catch (error) { stateError = publicMessage(error.message, this.repositoryRoot) }
+          if (!stateError && !['completed', 'paused', 'failed'].includes(mapped)) {
+            stateError = 'Core Engine 进程正常退出，但没有留下合法的终态状态文件'
+          }
+        }
+        const status = cancelled ? 'cancelled' : stateError ? 'failed'
+          : code === 0 ? (mapped === 'paused' ? 'paused' : mapped === 'failed' ? 'failed' : 'completed') : 'failed'
         return this.updateDescriptor(descriptor.runId, {
-          status: cancelled ? 'cancelled' : code === 0 ? 'completed' : 'failed',
+          status,
           pid: null,
           completedAt: now(this.clock),
-          ...(code === 0 || cancelled ? {} : { error: `Core Engine 退出：code=${code ?? 'null'}, signal=${signal ?? 'null'}` }),
+          error: status === 'failed' ? stateError ?? `Core Engine 退出：code=${code ?? 'null'}, signal=${signal ?? 'null'}` : null,
         })
       }).then((next) => this.event(descriptor.runId, `run.${next.status}`, {
         code: code ?? null,
         signal: signal ?? null,
-      })).catch(() => {})
+      })).finally(() => {
+        if (this.processes.get(descriptor.runId) === child) this.processes.delete(descriptor.runId)
+      }).catch(() => {})
     })
+    // 必须先安装 error/close 监听；spawn 失败可能在第一次文件 I/O 完成前发生。
+    ready = (async () => {
+      await this.updateDescriptor(descriptor.runId, { status: 'running', pid: child.pid ?? null })
+      await this.event(descriptor.runId, 'run.started', { pid: child.pid ?? null })
+    })()
+    await ready
   }
 
   async refreshRun(runId) {
@@ -424,6 +524,12 @@ export class CoreEngine {
             status: mapped,
             pid: null,
             completedAt: now(this.clock),
+          }))
+        }
+        if (mapped === 'running') {
+          return publicDescriptor(await this.updateDescriptor(runId, {
+            status: 'paused', pid: null,
+            error: 'Core Engine 已中断，可从已提交状态恢复',
           }))
         }
         if (!mapped) {
@@ -447,8 +553,10 @@ export class CoreEngine {
     try {
       return await readJsonFile(statePath)
     } catch (error) {
-      if (error instanceof ProtocolError && /不存在/u.test(error.message)) return null
-      return null
+      if (error instanceof ProtocolError
+          && (/(?:不存在|ENOENT|no such file)/iu.test(error.message)
+            || error.details?.some((detail) => /(?:ENOENT|no such file)/iu.test(String(detail))))) return null
+      throw error
     }
   }
 
@@ -464,6 +572,18 @@ export class CoreEngine {
   }
 
   async controlRun(runId, action) {
+    const previous = this.controlTails.get(runId) ?? Promise.resolve()
+    const operation = () => this.controlRunUnlocked(runId, action)
+    const current = previous.then(operation, operation)
+    this.controlTails.set(runId, current)
+    try { return await current }
+    finally {
+      // 清理不影响已排队操作；后者仍持有 previous Promise。
+      if (this.controlTails.get(runId) === current) this.controlTails.delete(runId)
+    }
+  }
+
+  async controlRunUnlocked(runId, action) {
     const descriptor = await this.readDescriptor(runId)
     if (action === 'refresh') return await this.getRun(runId)
     if (action === 'cancel') {
@@ -486,7 +606,7 @@ export class CoreEngine {
       }
       if (!descriptor.population) throw new ProtocolError('旧版单 Run 暂不支持 Server Resume；请使用 Population Run')
       const runRoot = resolveInside(this.repositoryRoot, descriptor.runRoot, 'Run Root')
-      const next = await this.updateDescriptor(runId, { status: 'queued', operation: 'resume', error: null })
+      const next = await this.updateDescriptor(runId, { status: 'queued', operation: 'resume', error: null, completedAt: null })
       await this.event(runId, 'run.queued', { operation: 'resume' })
       await this.startProcess(next, ['experiment', 'resume', '--run', runRoot])
       return publicDescriptor(await this.readDescriptor(runId))
@@ -495,6 +615,15 @@ export class CoreEngine {
   }
 
   async getEvents(runId, after = 0) {
+    const previous = this.coreEventTails.get(runId) ?? Promise.resolve()
+    const current = previous.then(() => this.collectEvents(runId, after), () => this.collectEvents(runId, after))
+    this.coreEventTails.set(runId, current)
+    try { return await current }
+    finally { if (this.coreEventTails.get(runId) === current) this.coreEventTails.delete(runId) }
+  }
+
+  async collectEvents(runId, after = 0) {
+    if (!Number.isSafeInteger(after) || after < 0) throw new ProtocolError('after 必须是非负整数')
     const descriptor = await this.readDescriptor(runId)
     const serverEvents = await readJsonLines(this.eventsPath(runId))
     const runRoot = resolveInside(this.repositoryRoot, descriptor.runRoot, 'Run Root')
@@ -507,22 +636,20 @@ export class CoreEngine {
       try {
         const state = await readJsonFile(corePath)
         coreEvents = Array.isArray(state.events) ? state.events : []
-      } catch {}
+      } catch (error) {
+        if (!(error instanceof ProtocolError && /不存在/u.test(error.message))) throw error
+      }
     }
-    const combined = [
-      ...serverEvents,
-      ...coreEvents.map((event, index) => ({
-        apiVersion: 'harness-evo-gym/v1',
-        kind: 'RunEvent',
-        sequence: serverEvents.length + index + 1,
-        runId,
-        type: event.type ?? 'core.event',
-        at: event.at ?? null,
-        source: 'core',
-        details: event,
-      })),
-    ]
-    return combined.filter((event) => event.sequence > after).slice(-1000)
+    // 核心事件只导入一次，使用同一条持久化序号；后续 Server 事件不能给旧事件重新编号。
+    const imported = serverEvents.filter((event) => event.source === 'core').length
+    for (let index = imported; index < coreEvents.length; index += 1) {
+      const event = coreEvents[index]
+      await this.event(runId, event.type ?? 'core.event', {
+        source: 'core', coreSequence: index + 1, coreAt: event.at ?? null, details: event,
+      })
+    }
+    const combined = await readJsonLines(this.eventsPath(runId))
+    return combined.filter((event) => event.sequence > after).slice(0, 1000)
   }
 
   async getVersions(runId) {

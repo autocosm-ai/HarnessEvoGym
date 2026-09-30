@@ -7,6 +7,8 @@ import { REPOSITORY_ROOT, resolveInside } from '../config.mjs'
 import { safeDockerName } from '../docker.mjs'
 import { withGlobalPermit } from '../global-concurrency.mjs'
 import { ProtocolError, validateResultRecords } from '../protocol.mjs'
+import { SolverFailure, SOLVER_FAILURE_PROTOCOL } from '../solver-failure.mjs'
+import { validateInfrastructureRetries, withTrialInfrastructureRetries } from '../trial-infrastructure-retry.mjs'
 
 const TASKS_API_VERSION = 'harness-rsi/v1alpha1'
 const TASKS_KIND = 'SyntheticTextReasoningTasks'
@@ -222,7 +224,9 @@ export class TextReasoningEnvironment {
       partitions: Object.freeze(['feedback', 'selection', 'final']),
       supportsFeedback: true,
       supportsHiddenFinal: true,
-      supportsTaskRetry: false,
+      // 可以安全重试整个 task；但没有提交式 checkpoint，不能宣称支持
+      // Final 阶段的按题恢复。
+      supportsTaskRetry: true,
       supportsCheckpointResume: false,
       scoreType: 'scalar',
       artifactType: 'text-answer',
@@ -331,19 +335,33 @@ export class TextReasoningEnvironment {
         trialRoot,
       }
     } catch (cause) {
-      // Runtime、Docker、Gateway 或 Provider 失败不是“模型答错”，不能被伪装成 0 分。
-      throw new ProtocolError('Synthetic Reasoning Solver 基础设施失败', [
-        cause?.message ?? String(cause),
-        ...(cause?.details ?? []),
-        `candidate=${candidateId}`,
-        `partition=${partition}`,
-        `task=${task.id}`,
-      ])
+      // Runtime、Docker、Gateway 或 Provider 失败不是”模型答错”，不能被伪装成 0 分。
+      if (!(cause instanceof SolverFailure)) {
+        throw new ProtocolError('Synthetic Reasoning Solver 基础设施失败', [
+          cause?.message ?? String(cause),
+          ...(cause?.details ?? []),
+          `candidate=${candidateId}`,
+          `partition=${partition}`,
+          `task=${task.id}`,
+        ])
+      }
+      throw cause
     }
   }
 
-  async runCandidatePartition({ candidateId, candidateWorkspace, model, partition, seeds, outputPath }) {
+  async runCandidatePartition({
+    candidateId,
+    candidateWorkspace,
+    model,
+    partition,
+    seeds,
+    outputPath,
+    infrastructureRetries = 0,
+    retryReasoningOnly = false,
+    onInfrastructureRetry = async () => {},
+  }) {
     if (!this.tasks) throw new ProtocolError('必须先执行 Synthetic Reasoning preflight')
+    validateInfrastructureRetries(infrastructureRetries)
     const partitionSpec = this.benchmark.partitions[partition]
     if (!partitionSpec) throw new ProtocolError(`Benchmark 不存在 Partition：${partition}`)
     const candidate = await realpath(resolve(candidateWorkspace)).catch((error) => {
@@ -353,19 +371,28 @@ export class TextReasoningEnvironment {
     const records = []
     for (const instanceId of partitionSpec.instanceIds) {
       const task = this.tasks.get(instanceId)
-      const trials = []
-      for (const [trialIndex, seed] of seeds.entries()) {
-        trials.push(await this.runTrial({
-          candidateId,
-          candidateWorkspace: candidate,
-          task,
-          model,
-          partition,
-          seed,
-          trialIndex,
-          executionId,
-        }))
-      }
+      const trials = await withTrialInfrastructureRetries(async () => {
+        const attempts = []
+        for (const [trialIndex, seed] of seeds.entries()) {
+          attempts.push(await this.runTrial({
+            candidateId,
+            candidateWorkspace: candidate,
+            task,
+            model,
+            partition,
+            seed,
+            trialIndex,
+            executionId,
+          }))
+        }
+        return attempts
+      }, {
+        maximumRetries: infrastructureRetries,
+        retryReasoningOnly,
+        beforeRetry: async ({ error, retry, maximumRetries, delayMs }) => {
+          await onInfrastructureRetry({ retry, maximumRetries, delayMs, error })
+        },
+      })
       records.push(trialRecord({ task, partition, trials, runRoot: this.runRoot }))
     }
     await writeJsonLines(outputPath, records)

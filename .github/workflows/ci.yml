@@ -8,6 +8,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: harness-evogym-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   offline-tests:
     runs-on: ubuntu-latest
@@ -40,3 +44,56 @@ jobs:
 
       - name: Run standalone evaluator offline tests
         run: npm run test:eval
+
+      - name: Generate test coverage report
+        run: |
+          set -o pipefail
+          # npm test 已经运行完整套件；这里只对新增核心模块做一次覆盖率采样，
+          # 避免在同一个 Job 内把约 700 个测试再完整执行一遍。
+          node --test --experimental-test-coverage \
+            ./controller/test/evolution-monitor.test.mjs \
+            ./controller/test/generic-algorithm.test.mjs \
+            ./controller/test/generic-algorithm-cli.test.mjs \
+            ./controller/test/run-diagnostics.test.mjs \
+            ./controller/test/updater-robustness.test.mjs \
+            ./server/test/core-engine.test.mjs \
+            2>&1 | tee coverage-report.txt
+          echo "## Test Coverage Summary" >> $GITHUB_STEP_SUMMARY
+          grep -A 10 "^# coverage report" coverage-report.txt >> $GITHUB_STEP_SUMMARY || echo "Coverage report not generated" >> $GITHUB_STEP_SUMMARY
+
+      - name: Verify Docker build configurations
+        run: |
+          docker build --file docker/model-gateway/Dockerfile --tag harness-evogym/model-gateway:ci .
+          docker build --file docker/msa-minimal-runtime/Dockerfile --tag harness-evogym/msa-minimal-runtime:ci .
+
+      - name: Check for security vulnerabilities
+        run: npm audit --production --audit-level=high
+
+      - name: Verify essential scripts are executable
+        run: |
+          bash -n scripts/setup-hle-runtime.sh
+          bash -n scripts/setup-putnambench-runtime.sh
+          python3 -m py_compile scripts/download-hle-text-math.py
+          python3 -m py_compile docker/omegause-officeval/run-verifier.py
+
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint when configured
+        run: npm run lint --if-present
+
+      - name: Check formatting when configured
+        run: npm run format:check --if-present

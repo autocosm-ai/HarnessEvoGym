@@ -36,7 +36,7 @@ test('Solver 归因只依赖可信观测：有效输出后解析失败可进化�
   assert.equal(classify({ ...valid, contentBytes: 0 }).category, 'unknown')
   assert.equal(classify({ ...valid, httpStatus: 400 }).category, 'unknown')
   assert.equal(classify({ ...valid, origin: 'gateway-request', httpStatus: 400, errorCode: 'invalid-json-request' }).category, 'candidate')
-  for (const status of [429, 502]) assert.equal(classify({ ...valid, httpStatus: status }).category, 'provider')
+  for (const status of [429, 502, 524]) assert.equal(classify({ ...valid, httpStatus: status }).category, 'provider')
   for (const status of [401, 403]) assert.equal(classify({ ...valid, httpStatus: status }).category, 'trusted-runtime')
   assert.equal(classify({ ...valid, transportError: true, responseComplete: false }).category, 'provider')
   assert.equal(classify(valid, { diagnostics: null }).category, 'unknown')

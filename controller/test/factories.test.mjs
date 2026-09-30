@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { environmentCapabilities, supportsTaskInfrastructureRetries } from '../src/environment-capabilities.mjs'
+import {
+  environmentCapabilities,
+  supportsTaskCheckpointResume,
+  supportsTaskInfrastructureRetries,
+} from '../src/environment-capabilities.mjs'
 
 import {
   createEnvironmentRunner,
@@ -63,7 +67,9 @@ test('环境能力兼容旧驱动，并拒绝自相矛盾的恢复声明', () =>
     ...driver, supportsTaskInfrastructureRetries: false,
   }), /不一致/u)
   capabilities.supportsCheckpointResume = false
-  assert.throws(() => environmentCapabilities(driver), /不一致/u)
+  assert.equal(environmentCapabilities(driver).supportsTaskRetry, true)
+  assert.equal(supportsTaskInfrastructureRetries(driver), true)
+  assert.equal(supportsTaskCheckpointResume(driver), false)
 })
 
 test('Driver Registry 拒绝覆盖协议和不完整实现', () => {

@@ -68,14 +68,16 @@ still require an exact execution and evaluation identity. Changing the model, pr
 budget, or timeout requires a `fork` or `exploratory` identity; old results are never
 silently presented as results for the new configuration.
 
-Recipes may select a registered Algorithm through optional `spec.algorithm`.
-When omitted, the compatibility default is `population-v1`. New algorithms can
-use the SDK v2 `initialize`, `step`, `resume`, `report`, and `freezeBaseline`
-lifecycle with their own RunStore and versioned Checkpoint state; they do not
-have to pretend to be a `PopulationStore`. The legacy Population v1 driver keeps
-its `run` and Branch/budget state contract for existing Cowork recipes.
-Factories are registered by trusted code in the same process before
-validation/run/resume; the CLI does not dynamically execute untrusted modules.
+Population Recipes may select a registered Population-compatible driver through optional `spec.algorithm`.
+When omitted, the compatibility default is `population-v1`; this Recipe path
+still keeps its PopulationStore and Branch/budget contract. Independent
+algorithms such as Beam or MCTS prototypes can use the SDK v2
+`initialize`, `step`, `resume`, `report`, and `freezeBaseline` lifecycle with
+their own RunStore and versioned Checkpoint state through the trusted
+`harness-rsi algorithm run` CLI. That generic path is not yet wired into the
+standard Experiment Recipe or Server Run API. Factories are registered by
+trusted code in the same process; the CLI does not dynamically execute
+untrusted modules.
 
 ## One evolution round
 

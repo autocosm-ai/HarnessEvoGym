@@ -38,6 +38,8 @@ import { buildFeedbackPacket } from './feedback.mjs'
 import {
   attachRejectedCandidateEvidence, loadRejectedCandidateEvidence, saveRejectedCandidateEvidence,
 } from './failure-feedback.mjs'
+import { createRunDiagnostics } from './run-diagnostics.mjs'
+import { calculateUpdaterTimeout, validateMutationReportEnhanced, validateDiffSafety } from './updater-robustness.mjs'
 import { createEvaluationSummary } from './evaluation-summary.mjs'
 import { validateBranchProjection, validateBranchStepResult } from './branch-evolution-driver.mjs'
 import {
@@ -648,7 +650,15 @@ async function runUpdaterGeneration({
     mutationPolicy,
   })
 
-  const updaterResult = await withGlobalPermit('updater', () => context.updaterDriver.run({
+  const updaterTimeoutSeconds = calculateUpdaterTimeout({
+    mutationLevel: level,
+    baseTimeoutSeconds: context.bundle.environment.docker.resources.timeoutSeconds,
+    historicalDurations: context.updaterHistory?.getSuccessfulDurations(level) ?? [],
+  })
+  const updaterResult = await withGlobalPermit('updater', async () => {
+    const started = Date.now()
+    try {
+      const result = await context.updaterDriver.run({
     image: context.bundle.updater.runtime.image,
     model: context.bundle.experiment.models.updater,
     candidateWorkspace: workspace,
@@ -660,8 +670,16 @@ async function runUpdaterGeneration({
     targetId: context.bundle.target.id,
     reportName: context.bundle.updater.mutationReportName,
     name: `${context.runId}-${id}-updater`,
-    timeoutMs: context.bundle.environment.docker.resources.timeoutSeconds * 1000,
-  }))
+    // Updater 比 Solver 更容易因 L2/L3 改动变慢；超时仍受 60 分钟硬上限保护。
+    timeoutMs: updaterTimeoutSeconds * 1000,
+      })
+      context.updaterHistory?.record({ mutationLevel: level, durationMs: Date.now() - started, success: true })
+      return result
+    } catch (error) {
+      context.updaterHistory?.record({ mutationLevel: level, durationMs: Date.now() - started, success: false })
+      throw error
+    }
+  })
   await writeFile(join(root, 'updater-stdout.txt'), `${updaterResult.stdout}\n`, 'utf8')
   await writeFile(join(root, 'updater-stderr.txt'), `${updaterResult.stderr}\n`, 'utf8')
 
@@ -672,11 +690,12 @@ async function runUpdaterGeneration({
   const changes = diffSnapshots(before, after)
   const policyReport = enforceMutationPolicy(changes, mutationPolicy)
   const semanticReport = await validateCandidate({ workspace, target: context.bundle.target })
+  const diffSafety = validateDiffSafety(changes, updaterResult.report ?? {})
   await writeJsonFile(join(root, 'mutation-diff.json'), {
     apiVersion: 'harness-rsi/v1alpha1',
     kind: 'MutationDiff',
     metadata: { candidateId: id, parentId: parent.id },
-    spec: { ...policyReport, semanticChecks: semanticReport.checks },
+    spec: { ...policyReport, semanticChecks: semanticReport.checks, diffSafety },
   })
   await writeCandidateManifest(join(root, 'manifest.json'), {
     candidateId: id, parentId: parent.id, snapshot: after, sourceRevision: context.sourceRevision,
@@ -706,6 +725,24 @@ async function runUpdaterGeneration({
     report = validateMutationReport(updaterResult.report, policyReport.changes)
   } catch (error) {
     throw mutationError(error.message, error.details ?? [], error)
+  }
+  const reportQuality = validateMutationReportEnhanced(report)
+  await writeJsonFile(join(root, 'updater-diagnostics.json'), {
+    apiVersion: 'harness-rsi/v1alpha1',
+    kind: 'UpdaterDiagnostics',
+    spec: { reportQuality, diffSafety },
+  })
+  if (!reportQuality.valid) {
+    throw mutationError(
+      'Updater Mutation Report 质量检查失败',
+      reportQuality.errors,
+    )
+  }
+  if (!diffSafety.safe) {
+    throw mutationError(
+      'Updater Diff 安全检查失败',
+      diffSafety.errors,
+    )
   }
   await writeJsonFile(join(root, 'mutation-report.json'), report)
   return { id, root, workspace, digest: treeDigest(after), report, policyReport }
@@ -1320,9 +1357,11 @@ export function createCoworkBranchEvolutionDriver({
   let peerEvidencePath = null
   let ledgerOffset = null
   let baselinePack = null
+  let diagnostics = null
 
   async function persist() {
-    await writeJsonFile(join(runRoot, 'state.json'), state)
+    await diagnostics.persist({ state, runRoot,
+      solverUsage: context.solverDriver.usage(), updaterUsage: context.updaterDriver.usage() })
   }
 
   function ledger(generations) {
@@ -1377,6 +1416,9 @@ export function createCoworkBranchEvolutionDriver({
     }
     context.runRoot = runRoot
     startedAt = Date.now()
+    diagnostics = createRunDiagnostics({ secrets: secretValuesFromEnvironment(requiredSecrets(context.bundle)) })
+    context.updaterHistory = diagnostics.updaterHistory
+    diagnostics.monitor.recordEvent({ stage: 'initialize', message: '开始 Cowork Branch Evolution' })
     environment = environmentFactory({
       repositoryRoot,
       environment: context.bundle.environment,
@@ -1510,6 +1552,15 @@ export function createCoworkBranchEvolutionDriver({
           partition: decisionPartition,
           seeds,
           outputPath: resultPath(runRoot, 0, champion.id, decisionPartition),
+          infrastructureRetries: 3,
+          retryReasoningOnly: false,
+          onInfrastructureRetry: ({ retry, maximumRetries, delayMs }) => {
+            onEvent({
+              stage: 'infrastructure-retry',
+              generation: 0,
+              message: `模型接口故障，${delayMs / 1000} 秒后重试当前题（${retry}/${maximumRetries}）`,
+            })
+          },
         })
       }
     } catch (error) {
@@ -1772,6 +1823,10 @@ export function createCoworkBranchEvolutionDriver({
 
     startedAt = Date.now()
     ledgerOffset = structuredClone(state.spec.ledger)
+    diagnostics = createRunDiagnostics({ snapshot: state.spec.diagnostics,
+      secrets: secretValuesFromEnvironment(requiredSecrets(context.bundle)) })
+    context.updaterHistory = diagnostics.updaterHistory
+    diagnostics.monitor.recordEvent({ stage: 'resume', message: '恢复 Cowork Branch Evolution' })
     candidatesEvaluated = 0
     if (state.metadata.status === 'baseline-running') {
       const baselineRecord = state.spec.candidates.find((record) => record.id === state.spec.baselineId)
@@ -1798,6 +1853,15 @@ export function createCoworkBranchEvolutionDriver({
             partition: decisionPartition,
             seeds: state.spec.seeds,
             outputPath: resultPath(runRoot, 0, champion.id, decisionPartition),
+            infrastructureRetries: 3,
+            retryReasoningOnly: false,
+            onInfrastructureRetry: ({ retry, maximumRetries, delayMs }) => {
+              onEvent({
+                stage: 'infrastructure-retry',
+                generation: 0,
+                message: `模型接口故障，${delayMs / 1000} 秒后重试当前题（${retry}/${maximumRetries}）`,
+              })
+            },
           })
         }
       } catch (error) {
@@ -1845,6 +1909,7 @@ export function createCoworkBranchEvolutionDriver({
       })
     }
     const generation = state.spec.generationsCompleted + 1
+    diagnostics.monitor.recordEvent({ stage: 'generation-start', generation, message: `开始第 ${generation} 代` })
     const generationRoot = join(runRoot, 'generations', `generation-${generation}`)
     await mkdir(generationRoot, { recursive: true })
     const moduleSearch = context.bundle.recipe.spec.moduleSearch
@@ -1945,7 +2010,18 @@ export function createCoworkBranchEvolutionDriver({
           partition: 'feedback',
           seeds: state.spec.seeds,
           outputPath: resultPath(runRoot, generation, mutationParent.id, 'feedback'),
+          infrastructureRetries: 3,
+          retryReasoningOnly: false,
+          onInfrastructureRetry: ({ retry, maximumRetries, delayMs }) => {
+            onEvent({
+              stage: 'infrastructure-retry',
+              generation,
+              message: `模型接口故障，${delayMs / 1000} 秒后重试当前题（${retry}/${maximumRetries}）`,
+            })
+          },
         })
+        diagnostics.observeRecords({ generation, candidateId: mutationParent.id,
+          partition: 'feedback', records: parentFeedbackRecords })
         feedbackPacket = buildFeedbackPacket({
           runId,
           generation,
@@ -2001,6 +2077,15 @@ export function createCoworkBranchEvolutionDriver({
           partition: decisionPartition,
           seeds: state.spec.seeds,
           outputPath: resultPath(runRoot, generation, champion.id, decisionPartition),
+          infrastructureRetries: 3,
+          retryReasoningOnly: false,
+          onInfrastructureRetry: ({ retry, maximumRetries, delayMs }) => {
+            onEvent({
+              stage: 'infrastructure-retry',
+              generation,
+              message: `模型接口故障，${delayMs / 1000} 秒后重试当前题（${retry}/${maximumRetries}）`,
+            })
+          },
         })
       }
       const candidateRecords = await environment.runCandidatePartition({
@@ -2011,8 +2096,20 @@ export function createCoworkBranchEvolutionDriver({
         partition: decisionPartition,
         seeds: state.spec.seeds,
         outputPath: resultPath(runRoot, generation, proposal.id, decisionPartition),
+        infrastructureRetries: 3,
+        retryReasoningOnly: false,
+        onInfrastructureRetry: ({ retry, maximumRetries, delayMs }) => {
+          onEvent({
+            stage: 'infrastructure-retry',
+            generation,
+            message: `模型接口故障，${delayMs / 1000} 秒后重试当前题（${retry}/${maximumRetries}）`,
+          })
+        },
       })
       candidatesEvaluated += 1
+
+      diagnostics.observeRecords({ generation, candidateId: proposal.id, partition: decisionPartition, records: candidateRecords })
+
       const evaluation = evaluateBenchmark({
         benchmark: context.bundle.benchmark,
         policy: context.bundle.policy,
@@ -2083,10 +2180,17 @@ export function createCoworkBranchEvolutionDriver({
       }
     } catch (error) {
       // Feedback/Selection/Verifier 出错属于实验基础设施或可信评测失败，不能伪装成
-      // 一个“0 分 Candidate”。只有 Updater 自己产生的非法或越界提案才记 invalid。
+      // 一个”0 分 Candidate”。只有 Updater 自己产生的非法或越界提案才记 invalid。
+      if (phase === 'update') {
+        const failure = diagnostics.updaterFailure({ error, generation,
+          candidateId: proposal?.id ?? `g${String(generation).padStart(3, '0')}-${state.spec.mutationLevel}`,
+          parentId: mutationParent.id, mutationPlanId: mutationPlan.metadata.id,
+          regionIds: mutationPlan.spec.regionIds, mutationLevel: state.spec.mutationLevel })
+        onEvent({ ...failure, stage: 'updater-failure' })
+      }
       if (phase !== 'update' || !(error instanceof CandidateMutationError)) {
         // 保留失败尝试已经消耗的 Token/时间，但不增加 Generation 或
-        // Candidate 评测数。跨进程恢复后会从该 Ledger 继续累加，不会把失败成本“洗掉”。
+        // Candidate 评测数。跨进程恢复后会从该 Ledger 继续累加，不会把失败成本”洗掉”。
         if (!state.spec.inFlight?.proposal) state.spec.searchStrategyState = searchStrategyStateBefore
         state.spec.ledger = ledger(state.spec.generationsCompleted)
         await persist()
@@ -2094,6 +2198,8 @@ export function createCoworkBranchEvolutionDriver({
       }
       rejection = { stage: 'update-and-diff', message: error.message, details: error.details ?? [] }
       proposal ??= error.candidate
+
+
       if (proposal?.digest) {
         state.spec.rejectedCandidateEvidence = await saveRejectedCandidateEvidence({
           runRoot, generation, candidate: proposal, parentId: mutationParent.id,
@@ -2160,6 +2266,12 @@ export function createCoworkBranchEvolutionDriver({
         }
       }
     }
+    diagnostics.monitor.recordGeneration({
+      generation,
+      candidateId: historyEntry.proposalId,
+      status: historyEntry.status,
+      decision: historyEntry.selection ?? historyEntry.rejection,
+    })
     await persist()
     return validateBranchStepResult({
       apiVersion: 'harness-rsi/v1alpha1',
@@ -2224,10 +2336,11 @@ export async function runEvolution({
   experimentPath,
   runId = createRunId(),
   onEvent = () => {},
-}) {
+}, { contextFactory = createContext, environmentFactory = createEnvironmentRunner,
+  controllerRevisionReader = trustedControllerRevision } = {}) {
   safeRunId(runId)
-  const controllerRevision = await trustedControllerRevision(repositoryRoot)
-  const context = await createContext({ repositoryRoot, experimentPath, gatewayScope: runId })
+  const controllerRevision = await controllerRevisionReader(repositoryRoot)
+  const context = await contextFactory({ repositoryRoot, experimentPath, gatewayScope: runId })
   context.repositoryRoot = repositoryRoot
   context.runId = runId
   assertSecrets(requiredSecrets(context.bundle))
@@ -2245,8 +2358,11 @@ export async function runEvolution({
   await mkdir(runRoot, { recursive: false })
   context.runRoot = runRoot
   const startedAt = Date.now()
+  const diagnostics = createRunDiagnostics({ secrets: secretValuesFromEnvironment(requiredSecrets(context.bundle)) })
+  context.updaterHistory = diagnostics.updaterHistory
+  const monitor = diagnostics.monitor
 
-  const environment = createEnvironmentRunner({
+  const environment = environmentFactory({
     repositoryRoot,
     environment: context.bundle.environment,
     benchmark: context.bundle.benchmark,
@@ -2257,6 +2373,7 @@ export async function runEvolution({
   })
   onEvent({ stage: 'preflight', message: '校验 Docker、Target Source 与 Environment Revision' })
   const environmentStatus = await environment.preflight()
+  await environment.ensureRuntime?.()
   await context.searchStrategy.preflight()
   for (const instanceId of context.bundle.benchmark.allInstanceIds) await environment.taskLayout(instanceId)
   if (context.bundle.updater.runtime.image) {
@@ -2323,6 +2440,7 @@ export async function runEvolution({
 
   try {
     for (let generation = 1; generation <= context.bundle.experiment.evolution.generations; generation += 1) {
+      monitor.recordEvent({ stage: 'generation-start', generation, message: `开始第 ${generation} 代` })
       const generationRoot = join(runRoot, 'generations', `generation-${generation}`)
       await mkdir(generationRoot, { recursive: true })
       const proposed = await context.searchStrategy.propose({
@@ -2360,6 +2478,7 @@ export async function runEvolution({
         writeJsonFile(join(generationRoot, 'mutation-lease.json'), mutationLease),
       ])
 
+      monitor.startPhase('feedback')
       onEvent({ stage: 'feedback', generation, message: `${mutationParent.id} 运行 feedback Partition` })
       const feedbackRecords = await environment.runCandidatePartition({
         candidateId: mutationParent.id,
@@ -2369,7 +2488,19 @@ export async function runEvolution({
         partition: 'feedback',
         seeds: state.spec.seeds,
         outputPath: resultPath(runRoot, generation, mutationParent.id, 'feedback'),
+        infrastructureRetries: 3,
+        retryReasoningOnly: false,
+        onInfrastructureRetry: ({ retry, maximumRetries, delayMs }) => {
+          onEvent({
+            stage: 'infrastructure-retry',
+            generation,
+            message: `模型接口故障，${delayMs / 1000} 秒后重试当前题（${retry}/${maximumRetries}）`,
+          })
+        },
       })
+
+      diagnostics.observeRecords({ generation, candidateId: mutationParent.id, partition: 'feedback', records: feedbackRecords })
+
       const feedbackPacket = buildFeedbackPacket({
         runId,
         generation,
@@ -2387,11 +2518,13 @@ export async function runEvolution({
         maximumHistoryBytes: context.bundle.environment.feedback.maximumHistoryBytes,
       })
       await writeJsonFile(join(generationRoot, 'feedback-packet.json'), feedbackPacket)
+      monitor.endPhase()
 
       let proposal
       let rejection = null
       let historyEntry
       try {
+        monitor.startPhase('update')
         onEvent({ stage: 'update', generation, message: `启动 ${state.spec.mutationLevel.toUpperCase()} Updater Session` })
         proposal = await runUpdaterGeneration({
           context,
@@ -2402,7 +2535,14 @@ export async function runEvolution({
           mutationPolicy: mutationLease,
         })
         materializedCandidates.set(proposal.id, proposal)
+        monitor.endPhase()
       } catch (error) {
+        monitor.endPhase()
+        diagnostics.updaterFailure({ error, generation, parentId: mutationParent.id,
+          candidateId: `g${String(generation).padStart(3, '0')}-${state.spec.mutationLevel}`,
+          mutationLevel: state.spec.mutationLevel })
+        // 网络、进程和 Docker 故障不能被当作无效提案消费预算。
+        if (!(error instanceof CandidateMutationError)) throw error
         rejection = {
           stage: 'update-and-diff',
           message: error.message,
@@ -2411,6 +2551,7 @@ export async function runEvolution({
       }
 
       if (proposal) {
+        monitor.startPhase('evaluation')
         candidatesEvaluated += 1
         const decisionPartition = context.bundle.policy.decisionPartition
         onEvent({
@@ -2428,6 +2569,15 @@ export async function runEvolution({
               partition: decisionPartition,
               seeds: state.spec.seeds,
               outputPath: resultPath(runRoot, generation, champion.id, decisionPartition),
+              infrastructureRetries: 3,
+              retryReasoningOnly: false,
+              onInfrastructureRetry: ({ retry, maximumRetries, delayMs }) => {
+                onEvent({
+                  stage: 'infrastructure-retry',
+                  generation,
+                  message: `模型接口故障，${delayMs / 1000} 秒后重试当前题（${retry}/${maximumRetries}）`,
+                })
+              },
             })
         const candidateRecords = await environment.runCandidatePartition({
           candidateId: proposal.id,
@@ -2437,6 +2587,15 @@ export async function runEvolution({
           partition: decisionPartition,
           seeds: state.spec.seeds,
           outputPath: resultPath(runRoot, generation, proposal.id, decisionPartition),
+          infrastructureRetries: 3,
+          retryReasoningOnly: false,
+          onInfrastructureRetry: ({ retry, maximumRetries, delayMs }) => {
+            onEvent({
+              stage: 'infrastructure-retry',
+              generation,
+              message: `模型接口故障，${delayMs / 1000} 秒后重试当前题（${retry}/${maximumRetries}）`,
+            })
+          },
         })
         const evaluation = evaluateBenchmark({
           benchmark: context.bundle.benchmark,
@@ -2453,6 +2612,7 @@ export async function runEvolution({
             updaterUsage: context.updaterDriver.usage(),
           }),
         })
+        diagnostics.observeRecords({ generation, candidateId: proposal.id, partition: decisionPartition, records: candidateRecords })
         await writeJsonFile(join(proposal.root, 'evaluation.json'), evaluation)
         const parentId = mutationParent.id
         const championBeforeId = champion.id
@@ -2494,6 +2654,7 @@ export async function runEvolution({
           regionIds: mutationPlan.spec.regionIds,
           status: evaluation.decision.eligible ? 'promoted' : 'rejected',
         })
+        monitor.endPhase()
       } else {
         const rejectedId = `g${String(generation).padStart(3, '0')}-${state.spec.mutationLevel}`
         state.spec.candidates.push({
@@ -2556,13 +2717,22 @@ export async function runEvolution({
         message: proposal && champion.id === proposal.id ? `晋升 ${proposal.id}` : `保留 ${champion.id}`,
       })
 
-      await writeJsonFile(join(runRoot, 'state.json'), state)
+      monitor.recordGeneration({
+        generation,
+        candidateId: proposal ? proposal.id : historyEntry.proposalId,
+        status: historyEntry.status,
+        decision: historyEntry.selection ?? historyEntry.rejection,
+      })
+
+      await diagnostics.persist({ state, runRoot,
+        solverUsage: context.solverDriver.usage(), updaterUsage: context.updaterDriver.usage() })
       if (observed.exhausted) break
     }
   } catch (error) {
     state.metadata.status = 'failed'
     state.spec.failure = { message: error.message, details: error.details ?? [] }
-    await writeJsonFile(join(runRoot, 'state.json'), state)
+    await diagnostics.persist({ state, runRoot,
+      solverUsage: context.solverDriver.usage(), updaterUsage: context.updaterDriver.usage() })
     throw error
   } finally {
     const cleanupErrors = await stopContextModelGateways(context)
@@ -2579,7 +2749,10 @@ export async function runEvolution({
     solverUsage: context.solverDriver.usage(),
     updaterUsage: context.updaterDriver.usage(),
   })
-  await writeJsonFile(join(runRoot, 'state.json'), state)
+
+  await diagnostics.persist({ state, runRoot,
+    solverUsage: context.solverDriver.usage(), updaterUsage: context.updaterDriver.usage() })
+
   onEvent({ stage: 'completed', message: `进化完成，Champion=${champion.id}` })
   return { runId, runRoot, championId: champion.id, state }
 }

@@ -1,0 +1,19 @@
+schema_version = "1.0"
+artifacts = ["/workspace/result.txt"]
+
+[metadata]
+name = "add-numbers"
+difficulty = "easy"
+
+[verifier]
+environment_mode = "separate"
+timeout_seconds = 30
+
+[agent]
+timeout_seconds = 60
+
+[environment]
+cpus = 1
+memory_mb = 512
+storage_mb = 100
+build_timeout_seconds = 300

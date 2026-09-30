@@ -62,12 +62,11 @@ Population Store 和 Checkpoint 都留在这里，由 Server API 通过受信 CL
 预算或超时时，应创建 `fork` 或 `exploratory` 身份，旧结果不会被悄悄当成新配置的结果。
 
 EvolutionAlgorithm 与 SearchStrategy 的职责分开：Algorithm 决定搜索如何运行，Strategy
-决定下一步搜索哪里。Recipe 可以通过可选的 `spec.algorithm` 选择已注册的 Algorithm；未声明时
-保持 `population-v1`，所以旧配置不需要迁移。新算法可以使用 SDK v2 的
-`initialize`、`step`、`resume`、`report` 和 `freezeBaseline`，通过通用 RunStore 保存自己的
-状态和版本化 Checkpoint，不再要求伪装成 `PopulationStore`。旧 Population v1 仍保留
-`run` 与既有 Branch/Budget 状态契约，确保历史 Cowork Recipe 兼容。算法由可信启动代码注册；
-CLI 不会动态执行未审查模块。
+决定下一步搜索哪里。Population Recipe 的可选 `spec.algorithm` 目前只选择与 PopulationStore/Branch/Budget 契约兼容的受信驱动；未声明时
+保持 `population-v1`，所以旧配置不需要迁移。Beam、MCTS 等独立算法可以通过受信的
+`harness-rsi algorithm run` CLI 使用 SDK v2 的 `initialize`、`step`、`resume`、`report` 和
+`freezeBaseline`，用自己的 RunStore 保存状态和版本化 Checkpoint；这条通用路径目前还没有接入
+标准 Experiment Recipe 或 Server Run API。算法由可信启动代码注册；CLI 不会动态执行未审查模块。
 
 ## 一轮进化
 

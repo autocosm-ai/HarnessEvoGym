@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises'
+import { lstat, readFile } from 'node:fs/promises'
 import { resolve, join } from 'node:path'
 import { parse as parseYAML } from 'yaml'
 import { ProtocolError } from './protocol.mjs'
@@ -28,7 +28,14 @@ const PLUGIN_REGISTRY = {
  * @returns {Promise<Object>} Plugin Manifest
  */
 export async function loadPluginManifest(pluginPath) {
-  const manifestPath = join(pluginPath, 'plugin.yaml')
+  const pluginRoot = resolve(pluginPath)
+  const pluginInfo = await lstat(pluginRoot).catch((error) => {
+    throw new ProtocolError(`插件目录不存在：${pluginRoot}`, [error.message])
+  })
+  if (!pluginInfo.isDirectory() || pluginInfo.isSymbolicLink()) {
+    throw new ProtocolError(`插件目录必须是普通目录：${pluginRoot}`)
+  }
+  const manifestPath = join(pluginRoot, 'plugin.yaml')
   try {
     const content = await readFile(manifestPath, 'utf-8')
     const manifest = parseYAML(content)
@@ -38,7 +45,7 @@ export async function loadPluginManifest(pluginPath) {
     }
 
     // 补充插件根目录路径
-    manifest._pluginRoot = resolve(pluginPath)
+    manifest._pluginRoot = pluginRoot
     return manifest
   } catch (error) {
     if (error.code === 'ENOENT') {
@@ -64,8 +71,9 @@ export function registerPlugin(manifest, factory) {
     throw new ProtocolError(`不支持的插件类型：${kind}`)
   }
 
-  // 协议名称：implementation 已包含版本（如 fake-deterministic-v1），不再重复拼接
-  const protocolName = implementation ?? `${manifest.identity.name}-${version}`
+  // 协议名称：implementation 已包含版本（如 fake-deterministic-v1）；未显式声明时
+  // 从清单的协议主版本派生，不能引用不存在的局部变量，也不能留下无版本 ID。
+  const protocolName = implementation ?? `${manifest.identity.name}-${manifest.protocol.version}`
 
   if (registry.has(protocolName)) {
     throw new ProtocolError(`插件协议重复注册：${protocolName}`)
@@ -90,7 +98,8 @@ export function registerPlugin(manifest, factory) {
     factory,
   })
 
-  console.log(`[Plugin] 注册 ${kind}: ${protocolName} (${manifest.identity.name}@${manifest.identity.version})`)
+  // stdout 保留给 CLI 的机器可读报告；插件加载日志写 stderr，避免污染 JSON 输出。
+  console.error(`[Plugin] 注册 ${kind}: ${protocolName} (${manifest.identity.name}@${manifest.identity.version})`)
 }
 
 function buildPluginDriver(manifest, factory, kind, options) {
@@ -165,6 +174,12 @@ export async function autoRegisterPlugin(pluginPath) {
       manifest._pluginRoot,
       manifest.runtime.node.entrypoint,
     )
+    const entrypointInfo = await lstat(entrypointPath).catch((error) => {
+      throw new ProtocolError(`插件入口不存在：${entrypointPath}`, [error.message])
+    })
+    if (!entrypointInfo.isFile() || entrypointInfo.isSymbolicLink()) {
+      throw new ProtocolError(`插件入口必须是普通文件：${entrypointPath}`)
+    }
     const module = await import(entrypointPath)
     entrypoint = module.default ?? module
   } else {

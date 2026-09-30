@@ -127,7 +127,10 @@ class EvalRunnerTests(unittest.TestCase):
         self.assertFalse(self.out.exists())
 
     def test_configuration_and_path_validation(self):
-        for change in ({"tasks": self.tasks * 2}, {"solver": {**self.raw["solver"], "max_steps": True}}):
+        for change in ({"tasks": self.tasks * 2},
+                       {"solver": {**self.raw["solver"], "max_steps": True}},
+                       {"candidates": {"h0": {"workspace": "/etc"},
+                                        "single": {"workspace": "single"}}}):
             original = self.raw.copy()
             self.raw.update(change)
             self.write_config()

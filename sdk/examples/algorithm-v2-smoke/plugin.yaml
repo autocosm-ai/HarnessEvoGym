@@ -1,0 +1,13 @@
+identity:
+  name: algorithm-v2-smoke
+  version: 0.1.0
+protocol:
+  kind: algorithm
+  version: v2
+  implementation: algorithm-v2-smoke-v2
+runtime:
+  type: node
+  node:
+    entrypoint: index.mjs
+trust:
+  mode: trusted

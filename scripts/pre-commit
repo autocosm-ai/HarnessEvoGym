@@ -1,0 +1,30 @@
+#!/bin/bash
+# Pre-commit hook: 运行快速测试和语法检查
+
+set -e
+
+echo "🔍 运行 pre-commit 检查..."
+
+# 1. 语法检查
+echo "  - 检查源代码语法..."
+npm run check > /dev/null 2>&1 || {
+  echo "❌ 源代码语法检查失败"
+  exit 1
+}
+
+# 2. 运行快速单元测试（跳过慢速 E2E 测试）
+echo "  - 运行快速单元测试..."
+node --test \
+  controller/test/updater-runner.test.mjs \
+  controller/test/updater-failure-tracker.test.mjs \
+  controller/test/updater-run-error.test.mjs \
+  controller/test/task-failure-tracker.test.mjs \
+  controller/test/solver-failure.test.mjs \
+  > /dev/null 2>&1 || {
+  echo "❌ 单元测试失败，请修复后再提交"
+  echo "   运行 'npm test' 查看详细错误"
+  exit 1
+}
+
+echo "✅ Pre-commit 检查通过"
+exit 0

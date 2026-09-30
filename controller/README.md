@@ -92,11 +92,12 @@ OmegaUse-OfficeVal 与 HLE Text-only Math；真正接 pi-agent 时，还需同�
 Source/Materialization 生命周期和 Driver 注册，不是只注册一个函数就能运行。
 
 Driver 能执行和挂载工作区，因此必须作为受审查的 Controller 代码；只做搜索决策的外部
-Strategy 才可以使用沙箱镜像。EvolutionAlgorithm 通过 `spec.algorithm` 选择已注册实现；
-未声明时使用 `population-v1`，保证旧 Recipe 兼容。新的 Algorithm 可以实现 SDK v2 的
-`initialize`、`step`、`resume`、`report`、`freezeBaseline`，使用自己的 RunStore、状态和
-版本化 Checkpoint；现有 Cowork Population 继续使用 v1 的 Branch/Budget 契约。需在可信
-启动脚本内注册，恢复时也须加载同一实现；CLI 不自动安装或执行未审查模块。
+Strategy 才可以使用沙箱镜像。Population Recipe 通过 `spec.algorithm` 选择已注册的
+Population-compatible 实现；未声明时使用 `population-v1`，保证旧 Recipe 兼容。新的独立
+Algorithm 可以通过 `harness-rsi algorithm run` 实现 SDK v2 的 `initialize`、`step`、`resume`、
+`report`、`freezeBaseline`，使用自己的 RunStore、状态和版本化 Checkpoint；这条通用 CLI 路径
+尚未接入标准 Experiment Recipe 或 Server Run API。需在可信启动脚本内注册，恢复时也须加载同一
+实现；CLI 不自动安装或执行未审查模块。
 
 Environment 可通过 `describeCapabilities()` 声明分区、反馈、隐藏测试、按题重试和
 Checkpoint 恢复能力。Final 执行据此决定能否按题重试；旧 Driver 的

@@ -51,7 +51,7 @@ export function classifySolverFailure({ context = {}, process: processEvidence =
       || [401, 403].includes(last.httpStatus))) {
     category = 'trusted-runtime'
     code = 'gateway-or-provider-permission'
-  } else if (last && (last.transportError || [429, 500, 502, 503, 504].includes(last.httpStatus))) {
+  } else if (last && (last.transportError || [429, 500, 502, 503, 504, 524].includes(last.httpStatus))) {
     category = 'provider'
     code = last.transportError ? 'upstream-stream-interrupted' : 'upstream-unavailable'
   } else if (last && (last.httpStatus !== 200 || !last.responseComplete

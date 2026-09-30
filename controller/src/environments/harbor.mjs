@@ -468,12 +468,14 @@ export class HarborEnvironment {
           assertInside(workspace, source, 'Harbor Artifact Source')
           assertInside(submission, target, 'Harbor Submission')
           await assertNoSymlinkAncestors(source, workspace, 'Harbor Artifact Source')
-          await assertNoSymlinkAncestors(target, submission, 'Harbor Submission')
           await mkdir(dirname(target), { recursive: true, mode: 0o700 })
+          await assertNoSymlinkAncestors(target, submission, 'Harbor Submission')
           await copyRegularFile(source, target, `Harbor Artifact：${artifact}`, 64 * 1024 * 1024)
           artifacts.push(artifact)
         }
       } catch (cause) {
+        // 未完成交付物集合不能写成已交付，否则终态零分 Checkpoint 自身会校验失败。
+        artifacts = []
         solverFailure = failure({
           category: 'candidate',
           code: 'missing-or-unsafe-declared-artifact',

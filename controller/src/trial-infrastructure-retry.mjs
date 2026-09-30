@@ -30,7 +30,7 @@ export function isRetryableTrialInfrastructure(error, { retryReasoningOnly = fal
       && !request.streamError && !request.transportError && !request.malformedEvents) return true
   if (category === 'provider') {
     return ['upstream-stream-interrupted', 'upstream-unavailable'].includes(code)
-      && (request.transportError === true || [429, 500, 502, 503, 504].includes(request.httpStatus))
+      && (request.transportError === true || [429, 500, 502, 503, 504, 524].includes(request.httpStatus))
   }
   // 兼容旧网关把 HTTP 200 内的 error 帧标成 unknown 的记录。不把正常空回答、
   // length/tool_calls、拒答、Verifier 失败或任意 ProtocolError 当成可重试故障。

@@ -419,11 +419,55 @@ export function extractUpdaterStopReason(backend, stdout) {
 }
 
 export class UpdaterRunError extends Error {
-  constructor(message, { kind, result }) {
+  constructor(message, { kind, result, stage = 'updater-execution', context = {} }) {
     super(message)
     this.name = 'UpdaterRunError'
     this.kind = kind
     this.result = result
+    this.stage = stage
+    this.context = context
+  }
+
+  /**
+   * 生成结构化失败报告
+   */
+  toFailureReport() {
+    const details = []
+
+    if (this.result?.timedOut) {
+      details.push('执行超时')
+    }
+    if (this.result?.aborted) {
+      details.push('执行被中止')
+    }
+    if (this.result?.exitCode !== undefined && this.result.exitCode !== 0) {
+      details.push(`退出码：${this.result.exitCode}`)
+    }
+    if (this.result?.signal) {
+      details.push(`信号：${this.result.signal}`)
+    }
+
+    // 提取错误输出的关键信息
+    const stderr = this.result?.stderr ?? ''
+    if (stderr.length > 0) {
+      const errorLines = stderr.split('\n')
+        .filter(line => line.match(/error|exception|failed|timeout/i))
+        .slice(0, 3)
+      if (errorLines.length > 0) {
+        details.push(...errorLines.map(line => line.trim().slice(0, 200)))
+      }
+    }
+
+    return {
+      stage: this.stage,
+      message: this.message,
+      details,
+      errorType: this.kind,
+      exitCode: this.result?.exitCode ?? null,
+      timedOut: this.result?.timedOut ?? false,
+      durationMs: this.result?.durationMs ?? null,
+      ...this.context,
+    }
   }
 }
 
@@ -445,7 +489,15 @@ export async function runMutationPhase({
   })
   if (!result.ok) {
     const kind = result.timedOut || result.aborted ? 'infrastructure' : 'updater_failure'
-    throw new UpdaterRunError(`Updater ${kind}`, { kind, result })
+    const stage = result.timedOut ? 'updater-timeout' : result.aborted ? 'updater-aborted' : 'updater-execution'
+    const context = {
+      candidateId: templateValues?.candidateId ?? null,
+      parentId: templateValues?.parentId ?? null,
+      generation: templateValues?.generation ?? null,
+      backend: invocationOptions.backend ?? 'deepseek-harness',
+      timeoutMs,
+    }
+    throw new UpdaterRunError(`Updater ${kind}`, { kind, result, stage, context })
   }
   return {
     result,

@@ -156,15 +156,23 @@ export class DockerClient {
     if (!isAbsolute(destination) || /[\u0000\r\n]/u.test(destination)) {
       throw new ProtocolError('Docker cp 目标路径必须是绝对路径')
     }
-    const args = ['cp']
     if (owner !== null) {
       if (typeof owner !== 'string' || !/^\d+:\d+$/u.test(owner)) {
         throw new ProtocolError('Docker cp owner 必须是 UID:GID')
       }
-      args.push(`--chown=${owner}`)
+      const currentOwner = typeof process.getuid === 'function' && typeof process.getgid === 'function'
+        ? `${process.getuid()}:${process.getgid()}`
+        : null
+      if (currentOwner === null || owner !== currentOwner) {
+        throw new ProtocolError('Docker cp owner 必须与当前 Controller UID:GID 一致')
+      }
     }
+    // 不使用 docker cp -a：它会保留镜像内 root 所有权，普通用户随后无法
+    // 读取 Candidate 产物。docker cp 默认按执行该命令的宿主用户创建文件。
+    const args = ['cp']
     args.push(`${container}:${source}`, destination)
-    return await runProcess(this.binary, args, { timeoutMs: 300_000 })
+    const result = await runProcess(this.binary, args, { timeoutMs: 300_000 })
+    return result
   }
 
   async removeContainer(container) {

@@ -1,0 +1,1674 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HarnessEvoGym：从开源项目到商业产品路线图</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #4c8bf5;
+            --secondary: #8b5cf6;
+            --accent: #f4a261;
+            --success: #20a36a;
+            --warning: #e76f51;
+            --bg-light: #f8f9fa;
+            --bg-white: #ffffff;
+            --text-dark: #2c3e50;
+            --text-medium: #5a6c7d;
+            --text-light: #7f8c9a;
+            --border: #e1e8ed;
+            --shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            --shadow-hover: 0 4px 16px rgba(0, 0, 0, 0.12);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+            line-height: 1.7;
+            color: var(--text-dark);
+            background: var(--bg-light);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            padding: 60px 20px;
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        header h1 {
+            font-size: 2.5em;
+            margin-bottom: 16px;
+            font-weight: 700;
+        }
+
+        header .subtitle {
+            font-size: 1.2em;
+            opacity: 0.95;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .meta {
+            background: var(--bg-white);
+            padding: 24px;
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+            margin-bottom: 32px;
+        }
+
+        .meta-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+        }
+
+        .meta-item strong {
+            display: block;
+            color: var(--text-medium);
+            font-size: 0.9em;
+            margin-bottom: 4px;
+        }
+
+        .section {
+            background: var(--bg-white);
+            padding: 32px;
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+            margin-bottom: 32px;
+        }
+
+        h2 {
+            color: var(--primary);
+            font-size: 1.8em;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 3px solid var(--primary);
+        }
+
+        h3 {
+            color: var(--secondary);
+            font-size: 1.4em;
+            margin: 24px 0 16px 0;
+        }
+
+        h4 {
+            color: var(--text-dark);
+            font-size: 1.1em;
+            margin: 16px 0 12px 0;
+        }
+
+        p {
+            margin-bottom: 16px;
+            color: var(--text-medium);
+        }
+
+        ul, ol {
+            margin: 16px 0 16px 24px;
+            color: var(--text-medium);
+        }
+
+        li {
+            margin-bottom: 8px;
+        }
+
+        .highlight {
+            background: #fff3cd;
+            border-left: 4px solid var(--warning);
+            padding: 16px;
+            margin: 16px 0;
+            border-radius: 4px;
+        }
+
+        .callout {
+            background: #d4edda;
+            border-left: 4px solid var(--success);
+            padding: 16px;
+            margin: 16px 0;
+            border-radius: 4px;
+        }
+
+        .warning-box {
+            background: #f8d7da;
+            border-left: 4px solid #dc3545;
+            padding: 16px;
+            margin: 16px 0;
+            border-radius: 4px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            background: var(--bg-light);
+            color: var(--text-dark);
+            font-weight: 600;
+        }
+
+        tr:hover {
+            background: var(--bg-light);
+        }
+
+        .timeline {
+            position: relative;
+            padding-left: 40px;
+            margin: 32px 0;
+        }
+
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 8px;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background: var(--primary);
+        }
+
+        .timeline-item {
+            position: relative;
+            margin-bottom: 32px;
+            padding-left: 32px;
+        }
+
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -33px;
+            top: 4px;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--primary);
+            border: 3px solid var(--bg-white);
+        }
+
+        .timeline-phase {
+            display: inline-block;
+            background: var(--primary);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 16px;
+            font-size: 0.9em;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin: 24px 0;
+        }
+
+        .card {
+            background: var(--bg-white);
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            border-color: var(--primary);
+            box-shadow: var(--shadow-hover);
+            transform: translateY(-2px);
+        }
+
+        .card-header {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: var(--text-dark);
+            margin-bottom: 12px;
+        }
+
+        .card-meta {
+            font-size: 0.85em;
+            color: var(--text-light);
+            margin-bottom: 12px;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: 600;
+            margin: 4px 4px 4px 0;
+        }
+
+        .status-done {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-plan {
+            background: #cce5ff;
+            color: #004085;
+        }
+
+        .status-research {
+            background: #e2e3e5;
+            color: #383d41;
+        }
+
+        .comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin: 24px 0;
+        }
+
+        .comparison-col {
+            padding: 20px;
+            border-radius: 8px;
+        }
+
+        .comparison-col.to-b {
+            background: #e7f3ff;
+            border: 2px solid var(--primary);
+        }
+
+        .comparison-col.to-c {
+            background: #f0e6ff;
+            border: 2px solid var(--secondary);
+        }
+
+        .comparison-col h4 {
+            margin-top: 0;
+        }
+
+        @media (max-width: 768px) {
+            header h1 {
+                font-size: 2em;
+            }
+
+            .comparison {
+                grid-template-columns: 1fr;
+            }
+
+            .cards {
+                grid-template-columns: 1fr;
+            }
+
+            .timeline {
+                padding-left: 30px;
+            }
+
+            .meta-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .arch-diagram {
+            margin: 32px 0;
+            padding: 24px;
+            background: var(--bg-light);
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>HarnessEvoGym：从开源项目到商业产品</h1>
+        <div class="subtitle">Agent Harness RSI 训练场的产品化、商业化和技术演进路线图</div>
+    </header>
+
+    <div class="container">
+        <div class="meta">
+            <div class="meta-grid">
+                <div class="meta-item">
+                    <strong>文档版本</strong>
+                    <div>v1.0 · 2025年1月</div>
+                </div>
+                <div class="meta-item">
+                    <strong>项目阶段</strong>
+                    <div>Research Preview → Product Transition</div>
+                </div>
+                <div class="meta-item">
+                    <strong>目标客户</strong>
+                    <div>企业 AI 团队、Agent 产品团队、研究机构</div>
+                </div>
+                <div class="meta-item">
+                    <strong>核心价值</strong>
+                    <div>自动优化 Agent 性能，降低人工调优成本</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>执行摘要</h2>
+
+            <p><strong>HarnessEvoGym 当前定位：</strong>可信、可复现的 Agent Harness 递归自我改进（RSI）研究预览版。已实现核心 Controller、五种 Population Mode、OmegaUse-OfficeVal 和 HLE Text-only Math 双环境验证、Mutation Catalog、SearchStrategy 可插拔协议、Server API 与 Core Engine 分离。</p>
+
+            <p><strong>商业化核心结论：优先 To B，阶段性探索 To C。</strong></p>
+
+            <div class="callout">
+                <strong>为什么优先 To B：</strong>
+                <ul>
+                    <li><strong>价值可量化：</strong>企业 Agent 项目有明确 KPI（任务成功率、处理时长、成本），改进 5-10% 即有显著 ROI</li>
+                    <li><strong>付费意愿强：</strong>企业为节省调优人力和缩短上线时间愿意付费，决策周期可控</li>
+                    <li><strong>环境可控：</strong>企业私有部署或托管服务能接入真实评测环境、代码库、业务数据，不需要从零构造 Benchmark</li>
+                    <li><strong>信任要求高：</strong>企业接受"控制平面可信、Candidate 隔离、Sealed Final 不可重复打开"等设计，个人用户对审计链和隔离的理解成本高</li>
+                    <li><strong>反馈快：</strong>企业客户会明确提出缺失能力和集成需求，指导产品迭代</li>
+                </ul>
+            </div>
+
+            <div class="highlight">
+                <strong>To C 场景保留但不优先：</strong>
+                <ul>
+                    <li><strong>适合场景：</strong>开发者个人优化自己的 Agent、研究者复现论文、教育场景学习 RSI</li>
+                    <li><strong>挑战：</strong>个人用户缺乏真实评测环境、很难构造可靠 Benchmark、付费意愿低、支持成本高</li>
+                    <li><strong>策略：</strong>保持开源 Core Engine、提供详尽文档和示例，通过社区驱动；待 To B 产品成熟后，可提供 SaaS 形式的托管优化服务（Freemium 模式）</li>
+                </ul>
+            </div>
+
+            <div class="warning-box">
+                <strong>绝对不要一开始做的事情：</strong>
+                <ul>
+                    <li>❌ 在没有真实客户反馈前开发通用 Web 控制台和复杂权限体系</li>
+                    <li>❌ 过早标准化所有 Target/Environment，导致为假设场景写大量适配代码</li>
+                    <li>❌ 把 Updater、SearchStrategy 做成低代码拖拽工具（客户需要的是结果，不是更复杂的配置界面）</li>
+                    <li>❌ 承诺"自动超越人类专家"或"保证提升 X%"（应强调辅助人类、可审计、可回滚）</li>
+                    <li>❌ 直接向 C 端用户承诺 SLA 和 7×24 支持</li>
+                </ul>
+            </div>
+
+            <p><strong>产品价值衡量指标：</strong></p>
+            <table>
+                <tr>
+                    <th>维度</th>
+                    <th>主指标</th>
+                    <th>辅助指标</th>
+                </tr>
+                <tr>
+                    <td><strong>效果</strong></td>
+                    <td>目标任务成功率提升幅度（validation → sealed final 一致性）</td>
+                    <td>Bad Case 覆盖率、泛化到新题的稳定性</td>
+                </tr>
+                <tr>
+                    <td><strong>成本</strong></td>
+                    <td>单次改进的 Token/算力消耗、人工审核工时节省</td>
+                    <td>Candidate Credit、Provider 请求次数、失败重试成本</td>
+                </tr>
+                <tr>
+                    <td><strong>时间</strong></td>
+                    <td>从 H0 到可交付 Champion 的墙钟时间</td>
+                    <td>单轮 Updater Session 延迟、Resume 后恢复速度</td>
+                </tr>
+                <tr>
+                    <td><strong>可靠性</strong></td>
+                    <td>基础设施故障暂停率、sealed final 不可重复打开保证</td>
+                    <td>Provider 重试成功率、Checkpoint 恢复完整性</td>
+                </tr>
+                <tr>
+                    <td><strong>可审计性</strong></td>
+                    <td>完整 Lineage、Diff Guard 覆盖、Mutation Report 完整性</td>
+                    <td>凭据隔离、日志脱敏、决策可重现</td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="section">
+            <h2>当前项目能力边界（2025年1月）</h2>
+
+            <h3>✅ 已实现并稳定</h3>
+
+            <div class="cards">
+                <div class="card">
+                    <div class="card-header">控制平面</div>
+                    <div class="card-meta"><span class="status-badge status-done">已完成</span></div>
+                    <ul>
+                        <li>Target × Environment × Recipe 独立协议</li>
+                        <li>Mutation Catalog → Plan → Lease 硬边界</li>
+                        <li>Candidate 晋升、回退、冻结、审计</li>
+                        <li>五种 Population Mode（single/independent/mutualism/competition/combined）</li>
+                        <li>可插拔 SearchStrategy（linear-hill-climb、progressive-risk-expansion、Docker API）</li>
+                    </ul>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">评测环境</div>
+                    <div class="card-meta"><span class="status-badge status-done">已完成</span></div>
+                    <ul>
+                        <li><strong>OmegaUse-OfficeVal：</strong>91 个 Linux 任务（55 feedback + 18 selection + 18 sealed final）</li>
+                        <li><strong>HLE Text-only Math：</strong>固定 revision、分层抽样、sealed test Broker</li>
+                        <li>隔离 Solver/Verifier、Provider 重试、按题 Checkpoint、Resume</li>
+                    </ul>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">Target 与 Updater</div>
+                    <div class="card-meta"><span class="status-badge status-done">已完成</span></div>
+                    <ul>
+                        <li>MSA Minimal Cowork（L1 prompt/skills + L2 agent loop）</li>
+                        <li>MSA Minimal Reasoning（同上）</li>
+                        <li>DeepSeek Harness path（实验性）</li>
+                        <li>隔离 Codex CLI、Claude Code CLI 作为 Updater</li>
+                    </ul>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">Server API 与 Core Engine</div>
+                    <div class="card-meta"><span class="status-badge status-done">已完成</span></div>
+                    <ul>
+                        <li>Run 创建、状态查询、Resume/Cancel</li>
+                        <li>事件流（SSE）、版本摘要</li>
+                        <li>Fork from Checkpoint</li>
+                        <li>本地 HTTP API（127.0.0.1，无认证）</li>
+                    </ul>
+                </div>
+            </div>
+
+            <h3>🚧 实验性或兼容路径（不属于稳定支持）</h3>
+            <ul>
+                <li>Harbor、SWE-bench、PutnamBench、Synthetic Text Reasoning：协议占位或示例，未完成端到端验证</li>
+                <li>PI Agent：示例 Adapter，缺少完整 Runtime、Seed、Validator 和 E2E</li>
+            </ul>
+
+            <h3>❌ 当前明确不支持</h3>
+            <ul>
+                <li>多租户、认证、权限体系</li>
+                <li>持久化数据库（当前用本地文件）</li>
+                <li>独立 Worker/队列（当前用子进程）</li>
+                <li>Web 控制台、可视化编辑器</li>
+                <li>公网部署、7×24 SLA</li>
+                <li>跨 Run 的全局费用上限（当前按 Branch 计量）</li>
+                <li>统计显著性验证（当前每题 1 Trial）</li>
+            </ul>
+
+            <div class="callout">
+                <strong>测试覆盖：</strong>npm test 通过 572 个 Node.js 测试，npm run test:eval 通过 14 个 Python 评测测试。Controller 代码约 29,600 行。
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>三阶段产品演进</h2>
+
+            <h3>阶段一：开源 Core Engine（HarnessEvoGym）</h3>
+            <p><strong>定位：</strong>面向研究者和高级开发者的 RSI Gym / Core Engine，用于复现论文、验证算法、扩展 Target/Environment。</p>
+
+            <p><strong>用户画像：</strong></p>
+            <ul>
+                <li>Agent 框架开发者（需要对比不同 Population Mode 和 SearchStrategy）</li>
+                <li>研究机构（发表 RSI、AutoML、Agent 优化论文）</li>
+                <li>企业 AI 团队技术预研（评估 RSI 可行性）</li>
+            </ul>
+
+            <p><strong>当前已支持：</strong></p>
+            <ul>
+                <li>✅ 完整 Controller + 五种 Population Mode</li>
+                <li>✅ OmegaUse-OfficeVal 和 HLE 双环境</li>
+                <li>✅ Mutation Catalog、Diff Guard、Sealed Final</li>
+                <li>✅ 可复现实验（固定 Source、Seed、Split、Policy）</li>
+                <li>✅ 本地 Server API（Run 管理、Resume、Fork）</li>
+            </ul>
+
+            <p><strong>缺少但需要补齐：</strong></p>
+            <ul>
+                <li>⚠️ 完整文档（quickstart、tutorial、best practices、troubleshooting）</li>
+                <li>⚠️ 更多真实 Target/Environment 示例（SWE-bench、Harbor、自定义 Harness 模板）</li>
+                <li>⚠️ 端到端 Smoke 测试纳入 CI</li>
+                <li>⚠️ 版本策略和发布流程</li>
+                <li>⚠️ 性能基准和资源消耗参考</li>
+            </ul>
+
+            <p><strong>开源价值：</strong></p>
+            <ul>
+                <li>建立 RSI 领域信任和声誉</li>
+                <li>获取社区反馈和贡献（Target、Environment、Strategy 扩展）</li>
+                <li>为企业产品导流（企业用户从开源版开始试用）</li>
+            </ul>
+
+            <h3>阶段二：APP Server（类似 Coding Agent App Server）</h3>
+            <p><strong>定位：</strong>企业级 RSI 后端服务，支撑 CLI、桌面端、Web 控制台，提供 Run 管理、队列、持久化、认证、多租户、可观测性。</p>
+
+            <p><strong>核心能力：</strong></p>
+
+            <table>
+                <tr>
+                    <th>模块</th>
+                    <th>当前状态</th>
+                    <th>需要补齐</th>
+                </tr>
+                <tr>
+                    <td><strong>Run 生命周期</strong></td>
+                    <td>✅ 创建、查询、Resume、Cancel、Fork</td>
+                    <td>⚠️ 优先级队列、并发控制、过期清理</td>
+                </tr>
+                <tr>
+                    <td><strong>Worker 与队列</strong></td>
+                    <td>❌ 当前用子进程</td>
+                    <td>⚠️ 独立 Worker 池、消息队列（Redis/RabbitMQ）、崩溃恢复</td>
+                </tr>
+                <tr>
+                    <td><strong>持久化</strong></td>
+                    <td>❌ 当前用本地文件</td>
+                    <td>⚠️ PostgreSQL（Run、Candidate、Branch、Event）+ S3/MinIO（Checkpoint、Artifact）</td>
+                </tr>
+                <tr>
+                    <td><strong>认证与租户</strong></td>
+                    <td>❌ 无</td>
+                    <td>⚠️ JWT/OAuth、Tenant 隔离、API Key 管理</td>
+                </tr>
+                <tr>
+                    <td><strong>可观测性</strong></td>
+                    <td>✅ 本地事件日志</td>
+                    <td>⚠️ Metrics（Prometheus）、Tracing（Jaeger）、Alert</td>
+                </tr>
+                <tr>
+                    <td><strong>费用计量</strong></td>
+                    <td>✅ Branch 级别 Token 计数</td>
+                    <td>⚠️ Population 全局预算、按客户计费、成本预测</td>
+                </tr>
+                <tr>
+                    <td><strong>权限体系</strong></td>
+                    <td>❌ 无</td>
+                    <td>⚠️ RBAC（Owner/Editor/Viewer）、Experiment 共享</td>
+                </tr>
+            </table>
+
+            <p><strong>关键决策：</strong></p>
+            <ul>
+                <li><strong>保持 Core Engine 独立：</strong>APP Server 调用 Core Engine CLI，不把 Controller 逻辑搬进 HTTP 层</li>
+                <li><strong>兼容本地部署：</strong>企业私有部署时，Worker 和数据库都在客户内网</li>
+                <li><strong>支持混合云：</strong>控制平面在客户内网，Solver/Updater 可选托管算力或客户自有 GPU</li>
+            </ul>
+
+            <h3>阶段三：商业产品（全栈 RSI 优化平台）</h3>
+            <p><strong>定位：</strong>客户接入自己的 Harness、代码库、任务/评测环境、预算和目标，系统自动搜索、验证、交付改进版本。</p>
+
+            <p><strong>完整价值链：</strong></p>
+            <ol>
+                <li><strong>接入：</strong>客户提供 Git 仓库（Agent 代码）、Benchmark（任务集或真实业务数据抽样）、评测脚本、目标指标</li>
+                <li><strong>配置：</strong>系统自动或半自动生成 Target Adapter、Environment Adapter、Mutation Catalog</li>
+                <li><strong>基线评测：</strong>系统对当前版本（H0）做完整基线评测，确认起点性能</li>
+                <li><strong>自动搜索：</strong>系统按预算运行 Population，自动选择 SearchStrategy 和 Updater</li>
+                <li><strong>人工审核：</strong>系统推荐 Champion 候选，客户审核 Diff、Mutation Report、validation 结果</li>
+                <li><strong>最终验证：</strong>客户确认后，系统在 sealed final 上评测，生成审计报告</li>
+                <li><strong>交付：</strong>系统输出 Git patch、完整 lineage、性能对比、成本报告</li>
+            </ol>
+
+            <p><strong>产品形态：</strong></p>
+            <ul>
+                <li><strong>企业私有部署：</strong>完整控制平面 + Worker 部署在客户内网，数据不出内网</li>
+                <li><strong>托管优化服务：</strong>客户通过 API 提交任务，平台提供算力和托管 Worker，结果回传</li>
+                <li><strong>混合模式：</strong>控制平面和数据在客户侧，算力按需租用云端 GPU Worker</li>
+            </ul>
+
+            <p><strong>关键差异化能力：</strong></p>
+            <ul>
+                <li>✅ <strong>可信边界：</strong>Controller、Evaluator、Sealed Final 不被 Candidate 修改</li>
+                <li>✅ <strong>可复现：</strong>完整 Source、Seed、Split、Policy、Lineage 固定</li>
+                <li>✅ <strong>可审计：</strong>Diff Guard、Mutation Report、完整事件流</li>
+                <li>✅ <strong>可回滚：</strong>晋升失败自动回退，不污染 Champion</li>
+                <li>✅ <strong>灵活搜索：</strong>五种 Population Mode + 可插拔 Strategy，而非单一黑盒优化</li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h2>优先 RSI 方向与商业价值</h2>
+
+            <p>以下方向按<strong>当前 HarnessEvoGym 能力匹配度、客户痛点明确性、商业价值</strong>排序。</p>
+
+            <div class="cards">
+                <div class="card">
+                    <div class="card-header">1. Coding Agent Harness 优化</div>
+                    <div class="card-meta">
+                        <span class="status-badge status-done">已部分支持</span>
+                        <span class="status-badge status-plan">优先级：最高</span>
+                    </div>
+                    <p><strong>优化对象：</strong>编程 Agent 的 Prompt、Tool、Agent Loop、错误处理、多步规划</p>
+                    <p><strong>客户痛点：</strong></p>
+                    <ul>
+                        <li>企业自研 Coding Agent 在特定语言/框架上表现不稳定</li>
+                        <li>人工调优 Prompt 和工具链耗时长（数周到数月）</li>
+                        <li>没有系统化方法验证改进是否真正泛化</li>
+                    </ul>
+                    <p><strong>商业价值：</strong></p>
+                    <ul>
+                        <li>💰 企业愿意为"任务成功率从 60% 提升到 75%"支付显著费用</li>
+                        <li>💰 缩短上线时间（从人工调优 2 个月到自动优化 1 周）</li>
+                        <li>💰 可复用到多个项目和语言</li>
+                    </ul>
+                    <p><strong>评测环境：</strong></p>
+                    <ul>
+                        <li>✅ 已支持：OmegaUse-OfficeVal（91 任务）</li>
+                        <li>⚠️ 需补齐：SWE-bench Verified（真实 GitHub issue）、企业内部代码库任务</li>
+                    </ul>
+                    <p><strong>技术难点：</strong></p>
+                    <ul>
+                        <li>SWE-bench 环境复杂（需 Docker、多版本依赖、长时间运行）</li>
+                        <li>企业代码库需接入私有 Git、CI/CD、测试框架</li>
+                        <li>评测指标多样（代码正确性、测试覆盖、可维护性）</li>
+                    </ul>
+                    <p><strong>当前能力匹配：</strong>⭐⭐⭐⭐ 4/5（MSA Cowork 已验证核心链路，需补齐 SWE-bench 适配）</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">2. 知识工作 Agent（Office/文档/数据处理）</div>
+                    <div class="card-meta">
+                        <span class="status-badge status-done">已支持</span>
+                        <span class="status-badge status-plan">优先级：高</span>
+                    </div>
+                    <p><strong>优化对象：</strong>文档生成、表格处理、数据清洗、报告自动化的 Agent</p>
+                    <p><strong>客户痛点：</strong></p>
+                    <ul>
+                        <li>企业内部大量重复性知识工作（财务报表、合规文档、数据整理）</li>
+                        <li>通用 Agent 在企业特定格式/规则上表现差</li>
+                        <li>需要符合企业模板和审批流程</li>
+                    </ul>
+                    <p><strong>商业价值：</strong></p>
+                    <ul>
+                        <li>💰 直接节省人力（1 个 Agent 替代 0.5 FTE 重复工作）</li>
+                        <li>💰 市场广阔（几乎所有企业都有知识工作自动化需求）</li>
+                        <li>💰 客户续费率高（一旦接入真实流程，替换成本高）</li>
+                    </ul>
+                    <p><strong>评测环境：</strong></p>
+                    <ul>
+                        <li>✅ 已支持：OmegaUse-OfficeVal（Word/Excel/PPT 任务）</li>
+                        <li>⚠️ 需补齐：企业自定义模板、多语言文档、API 集成（Notion/飞书/钉钉）</li>
+                    </ul>
+                    <p><strong>技术难点：</strong></p>
+                    <ul>
+                        <li>企业模板和规则难以标准化</li>
+                        <li>评测指标主观性强（文档质量、格式美观度）</li>
+                        <li>需要接入企业内部系统（ERP/CRM/审批流）</li>
+                    </ul>
+                    <p><strong>当前能力匹配：</strong>⭐⭐⭐⭐⭐ 5/5（OfficeVal 已完整验证，直接可商业化）</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">3. 数学推理 Agent 优化</div>
+                    <div class="card-meta">
+                        <span class="status-badge status-done">已支持</span>
+                        <span class="status-badge status-plan">优先级：中</span>
+                    </div>
+                    <p><strong>优化对象：</strong>数学证明、竞赛题求解、形式化验证的 Agent</p>
+                    <p><strong>客户痛点：</strong></p>
+                    <ul>
+                        <li>教育机构需要自动批改和辅导数学题</li>
+                        <li>研究机构需要自动化定理证明</li>
+                        <li>通用模型在特定数学领域（如数论、拓扑）表现弱</li>
+                    </ul>
+                    <p><strong>商业价值：</strong></p>
+                    <ul>
+                        <li>💰 教育市场（K-12、高等教育、竞赛培训）</li>
+                        <li>💰 研究工具（加速形式化验证、定理证明）</li>
+                        <li>⚠️ 付费意愿相对企业场景较低</li>
+                    </ul>
+                    <p><strong>评测环境：</strong></p>
+                    <ul>
+                        <li>✅ 已支持：HLE Text-only Math（固定 split、sealed test）</li>
+                        <li>⚠️ 需补齐：更多数学竞赛数据集（AMC、AIME、IMO）、Lean 形式化证明</li>
+                    </ul>
+                    <p><strong>技术难点：</strong></p>
+                    <ul>
+                        <li>数学题多样性高，泛化困难</li>
+                        <li>形式化证明需要 Lean/Coq 集成</li>
+                        <li>商业化路径不如 Coding/Office 明确</li>
+                    </ul>
+                    <p><strong>当前能力匹配：</strong>⭐⭐⭐⭐ 4/5（HLE 已验证，但商业场景需进一步探索）</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">4. 企业流程自动化 Agent</div>
+                    <div class="card-meta">
+                        <span class="status-badge status-research">研究方向</span>
+                        <span class="status-badge status-plan">优先级：中高</span>
+                    </div>
+                    <p><strong>优化对象：</strong>RPA、工单处理、客服对话、审批流程的 Agent</p>
+                    <p><strong>客户痛点：</strong></p>
+                    <ul>
+                        <li>企业有大量结构化流程（审批、工单、客服）</li>
+                        <li>通用 Agent 不理解企业特定术语和规则</li>
+                        <li>需要与企业 ERP/CRM/工单系统集成</li>
+                    </ul>
+                    <p><strong>商业价值：</strong></p>
+                    <ul>
+                        <li>💰 市场巨大（RPA 市场规模百亿美元）</li>
+                        <li>💰 客户付费意愿强（直接替代人力）</li>
+                        <li>💰 长期合同（年度订阅或按流程计费）</li>
+                    </ul>
+                    <p><strong>评测环境：</strong></p>
+                    <ul>
+                        <li>❌ 当前无标准 Benchmark</li>
+                        <li>⚠️ 需从零构建：模拟企业系统、工单数据、审批规则</li>
+                    </ul>
+                    <p><strong>技术难点：</strong></p>
+                    <ul>
+                        <li>企业系统集成复杂（API、权限、数据隐私）</li>
+                        <li>流程规则难以标准化（每个企业不同）</li>
+                        <li>评测需要模拟真实企业环境</li>
+                        <li>竞争激烈（UiPath、Automation Anywhere 等成熟 RPA 厂商）</li>
+                    </ul>
+                    <p><strong>当前能力匹配：</strong>⭐⭐ 2/5（需大量前期工作构建 Environment 和 Benchmark）</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">5. Agent 评测策略与工具调用优化</div>
+                    <div class="card-meta">
+                        <span class="status-badge status-research">研究方向</span>
+                        <span class="status-badge status-plan">优先级：中</span>
+                    </div>
+                    <p><strong>优化对象：</strong>Agent 的工具选择、参数生成、错误处理、重试策略</p>
+                    <p><strong>客户痛点：</strong></p>
+                    <ul>
+                        <li>Agent 频繁调用错误工具或生成无效参数</li>
+                        <li>缺乏系统化方法优化工具调用链</li>
+                        <li>工具调用成本高（每次调用都消耗 Token）</li>
+                    </ul>
+                    <p><strong>商业价值：</strong></p>
+                    <ul>
+                        <li>💰 降低 Agent 运行成本（减少无效工具调用）</li>
+                        <li>💰 提升成功率（正确工具 + 正确参数）</li>
+                        <li>⚠️ 更像"特性优化"而非独立产品</li>
+                    </ul>
+                    <p><strong>评测环境：</strong></p>
+                    <ul>
+                        <li>✅ 部分支持：MSA Cowork 中包含工具调用</li>
+                        <li>⚠️ 需补齐：专门的工具调用 Benchmark（ToolBench、API-Bank）</li>
+                    </ul>
+                    <p><strong>技术难点：</strong></p>
+                    <ul>
+                        <li>工具调用链复杂（多步依赖、状态管理）</li>
+                        <li>评测指标多样（正确性、效率、成本）</li>
+                        <li>商业化路径不明确（更适合作为其他方向的子模块）</li>
+                    </ul>
+                    <p><strong>当前能力匹配：</strong>⭐⭐⭐ 3/5（核心能力具备，但需专门 Benchmark 和客户场景验证）</p>
+                </div>
+            </div>
+
+            <div class="callout">
+                <strong>推荐优先级排序（0-6个月）：</strong>
+                <ol>
+                    <li><strong>知识工作 Agent（OfficeVal 路径）</strong> — 已验证，直接商业化</li>
+                    <li><strong>Coding Agent + SWE-bench</strong> — 客户需求明确，需 3-6 周补齐环境</li>
+                    <li><strong>数学推理 Agent</strong> — 教育市场探索，作为技术展示</li>
+                    <li><strong>企业流程自动化</strong> — 长期方向，需要客户深度合作共建 Benchmark</li>
+                    <li><strong>工具调用优化</strong> — 作为其他方向的增强特性，而非独立产品</li>
+                </ol>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>分阶段路线图</h2>
+
+            <div class="timeline">
+                <div class="timeline-item">
+                    <div class="timeline-phase">现在（0-3个月）</div>
+                    <h4>目标：稳定开源版，完成首个商业化 PoC</h4>
+
+                    <p><strong>必须交付：</strong></p>
+                    <ul>
+                        <li>✅ 补齐开源文档（Quickstart、Tutorial、API Reference、Troubleshooting）</li>
+                        <li>✅ SWE-bench Verified 环境适配（至少 50 个任务端到端验证）</li>
+                        <li>✅ 端到端 Smoke 测试纳入 CI</li>
+                        <li>✅ 版本策略和发布流程（v0.2.0 稳定版）</li>
+                        <li>✅ 性能基准和资源消耗参考文档</li>
+                        <li>✅ <strong>首个商业 PoC：</strong>与 1-2 家企业合作，在真实 Coding Agent 或 Office Agent 场景验证</li>
+                    </ul>
+
+                    <p><strong>验收指标：</strong></p>
+                    <ul>
+                        <li>新用户从 git clone 到运行第一个实验 < 30 分钟</li>
+                        <li>SWE-bench 环境稳定性 > 95%（任务执行不因基础设施失败）</li>
+                        <li>至少 1 个企业客户完成 PoC，验证 5-10% 性能提升</li>
+                        <li>GitHub Stars > 500，贡献者 > 10</li>
+                    </ul>
+
+                    <p><strong>明确不做：</strong></p>
+                    <ul>
+                        <li>❌ Web 控制台（CLI 和 API 足够 PoC）</li>
+                        <li>❌ 多租户和认证（单客户私有部署）</li>
+                        <li>❌ 复杂计费系统（PoC 阶段按固定价格或免费）</li>
+                    </ul>
+                </div>
+
+                <div class="timeline-item">
+                    <div class="timeline-phase" style="background: var(--secondary);">近期（3-6个月）</div>
+                    <h4>目标：APP Server 基础能力，开始商业化落地</h4>
+
+                    <p><strong>必须交付：</strong></p>
+                    <ul>
+                        <li>✅ Worker 与队列系统（Redis + 独立 Worker 进程池）</li>
+                        <li>✅ 持久化层（PostgreSQL + S3/MinIO）</li>
+                        <li>✅ 基础认证与多租户（JWT、Tenant 隔离）</li>
+                        <li>✅ 简化 Web 控制台（Run 列表、状态监控、日志查看、Diff 对比）</li>
+                        <li>✅ 可观测性（Prometheus Metrics、Grafana Dashboard）</li>
+                        <li>✅ 全局费用预算与成本预测</li>
+                        <li>✅ <strong>商业落地：</strong>3-5 家付费客户，至少 1 个年度合同</li>
+                    </ul>
+
+                    <p><strong>验收指标：</strong></p>
+                    <ul>
+                        <li>支持 10+ 并发 Run，单 Worker 崩溃不影响其他 Run</li>
+                        <li>Run 恢复成功率 > 99%（从 Checkpoint 恢复）</li>
+                        <li>Web 控制台覆盖 80% 常用操作（剩余 20% 用 CLI）</li>
+                        <li>客户满意度 > 4/5，至少 1 个客户续约或扩大使用</li>
+                        <li>ARR（年度经常性收入）> $50K</li>
+                    </ul>
+
+                    <p><strong>明确不做：</strong></p>
+                    <ul>
+                        <li>❌ 拖拽式配置界面（用 YAML/JSON + 预设模板）</li>
+                        <li>❌ 复杂 RBAC（只支持 Owner/Editor/Viewer）</li>
+                        <li>❌ 公有云 SaaS（先做私有部署和托管服务）</li>
+                    </ul>
+                </div>
+
+                <div class="timeline-item">
+                    <div class="timeline-phase" style="background: var(--accent);">中期（6-12个月）</div>
+                    <h4>目标：完整商业产品，扩展到多个 RSI 方向</h4>
+
+                    <p><strong>必须交付：</strong></p>
+                    <ul>
+                        <li>✅ 自动 Adapter 生成（从客户 Git 仓库半自动生成 Target/Environment）</li>
+                        <li>✅ 混合云支持（控制平面内网 + 算力云端 GPU Worker）</li>
+                        <li>✅ 完整 RBAC 与审计日志</li>
+                        <li>✅ 高级 SearchStrategy（强化学习、贝叶斯优化、遗传算法）</li>
+                        <li>✅ 多 Updater 并行（同时尝试多个修改方向，取最佳）</li>
+                        <li>✅ 统计显著性验证（多 Trial、Bootstrap、置信区间）</li>
+                        <li>✅ 企业流程自动化方向 Benchmark 和首个客户</li>
+                        <li>✅ <strong>商业目标：</strong>10-20 家付费客户，ARR > $500K</li>
+                    </ul>
+
+                    <p><strong>验收指标：</strong></p>
+                    <ul>
+                        <li>支持 50+ 并发 Run，多租户隔离完善</li>
+                        <li>Adapter 生成成功率 > 70%（客户只需少量人工调整）</li>
+                        <li>至少 3 个不同 RSI 方向有付费客户（Coding/Office/流程自动化）</li>
+                        <li>客户流失率 < 10%</li>
+                        <li>平均客户 LTV（生命周期价值）> $50K</li>
+                    </ul>
+
+                    <p><strong>明确不做：</strong></p>
+                    <ul>
+                        <li>❌ 通用 AutoML 平台（聚焦 Agent Harness RSI）</li>
+                        <li>❌ 模型训练和微调（只优化 Harness，不训练模型）</li>
+                        <li>❌ To C 免费版和社区版（资源聚焦企业客户）</li>
+                    </ul>
+                </div>
+
+                <div class="timeline-item">
+                    <div class="timeline-phase" style="background: var(--success);">后期（12-24个月）</div>
+                    <h4>目标：平台化、生态化，成为 Agent 优化标准</h4>
+
+                    <p><strong>必须交付：</strong></p>
+                    <ul>
+                        <li>✅ Marketplace（第三方 Target/Environment/Strategy 插件市场）</li>
+                        <li>✅ 自动 Benchmark 生成（从生产数据自动生成评测集）</li>
+                        <li>✅ 持续优化模式（Agent 上线后，持续监控并自动优化）</li>
+                        <li>✅ A/B 测试集成（新 Champion 灰度发布、自动回滚）</li>
+                        <li>✅ 跨客户知识复用（匿名化后的最佳实践、Strategy 参数）</li>
+                        <li>✅ 企业级 SLA（99.9% 可用性、7×24 支持）</li>
+                        <li>✅ 公有云 SaaS（降低中小企业使用门槛）</li>
+                        <li>✅ <strong>商业目标：</strong>50+ 企业客户，ARR > $2M</li>
+                    </ul>
+
+                    <p><strong>验收指标：</strong></p>
+                    <ul>
+                        <li>Marketplace 有 > 20 个第三方插件</li>
+                        <li>持续优化模式客户占比 > 30%（从一次性项目到持续订阅）</li>
+                        <li>平台月活跃 Run > 1000</li>
+                        <li>企业客户 NPS（净推荐值）> 50</li>
+                        <li>至少 1 家头部科技公司深度使用（参考客户）</li>
+                    </ul>
+
+                    <p><strong>明确不做：</strong></p>
+                    <ul>
+                        <li>❌ 横向扩展到非 Agent 领域（如传统 ML、数据处理）</li>
+                        <li>❌ 自研基础模型（专注 Harness 优化，模型用第三方）</li>
+                        <li>❌ 硬件一体机（保持软件平台定位）</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>架构演进图</h2>
+
+            <div class="arch-diagram">
+                <svg viewBox="0 0 1000 700" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: auto;">
+                    <!-- Background layers -->
+                    <defs>
+                        <linearGradient id="grad1" x1="0%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" style="stop-color:#4c8bf5;stop-opacity:0.1" />
+                            <stop offset="100%" style="stop-color:#4c8bf5;stop-opacity:0.05" />
+                        </linearGradient>
+                        <linearGradient id="grad2" x1="0%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" style="stop-color:#8b5cf6;stop-opacity:0.1" />
+                            <stop offset="100%" style="stop-color:#8b5cf6;stop-opacity:0.05" />
+                        </linearGradient>
+                        <linearGradient id="grad3" x1="0%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" style="stop-color:#20a36a;stop-opacity:0.1" />
+                            <stop offset="100%" style="stop-color:#20a36a;stop-opacity:0.05" />
+                        </linearGradient>
+                    </defs>
+
+                    <!-- Title -->
+                    <text x="500" y="30" text-anchor="middle" style="font-size: 20px; font-weight: 700; fill: #2c3e50;">HarnessEvoGym 架构演进：从 Core Engine 到商业产品</text>
+
+                    <!-- Stage 1: Core Engine (Left) -->
+                    <rect x="20" y="60" width="280" height="600" rx="8" fill="url(#grad1)" stroke="#4c8bf5" stroke-width="2"/>
+                    <text x="160" y="85" text-anchor="middle" style="font-size: 16px; font-weight: 600; fill: #4c8bf5;">阶段一：开源 Core Engine</text>
+                    <text x="160" y="105" text-anchor="middle" style="font-size: 12px; fill: #5a6c7d;">(当前已实现)</text>
+
+                    <!-- Controller -->
+                    <rect x="40" y="120" width="240" height="80" rx="4" fill="#fff" stroke="#4c8bf5" stroke-width="1.5"/>
+                    <text x="160" y="145" text-anchor="middle" style="font-size: 14px; font-weight: 600; fill: #2c3e50;">Controller</text>
+                    <text x="160" y="165" text-anchor="middle" style="font-size: 11px; fill: #5a6c7d;">Mutation Catalog · Diff Guard</text>
+                    <text x="160" y="180" text-anchor="middle" style="font-size: 11px; fill: #5a6c7d;">Population · SearchStrategy</text>
+                    <text x="160" y="195" text-anchor="middle" style="font-size: 11px; fill: #5a6c7d;">Promotion · Lineage</text>
+
+                    <!-- Environment -->
+                    <rect x="40" y="215" width="110" height="100" rx="4" fill="#fff" stroke="#20a36a" stroke-width="1.5"/>
+                    <text x="95" y="235" text-anchor="middle" style="font-size: 13px; font-weight: 600; fill: #2c3e50;">Environment</text>
+                    <text x="95" y="255" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">OfficeVal</text>
+                    <text x="95" y="270" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">HLE Math</text>
+                    <text x="95" y="285" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">SWE-bench</text>
+                    <text x="95" y="300" text-anchor="middle" style="font-size: 10px; fill: #7f8c9a;">(规划)</text>
+
+                    <!-- Target -->
+                    <rect x="170" y="215" width="110" height="100" rx="4" fill="#fff" stroke="#f4a261" stroke-width="1.5"/>
+                    <text x="225" y="235" text-anchor="middle" style="font-size: 13px; font-weight: 600; fill: #2c3e50;">Target</text>
+                    <text x="225" y="255" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">MSA Cowork</text>
+                    <text x="225" y="270" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">MSA Reasoning</text>
+                    <text x="225" y="285" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">DSH Path</text>
+                    <text x="225" y="300" text-anchor="middle" style="font-size: 10px; fill: #7f8c9a;">(实验)</text>
+
+                    <!-- Solver & Updater -->
+                    <rect x="40" y="330" width="110" height="60" rx="4" fill="#fff" stroke="#8b5cf6" stroke-width="1.5"/>
+                    <text x="95" y="350" text-anchor="middle" style="font-size: 13px; font-weight: 600; fill: #2c3e50;">Solver</text>
+                    <text x="95" y="370" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">隔离执行</text>
+                    <text x="95" y="385" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">只读 Candidate</text>
+
+                    <rect x="170" y="330" width="110" height="60" rx="4" fill="#fff" stroke="#8b5cf6" stroke-width="1.5"/>
+                    <text x="225" y="350" text-anchor="middle" style="font-size: 13px; font-weight: 600; fill: #2c3e50;">Updater</text>
+                    <text x="225" y="370" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">Codex CLI</text>
+                    <text x="225" y="385" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">Claude Code</text>
+
+                    <!-- Local Storage -->
+                    <rect x="40" y="405" width="240" height="60" rx="4" fill="#f8f9fa" stroke="#e1e8ed" stroke-width="1.5"/>
+                    <text x="160" y="425" text-anchor="middle" style="font-size: 13px; font-weight: 600; fill: #2c3e50;">本地存储</text>
+                    <text x="160" y="445" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">.rsi/ 文件系统 · Git worktree</text>
+                    <text x="160" y="460" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">Checkpoint · Event Log</text>
+
+                    <!-- CLI & Local API -->
+                    <rect x="40" y="480" width="240" height="60" rx="4" fill="#fff" stroke="#4c8bf5" stroke-width="1.5"/>
+                    <text x="160" y="500" text-anchor="middle" style="font-size: 13px; font-weight: 600; fill: #2c3e50;">CLI & Local Server API</text>
+                    <text x="160" y="520" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">experiment run · resume · fork</text>
+                    <text x="160" y="535" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">127.0.0.1:8787 (无认证)</text>
+
+                    <!-- Users -->
+                    <ellipse cx="160" cy="590" rx="100" ry="35" fill="#e7f3ff" stroke="#4c8bf5" stroke-width="1.5"/>
+                    <text x="160" y="590" text-anchor="middle" style="font-size: 12px; font-weight: 600; fill: #2c3e50;">研究者</text>
+                    <text x="160" y="605" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">高级开发者 · 论文复现</text>
+
+                    <!-- Stage 2: APP Server (Middle) -->
+                    <rect x="340" y="60" width="300" height="600" rx="8" fill="url(#grad2)" stroke="#8b5cf6" stroke-width="2"/>
+                    <text x="490" y="85" text-anchor="middle" style="font-size: 16px; font-weight: 600; fill: #8b5cf6;">阶段二：APP Server</text>
+                    <text x="490" y="105" text-anchor="middle" style="font-size: 12px; fill: #5a6c7d;">(3-6个月)</text>
+
+                    <!-- Web API -->
+                    <rect x="360" y="120" width="260" height="60" rx="4" fill="#fff" stroke="#8b5cf6" stroke-width="1.5"/>
+                    <text x="490" y="140" text-anchor="middle" style="font-size: 14px; font-weight: 600; fill: #2c3e50;">HTTP API + SSE</text>
+                    <text x="490" y="160" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">REST API · WebSocket · 认证</text>
+                    <text x="490" y="175" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">多租户 · RBAC</text>
+
+                    <!-- Worker Pool -->
+                    <rect x="360" y="195" width="120" height="70" rx="4" fill="#fff" stroke="#20a36a" stroke-width="1.5"/>
+                    <text x="420" y="215" text-anchor="middle" style="font-size: 13px; font-weight: 600; fill: #2c3e50;">Worker Pool</text>
+                    <text x="420" y="235" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">独立进程</text>
+                    <text x="420" y="250" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">崩溃恢复</text>
+                    <text x="420" y="265" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">并发控制</text>
+
+                    <!-- Message Queue -->
+                    <rect x="500" y="195" width="120" height="70" rx="4" fill="#fff" stroke="#f4a261" stroke-width="1.5"/>
+                    <text x="560" y="215" text-anchor="middle" style="font-size: 13px; font-weight: 600; fill: #2c3e50;">消息队列</text>
+                    <text x="560" y="235" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">Redis / RabbitMQ</text>
+                    <text x="560" y="250" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">优先级队列</text>
+                    <text x="560" y="265" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">任务调度</text>
+
+                    <!-- Core Engine (reuse) -->
+                    <rect x="360" y="280" width="260" height="60" rx="4" fill="#e7f3ff" stroke="#4c8bf5" stroke-width="1.5"/>
+                    <text x="490" y="300" text-anchor="middle" style="font-size: 13px; font-weight: 600; fill: #2c3e50;">Core Engine</text>
+                    <text x="490" y="320" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">复用阶段一 Controller 逻辑</text>
+                    <text x="490" y="335" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">通过 CLI 启动，保持隔离</text>
+
+                    <!-- Database -->
+                    <rect x="360" y="355" width="120" height="70" rx="4" fill="#fff" stroke="#4c8bf5" stroke-width="1.5"/>
+                    <text x="420" y="375" text-anchor="middle" style="font-size: 13px; font-weight: 600; fill: #2c3e50;">PostgreSQL</text>
+                    <text x="420" y="395" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">Run · Branch</text>
+                    <text x="420" y="410" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">Event · Metadata</text>
+                    <text x="420" y="425" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">Tenant 隔离</text>
+
+                    <!-- Object Storage -->
+                    <rect x="500" y="355" width="120" height="70" rx="4" fill="#fff" stroke="#4c8bf5" stroke-width="1.5"/>
+                    <text x="560" y="375" text-anchor="middle" style="font-size: 13px; font-weight: 600; fill: #2c3e50;">S3 / MinIO</text>
+                    <text x="560" y="395" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">Checkpoint</text>
+                    <text x="560" y="410" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">Artifact · Patch</text>
+                    <text x="560" y="425" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">Lineage 备份</text>
+
+                    <!-- Observability -->
+                    <rect x="360" y="440" width="260" height="60" rx="4" fill="#fff" stroke="#20a36a" stroke-width="1.5"/>
+                    <text x="490" y="460" text-anchor="middle" style="font-size: 13px; font-weight: 600; fill: #2c3e50;">可观测性</text>
+                    <text x="490" y="480" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">Prometheus · Grafana · Jaeger</text>
+                    <text x="490" y="495" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">Metrics · Tracing · Alert</text>
+
+                    <!-- Web Console -->
+                    <rect x="360" y="515" width="260" height="60" rx="4" fill="#fff" stroke="#8b5cf6" stroke-width="1.5"/>
+                    <text x="490" y="535" text-anchor="middle" style="font-size: 13px; font-weight: 600; fill: #2c3e50;">Web 控制台</text>
+                    <text x="490" y="555" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">Run 监控 · Diff 对比 · 日志查看</text>
+                    <text x="490" y="570" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">简化操作，CLI 仍可用</text>
+
+                    <!-- Users -->
+                    <ellipse cx="490" cy="615" rx="110" ry="35" fill="#f0e6ff" stroke="#8b5cf6" stroke-width="1.5"/>
+                    <text x="490" y="615" text-anchor="middle" style="font-size: 12px; font-weight: 600; fill: #2c3e50;">企业 AI 团队</text>
+                    <text x="490" y="630" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">内部私有部署 · 托管服务</text>
+
+                    <!-- Stage 3: Commercial Product (Right) -->
+                    <rect x="680" y="60" width="300" height="600" rx="8" fill="url(#grad3)" stroke="#20a36a" stroke-width="2"/>
+                    <text x="830" y="85" text-anchor="middle" style="font-size: 16px; font-weight: 600; fill: #20a36a;">阶段三：商业产品</text>
+                    <text x="830" y="105" text-anchor="middle" style="font-size: 12px; fill: #5a6c7d;">(6-24个月)</text>
+
+                    <!-- Customer Integration -->
+                    <rect x="700" y="120" width="260" height="70" rx="4" fill="#fff" stroke="#20a36a" stroke-width="1.5"/>
+                    <text x="830" y="140" text-anchor="middle" style="font-size: 14px; font-weight: 600; fill: #2c3e50;">客户接入层</text>
+                    <text x="830" y="160" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">Git 仓库 · 私有 Benchmark</text>
+                    <text x="830" y="175" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">企业系统集成 (ERP/CRM/工单)</text>
+                    <text x="830" y="190" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">自动生成 Adapter</text>
+
+                    <!-- Auto Config -->
+                    <rect x="700" y="205" width="120" height="70" rx="4" fill="#fff" stroke="#f4a261" stroke-width="1.5"/>
+                    <text x="760" y="225" text-anchor="middle" style="font-size: 13px; font-weight: 600; fill: #2c3e50;">自动配置</text>
+                    <text x="760" y="245" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">Target 识别</text>
+                    <text x="760" y="260" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">Benchmark 生成</text>
+                    <text x="760" y="275" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">Catalog 推断</text>
+
+                    <!-- Hybrid Cloud -->
+                    <rect x="840" y="205" width="120" height="70" rx="4" fill="#fff" stroke="#8b5cf6" stroke-width="1.5"/>
+                    <text x="900" y="225" text-anchor="middle" style="font-size: 13px; font-weight: 600; fill: #2c3e50;">混合云</text>
+                    <text x="900" y="245" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">控制平面内网</text>
+                    <text x="900" y="260" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">算力云端 GPU</text>
+                    <text x="900" y="275" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">数据不出域</text>
+
+                    <!-- Advanced Features -->
+                    <rect x="700" y="290" width="260" height="90" rx="4" fill="#fff" stroke="#4c8bf5" stroke-width="1.5"/>
+                    <text x="830" y="310" text-anchor="middle" style="font-size: 13px; font-weight: 600; fill: #2c3e50;">高级特性</text>
+                    <text x="830" y="330" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">多 Updater 并行 · 统计显著性验证</text>
+                    <text x="830" y="345" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">强化学习 SearchStrategy</text>
+                    <text x="830" y="360" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">持续优化模式 · A/B 测试</text>
+                    <text x="830" y="375" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">自动回滚 · 灰度发布</text>
+
+                    <!-- Audit & Compliance -->
+                    <rect x="700" y="395" width="260" height="60" rx="4" fill="#fff" stroke="#20a36a" stroke-width="1.5"/>
+                    <text x="830" y="415" text-anchor="middle" style="font-size: 13px; font-weight: 600; fill: #2c3e50;">审计与合规</text>
+                    <text x="830" y="435" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">完整 Lineage · 决策可追溯</text>
+                    <text x="830" y="450" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">数据隐私 · 凭据隔离 · 审计日志</text>
+
+                    <!-- Marketplace -->
+                    <rect x="700" y="470" width="260" height="60" rx="4" fill="#fff" stroke="#f4a261" stroke-width="1.5"/>
+                    <text x="830" y="490" text-anchor="middle" style="font-size: 13px; font-weight: 600; fill: #2c3e50;">插件市场</text>
+                    <text x="830" y="510" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">第三方 Target/Environment/Strategy</text>
+                    <text x="830" y="525" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">最佳实践共享 · 生态化</text>
+
+                    <!-- SaaS Option -->
+                    <rect x="700" y="545" width="260" height="50" rx="4" fill="#d4edda" stroke="#20a36a" stroke-width="1.5"/>
+                    <text x="830" y="565" text-anchor="middle" style="font-size: 13px; font-weight: 600; fill: #2c3e50;">可选：公有云 SaaS</text>
+                    <text x="830" y="585" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">降低中小企业门槛 · Freemium 模式</text>
+
+                    <!-- Users -->
+                    <ellipse cx="830" cy="630" rx="120" ry="35" fill="#d4edda" stroke="#20a36a" stroke-width="1.5"/>
+                    <text x="830" y="625" text-anchor="middle" style="font-size: 12px; font-weight: 600; fill: #2c3e50;">企业客户 + 中小团队</text>
+                    <text x="830" y="640" text-anchor="middle" style="font-size: 10px; fill: #5a6c7d;">私有部署 · 托管 · SaaS 多形态</text>
+
+                    <!-- Arrows between stages -->
+                    <path d="M 300 350 L 340 350" stroke="#5a6c7d" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+                    <path d="M 640 350 L 680 350" stroke="#5a6c7d" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+
+                    <defs>
+                        <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+                            <polygon points="0 0, 10 3, 0 6" fill="#5a6c7d" />
+                        </marker>
+                    </defs>
+                </svg>
+            </div>
+
+            <p style="margin-top: 24px; color: var(--text-medium); font-size: 0.95em;">
+                <strong>架构演进原则：</strong>
+            </p>
+            <ul>
+                <li><strong>保持 Core Engine 独立：</strong>阶段二和三都复用阶段一的核心逻辑，不重写 Controller</li>
+                <li><strong>渐进式增强：</strong>每个阶段只增加必要的企业级能力，不过度设计</li>
+                <li><strong>向后兼容：</strong>阶段二支持阶段一的 CLI 和本地运行模式；阶段三支持阶段二的 API</li>
+                <li><strong>灵活部署：</strong>客户可选私有部署、托管服务、混合云或公有云 SaaS</li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h2>商业化模型与定价</h2>
+
+            <h3>To B vs To C 对比分析</h3>
+
+            <div class="comparison">
+                <div class="comparison-col to-b">
+                    <h4>✅ To B（优先，0-12个月核心方向）</h4>
+
+                    <p><strong>目标客户：</strong></p>
+                    <ul>
+                        <li>企业 AI 产品团队（自研 Agent）</li>
+                        <li>软件公司（集成 Agent 到产品）</li>
+                        <li>咨询公司（为客户定制 Agent）</li>
+                        <li>大型企业 IT 部门（内部流程自动化）</li>
+                    </ul>
+
+                    <p><strong>价值主张：</strong></p>
+                    <ul>
+                        <li>节省 Agent 调优人力（数周到数月）</li>
+                        <li>提升任务成功率 5-15%，直接影响业务 KPI</li>
+                        <li>系统化、可审计、可复现的优化流程</li>
+                        <li>私有部署保障数据安全</li>
+                    </ul>
+
+                    <p><strong>付费形态：</strong></p>
+                    <table>
+                        <tr>
+                            <th>模式</th>
+                            <th>价格参考</th>
+                        </tr>
+                        <tr>
+                            <td><strong>私有部署许可</strong></td>
+                            <td>$50K-$200K/年<br><small>按 Worker 数或并发 Run 数</small></td>
+                        </tr>
+                        <tr>
+                            <td><strong>托管服务</strong></td>
+                            <td>$10K-$50K/项目<br><small>按优化任务数或 Candidate Credit</small></td>
+                        </tr>
+                        <tr>
+                            <td><strong>按成功付费</strong></td>
+                            <td>基础费 + 成功提升奖金<br><small>如：$5K 基础 + 每提升 1% 支付 $2K</small></td>
+                        </tr>
+                        <tr>
+                            <td><strong>专业服务</strong></td>
+                            <td>$200-$500/小时<br><small>定制 Adapter、Benchmark、集成</small></td>
+                        </tr>
+                    </table>
+
+                    <p><strong>销售策略：</strong></p>
+                    <ul>
+                        <li>PoC 驱动（免费或低价 PoC，验证后转年度合同）</li>
+                        <li>参考客户（头部公司案例，带动同行业客户）</li>
+                        <li>技术营销（论文、开源社区、技术博客）</li>
+                        <li>合作伙伴（集成到 LLM 平台、Agent 框架）</li>
+                    </ul>
+                </div>
+
+                <div class="comparison-col to-c">
+                    <h4>⚠️ To C（保留但不优先，12个月后探索）</h4>
+
+                    <p><strong>目标客户：</strong></p>
+                    <ul>
+                        <li>独立开发者（个人 Agent 项目）</li>
+                        <li>研究者（论文复现、算法验证）</li>
+                        <li>学生（学习 RSI、Agent 优化）</li>
+                        <li>开源贡献者（扩展 Target/Environment）</li>
+                    </ul>
+
+                    <p><strong>价值主张：</strong></p>
+                    <ul>
+                        <li>免费开源 Core Engine</li>
+                        <li>学习和实验 RSI 技术</li>
+                        <li>复现论文和验证想法</li>
+                        <li>为企业产品导流（试用后转 To B）</li>
+                    </ul>
+
+                    <p><strong>付费形态（可选，12个月后）：</strong></p>
+                    <table>
+                        <tr>
+                            <th>模式</th>
+                            <th>价格参考</th>
+                        </tr>
+                        <tr>
+                            <td><strong>Freemium SaaS</strong></td>
+                            <td>免费：10 Candidate/月<br>Pro：$50-$200/月</td>
+                        </tr>
+                        <tr>
+                            <td><strong>按量付费</strong></td>
+                            <td>$0.5-$2 per Candidate<br><small>算力成本 + 平台费</small></td>
+                        </tr>
+                        <tr>
+                            <td><strong>教育版</strong></td>
+                            <td>免费或学生折扣<br><small>品牌建设，不追求盈利</small></td>
+                        </tr>
+                    </table>
+
+                    <p><strong>挑战：</strong></p>
+                    <ul>
+                        <li>❌ 个人用户很难构造可靠 Benchmark</li>
+                        <li>❌ 缺乏真实评测环境（不如企业有业务数据）</li>
+                        <li>❌ 付费意愿低，支持成本高</li>
+                        <li>❌ 需要简化配置和文档，增加开发成本</li>
+                    </ul>
+
+                    <p><strong>策略：</strong></p>
+                    <ul>
+                        <li>保持开源 Core Engine（社区驱动）</li>
+                        <li>提供详尽文档和示例（降低学习成本）</li>
+                        <li>待 To B 成熟后，再探索 Freemium SaaS</li>
+                        <li>优先服务会转化为 To B 客户的用户</li>
+                    </ul>
+                </div>
+            </div>
+
+            <h3>收入预测与里程碑</h3>
+
+            <table>
+                <tr>
+                    <th>时间</th>
+                    <th>客户数</th>
+                    <th>ARR 目标</th>
+                    <th>关键里程碑</th>
+                </tr>
+                <tr>
+                    <td><strong>0-3个月</strong></td>
+                    <td>1-2 PoC</td>
+                    <td>$0</td>
+                    <td>首个商业 PoC 验证，开源版稳定发布</td>
+                </tr>
+                <tr>
+                    <td><strong>3-6个月</strong></td>
+                    <td>3-5 付费</td>
+                    <td>$50K-$150K</td>
+                    <td>APP Server 上线，至少 1 个年度合同</td>
+                </tr>
+                <tr>
+                    <td><strong>6-12个月</strong></td>
+                    <td>10-20 付费</td>
+                    <td>$500K-$1M</td>
+                    <td>覆盖 3 个 RSI 方向，头部客户案例</td>
+                </tr>
+                <tr>
+                    <td><strong>12-24个月</strong></td>
+                    <td>50+ 付费</td>
+                    <td>$2M-$5M</td>
+                    <td>平台化，Marketplace 上线，探索 SaaS</td>
+                </tr>
+            </table>
+
+            <div class="callout">
+                <strong>定价策略建议：</strong>
+                <ul>
+                    <li><strong>早期（0-6个月）：</strong>灵活定价，优先获取参考客户和案例，可接受低价或免费 PoC</li>
+                    <li><strong>中期（6-12个月）：</strong>标准化定价，按 Worker/Run/Credit 分级，提供专业服务增值</li>
+                    <li><strong>长期（12个月后）：</strong>引入按成功付费、持续订阅、Marketplace 分成等多元模式</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>风险、决策门与关键假设</h2>
+
+            <h3>关键风险识别</h3>
+
+            <table>
+                <tr>
+                    <th>风险类别</th>
+                    <th>具体风险</th>
+                    <th>影响</th>
+                    <th>缓解策略</th>
+                </tr>
+                <tr>
+                    <td><strong>市场风险</strong></td>
+                    <td>企业客户认为 RSI "太前沿"，不愿尝试</td>
+                    <td>高</td>
+                    <td>• PoC 免费或低价<br>• 强调可审计、可回滚<br>• 参考客户背书</td>
+                </tr>
+                <tr>
+                    <td><strong>技术风险</strong></td>
+                    <td>自动优化效果不稳定，客户信心下降</td>
+                    <td>高</td>
+                    <td>• 设置合理预期（辅助而非替代人类）<br>• 严格 validation/final 分离<br>• 提供人工审核环节</td>
+                </tr>
+                <tr>
+                    <td><strong>集成风险</strong></td>
+                    <td>客户环境复杂，接入成本高</td>
+                    <td>中</td>
+                    <td>• 提供标准 Adapter 模板<br>• 专业服务支持<br>• 半自动生成 Adapter</td>
+                </tr>
+                <tr>
+                    <td><strong>竞争风险</strong></td>
+                    <td>大厂（OpenAI/Anthropic）推出类似能力</td>
+                    <td>中</td>
+                    <td>• 差异化：可信边界、可审计、私有部署<br>• 快速占领细分场景<br>• 开源社区护城河</td>
+                </tr>
+                <tr>
+                    <td><strong>成本风险</strong></td>
+                    <td>算力成本高，毛利率低</td>
+                    <td>中</td>
+                    <td>• 客户自有算力或云端混合<br>• 优化 SearchStrategy 降低无效尝试<br>• 按成功付费转嫁风险</td>
+                </tr>
+                <tr>
+                    <td><strong>安全风险</strong></td>
+                    <td>Candidate 逃逸、数据泄露</td>
+                    <td>高</td>
+                    <td>• 严格隔离（Docker、bubblewrap）<br>• Diff Guard 硬校验<br>• 安全审计和渗透测试</td>
+                </tr>
+            </table>
+
+            <h3>关键决策门（Go/No-Go）</h3>
+
+            <div class="cards">
+                <div class="card">
+                    <div class="card-header">决策门 1：3 个月后</div>
+                    <div class="card-meta">评估是否继续投入 APP Server 开发</div>
+                    <p><strong>Go 条件：</strong></p>
+                    <ul>
+                        <li>✅ 至少 1 个企业客户完成 PoC，验证 > 5% 提升</li>
+                        <li>✅ 客户愿意为正式部署付费或签 LOI</li>
+                        <li>✅ 开源版 GitHub Stars > 300，社区活跃</li>
+                        <li>✅ 核心团队对技术路线有信心</li>
+                    </ul>
+                    <p><strong>No-Go 后果：</strong>暂停商业化，转回纯研究项目或开源维护模式</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">决策门 2：6 个月后</div>
+                    <div class="card-meta">评估是否扩展到多个 RSI 方向</div>
+                    <p><strong>Go 条件：</strong></p>
+                    <ul>
+                        <li>✅ 3-5 家付费客户，ARR > $50K</li>
+                        <li>✅ 客户续约率 > 80%</li>
+                        <li>✅ 至少 1 个方向（Coding 或 Office）产品化成熟</li>
+                        <li>✅ APP Server 稳定性 > 95%</li>
+                    </ul>
+                    <p><strong>No-Go 后果：</strong>聚焦单一方向深耕，暂缓扩展；或调整商业模式（如只做咨询服务）</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">决策门 3：12 个月后</div>
+                    <div class="card-meta">评估是否推出 SaaS 和 Marketplace</div>
+                    <p><strong>Go 条件：</strong></p>
+                    <ul>
+                        <li>✅ 10+ 企业客户，ARR > $500K</li>
+                        <li>✅ To B 产品成熟，复购率高</li>
+                        <li>✅ 至少 5 个第三方贡献的 Adapter</li>
+                        <li>✅ 团队有能力支持 SaaS 运维</li>
+                    </ul>
+                    <p><strong>No-Go 后果：</strong>继续聚焦 To B 私有部署和托管服务，推迟平台化</p>
+                </div>
+            </div>
+
+            <h3>关键假设验证</h3>
+
+            <div class="highlight">
+                <strong>假设 1：企业客户愿意为 5-10% 的 Agent 性能提升付费</strong>
+                <ul>
+                    <li><strong>验证方法：</strong>PoC 阶段明确量化提升幅度，询问客户支付意愿</li>
+                    <li><strong>反例应对：</strong>如果客户认为提升幅度不够，探索"按成功付费"或"保证提升 X% 否则退款"</li>
+                </ul>
+            </div>
+
+            <div class="highlight">
+                <strong>假设 2：自动优化比人工调优更高效</strong>
+                <ul>
+                    <li><strong>验证方法：</strong>对比人工调优 2-4 周 vs 系统自动优化 1 周的时间和成本</li>
+                    <li><strong>反例应对：</strong>如果自动优化时间过长或成本过高，优化 SearchStrategy，或提供"混合模式"（系统推荐 + 人工筛选）</li>
+                </ul>
+            </div>
+
+            <div class="highlight">
+                <strong>假设 3：客户能够提供可靠的评测环境和 Benchmark</strong>
+                <ul>
+                    <li><strong>验证方法：</strong>PoC 阶段评估客户 Benchmark 质量（覆盖率、代表性、可复现性）</li>
+                    <li><strong>反例应对：</strong>如果客户 Benchmark 不可靠，提供"Benchmark 咨询服务"或"半自动生成 Benchmark"工具</li>
+                </ul>
+            </div>
+
+            <div class="highlight">
+                <strong>假设 4：开源 Core Engine 能带来企业客户导流</strong>
+                <ul>
+                    <li><strong>验证方法：</strong>追踪企业客户来源（GitHub → PoC 咨询 → 付费合同）</li>
+                    <li><strong>反例应对：</strong>如果开源转化率低，加强技术营销（论文、博客、案例）或直接 BD 头部客户</li>
+                </ul>
+            </div>
+
+            <h3>退出与调整策略</h3>
+
+            <p><strong>如果商业化不顺利，可考虑：</strong></p>
+            <ul>
+                <li><strong>转型：</strong>专注开源项目和学术影响力，不追求短期收入</li>
+                <li><strong>精简：</strong>只做专业服务（咨询、定制开发），不做产品化</li>
+                <li><strong>合并：</strong>被大厂（LLM 平台、Agent 框架）收购或合作集成</li>
+                <li><strong>开源维护：</strong>核心团队转向其他项目，社区接手维护</li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h2>下一步行动计划</h2>
+
+            <h3>立即开始（本周内）</h3>
+
+            <div class="callout">
+                <strong>第一优先级：</strong>
+                <ol>
+                    <li><strong>完善开源文档：</strong>Quickstart（< 30 分钟从零到第一个实验）、Tutorial（MSA Cowork + OfficeVal 完整流程）、API Reference</li>
+                    <li><strong>识别潜在 PoC 客户：</strong>梳理已有联系的企业 AI 团队，准备 PoC 方案（Coding Agent 或 Office Agent）</li>
+                    <li><strong>制定 SWE-bench 适配计划：</strong>拆解技术任务、评估工作量（3-6 周）、分配资源</li>
+                    <li><strong>设计客户 PoC 模板：</strong>标准化 PoC 流程（环境准备 → 基线评测 → 自动优化 → 结果交付）</li>
+                </ol>
+            </div>
+
+            <h3>未来 4 周</h3>
+
+            <table>
+                <tr>
+                    <th>任务</th>
+                    <th>负责人/团队</th>
+                    <th>交付物</th>
+                </tr>
+                <tr>
+                    <td><strong>开源版发布</strong></td>
+                    <td>核心开发团队</td>
+                    <td>• v0.2.0 稳定版<br>• 完整文档站<br>• CI 端到端测试</td>
+                </tr>
+                <tr>
+                    <td><strong>首个 PoC 启动</strong></td>
+                    <td>技术 + 商务</td>
+                    <td>• 1-2 家客户签约 PoC<br>• PoC 执行计划<br>• 基线数据</td>
+                </tr>
+                <tr>
+                    <td><strong>SWE-bench 适配</strong></td>
+                    <td>环境团队</td>
+                    <td>• Environment Adapter<br>• 50 任务验证<br>• 稳定性测试</td>
+                </tr>
+                <tr>
+                    <td><strong>性能基准</strong></td>
+                    <td>测试团队</td>
+                    <td>• 资源消耗报告<br>• 性能优化建议<br>• 成本估算工具</td>
+                </tr>
+            </table>
+
+            <h3>未来 12 周（第一个决策门前）</h3>
+
+            <div class="cards">
+                <div class="card">
+                    <div class="card-header">技术线</div>
+                    <ul>
+                        <li>✅ 开源版稳定（v0.2.0 → v0.3.0）</li>
+                        <li>✅ SWE-bench 环境上线</li>
+                        <li>✅ 端到端 Smoke 纳入 CI</li>
+                        <li>✅ 性能优化（降低单轮成本 20%）</li>
+                        <li>✅ 补齐缺失文档和示例</li>
+                    </ul>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">商务线</div>
+                    <ul>
+                        <li>✅ 完成 1-2 个 PoC</li>
+                        <li>✅ 验证 > 5% 性能提升</li>
+                        <li>✅ 收集客户反馈和痛点</li>
+                        <li>✅ 准备商业化材料（案例、Deck、定价）</li>
+                        <li>✅ 建立销售漏斗和 CRM</li>
+                    </ul>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">社区线</div>
+                    <ul>
+                        <li>✅ GitHub Stars > 500</li>
+                        <li>✅ 贡献者 > 10</li>
+                        <li>✅ 发布技术博客 2-3 篇</li>
+                        <li>✅ 参加或举办技术分享（Meetup/Conference）</li>
+                        <li>✅ 建立 Discord/Slack 社区</li>
+                    </ul>
+                </div>
+            </div>
+
+            <h3>成功指标仪表盘</h3>
+
+            <p>建议建立实时追踪的关键指标：</p>
+
+            <table>
+                <tr>
+                    <th>类别</th>
+                    <th>指标</th>
+                    <th>当前值</th>
+                    <th>3 个月目标</th>
+                    <th>6 个月目标</th>
+                </tr>
+                <tr>
+                    <td rowspan="3"><strong>产品</strong></td>
+                    <td>开源版稳定性</td>
+                    <td>Research Preview</td>
+                    <td>v0.2.0 稳定版</td>
+                    <td>v0.3.0 + APP Server</td>
+                </tr>
+                <tr>
+                    <td>测试覆盖率</td>
+                    <td>572 Node + 14 Python</td>
+                    <td>+ E2E Smoke in CI</td>
+                    <td>> 90% 覆盖</td>
+                </tr>
+                <tr>
+                    <td>文档完整度</td>
+                    <td>60%</td>
+                    <td>90%</td>
+                    <td>95%</td>
+                </tr>
+                <tr>
+                    <td rowspan="3"><strong>商务</strong></td>
+                    <td>PoC 数量</td>
+                    <td>0</td>
+                    <td>1-2</td>
+                    <td>5-8</td>
+                </tr>
+                <tr>
+                    <td>付费客户</td>
+                    <td>0</td>
+                    <td>0-1</td>
+                    <td>3-5</td>
+                </tr>
+                <tr>
+                    <td>ARR</td>
+                    <td>$0</td>
+                    <td>$0</td>
+                    <td>$50K-$150K</td>
+                </tr>
+                <tr>
+                    <td rowspan="3"><strong>社区</strong></td>
+                    <td>GitHub Stars</td>
+                    <td>~100</td>
+                    <td>> 500</td>
+                    <td>> 1000</td>
+                </tr>
+                <tr>
+                    <td>贡献者</td>
+                    <td>~5</td>
+                    <td>> 10</td>
+                    <td>> 20</td>
+                </tr>
+                <tr>
+                    <td>技术内容</td>
+                    <td>1-2 篇</td>
+                    <td>5 篇</td>
+                    <td>10+ 篇</td>
+                </tr>
+            </table>
+
+            <div class="warning-box">
+                <strong>风险预警触发条件：</strong>
+                <ul>
+                    <li>🚨 3 个月后无任何 PoC 客户 → 重新评估产品方向</li>
+                    <li>🚨 PoC 客户反馈"效果不明显" → 技术攻关或调整预期</li>
+                    <li>🚨 开源社区无人关注（Stars < 200） → 加强技术营销</li>
+                    <li>🚨 核心团队信心下降 → 及时调整或考虑退出</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="section" style="background: linear-gradient(135deg, #e7f3ff 0%, #f0e6ff 100%); border: 2px solid var(--primary);">
+            <h2 style="border-bottom: none; color: var(--primary);">总结与建议</h2>
+
+            <p style="font-size: 1.1em; line-height: 1.8;"><strong>HarnessEvoGym 具备成为商业产品的技术基础和市场潜力。</strong>核心 Controller、五种 Population Mode、双环境验证已经证明了技术可行性。接下来 3-6 个月是关键窗口期：</p>
+
+            <div class="callout">
+                <strong>明确优先级：</strong>
+                <ol style="font-size: 1.05em;">
+                    <li><strong>To B 优先，To C 保留</strong> — 企业客户有明确需求、付费意愿和评测环境</li>
+                    <li><strong>聚焦 Coding 和 Office 两个方向</strong> — 已有环境支持，客户痛点明确</li>
+                    <li><strong>PoC 驱动商业化</strong> — 用真实案例验证价值，再推广复制</li>
+                    <li><strong>保持技术领先</strong> — 开源社区 + 差异化能力（可信边界、可审计）构建护城河</li>
+                </ol>
+            </div>
+
+            <div class="highlight">
+                <strong>关键成功因素：</strong>
+                <ul style="font-size: 1.05em;">
+                    <li>✅ 快速完成首个商业 PoC，验证产品价值假设</li>
+                    <li>✅ 保持 Core Engine 稳定性和可复现性，建立技术信任</li>
+                    <li>✅ 降低客户接入成本（自动 Adapter、标准模板、专业服务）</li>
+                    <li>✅ 设置合理预期（辅助人类，而非完全替代；5-15% 提升，而非 100%）</li>
+                    <li>✅ 建立决策门机制，及时调整方向或止损</li>
+                </ul>
+            </div>
+
+            <p style="font-size: 1.05em; margin-top: 24px;"><strong>最后，</strong>商业化是马拉松而非冲刺。保持技术深度、客户导向和团队信心，HarnessEvoGym 有机会成为 Agent 优化领域的标准平台。</p>
+        </div>
+
+        <footer style="text-align: center; padding: 40px 20px; color: var(--text-light); font-size: 0.9em;">
+            <p><strong>HarnessEvoGym Roadmap v1.0</strong></p>
+            <p>北京大学 DCAI 团队 / OpenDCAI 与 AutoCosm.AI 联合开发</p>
+            <p style="margin-top: 12px;">
+                <a href="../README.zh.md" style="color: var(--primary); text-decoration: none; margin: 0 8px;">项目首页</a> ·
+                <a href="architecture.zh.md" style="color: var(--primary); text-decoration: none; margin: 0 8px;">架构文档</a> ·
+                <a href="../CONTRIBUTING.md" style="color: var(--primary); text-decoration: none; margin: 0 8px;">贡献指南</a> ·
+                <a href="https://github.com/autocosm-ai/HarnessEvoGym" style="color: var(--primary); text-decoration: none; margin: 0 8px;">GitHub</a>
+            </p>
+        </footer>
+
+    </div>
+</body>
+</html>

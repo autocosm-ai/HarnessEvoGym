@@ -28,7 +28,15 @@ def identifier(value):
 def resolve_path(value, root):
     if not isinstance(value, str) or not value.strip():
         raise ValueError("路径必须是非空字符串")
-    return (root / value).resolve()
+    candidate = Path(value)
+    if candidate.is_absolute():
+        raise ValueError("评测配置中的路径必须是相对路径")
+    resolved = (root / candidate).resolve()
+    try:
+        resolved.relative_to(root.resolve())
+    except ValueError as exc:
+        raise ValueError("评测配置中的路径不能逃逸配置目录") from exc
+    return resolved
 
 
 def load_config(path=DEFAULT_CONFIG):

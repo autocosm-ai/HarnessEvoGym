@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises'
+import { appendFile, lstat, mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 
 import { normalizeEvolutionAlgorithm } from './evolution-algorithm-reference.mjs'
@@ -7,6 +7,8 @@ import { ProtocolError } from './protocol.mjs'
 
 const ALGORITHM_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u
 const CHECKPOINT_VERSION = /^v[0-9]+$/u
+const MAX_EVENTS = 100_000
+const MAX_EVENT_BYTES = 8 * 1024
 
 function object(value, label) {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
@@ -60,10 +62,18 @@ export class FileAlgorithmRunStore {
     this.statePath = join(this.root, 'state.json')
     this.eventsPath = join(this.root, 'events.jsonl')
     this.checkpointsRoot = join(this.root, 'checkpoints')
+    this.eventSequence = null
+    this.eventTail = Promise.resolve()
   }
 
   async initialize({ state, metadata = {} } = {}) {
     safeJson(state, 'RunStore state')
+    await mkdir(dirname(this.root), { recursive: true, mode: 0o700 })
+    const existing = await lstat(this.root).catch((error) => {
+      if (error.code === 'ENOENT') return null
+      throw error
+    })
+    if (existing?.isSymbolicLink()) throw new ProtocolError('RunStore root 不能是符号链接')
     await mkdir(this.root, { recursive: false, mode: 0o700 })
     await mkdir(this.checkpointsRoot, { recursive: true, mode: 0o700 })
     await atomicJson(this.statePath, state)
@@ -75,20 +85,40 @@ export class FileAlgorithmRunStore {
     return safeJson(JSON.parse(await readFile(this.statePath, 'utf8')), 'RunStore state')
   }
 
+  async readMetadata() {
+    return safeJson(JSON.parse(await readFile(join(this.root, 'metadata.json'), 'utf8')), 'RunStore metadata')
+  }
+
   async writeState(state) {
     return await atomicJson(this.statePath, safeJson(state, 'RunStore state'))
   }
 
   async appendEvent(event) {
-    const value = safeJson(event, 'RunStore event')
-    const text = await readFile(this.eventsPath, 'utf8').catch((error) => {
-      if (error.code === 'ENOENT') return ''
-      throw error
-    })
-    const sequence = text.trim() === '' ? 1 : text.trimEnd().split(/\r?\n/u).length + 1
-    const record = { sequence, ...value }
-    await writeFile(this.eventsPath, `${text}${JSON.stringify(record)}\n`, { encoding: 'utf8' })
-    return record
+    const operation = async () => {
+      const value = safeJson(event, 'RunStore event')
+      if (this.eventSequence === null) {
+        const text = await readFile(this.eventsPath, 'utf8').catch((error) => {
+          if (error.code === 'ENOENT') return ''
+          throw error
+        })
+        const lines = text.trim() === '' ? [] : text.trimEnd().split(/\r?\n/u)
+        this.eventSequence = lines.length === 0 ? 0 : lines.length
+      }
+      if (this.eventSequence >= MAX_EVENTS) {
+        throw new ProtocolError(`Algorithm 事件数量超过上限 ${MAX_EVENTS}`)
+      }
+      const record = { sequence: this.eventSequence + 1, ...value }
+      const serialized = JSON.stringify(record)
+      if (Buffer.byteLength(serialized, 'utf8') > MAX_EVENT_BYTES) {
+        throw new ProtocolError(`Algorithm 事件超过 ${MAX_EVENT_BYTES} 字节上限`)
+      }
+      await appendFile(this.eventsPath, `${serialized}\n`, 'utf8')
+      this.eventSequence = record.sequence
+      return record
+    }
+    const current = this.eventTail.then(operation, operation)
+    this.eventTail = current.catch(() => {})
+    return await current
   }
 
   async writeCheckpoint(name, checkpoint) {
@@ -194,6 +224,8 @@ export async function runGenericEvolution({
   resume = false,
   baselineOnly = false,
   checkpointPrefix = 'step',
+  resumeCheckpoint = null,
+  metadata = {},
 } = {}) {
   const algorithm = validateGenericEvolutionAlgorithm(driver)
   if (!Number.isSafeInteger(maxSteps) || maxSteps < 0 || maxSteps > 100_000) {
@@ -202,9 +234,34 @@ export async function runGenericEvolution({
   let state = resume
     ? await algorithm.store.readState()
     : safeJson(initialState, 'Algorithm initialState')
-  if (!resume) await algorithm.store.initialize({ state })
+  let checkpoint = null
+  const normalizedMetadata = safeJson(metadata, 'RunStore metadata')
+  if (resumeCheckpoint !== null && resumeCheckpoint !== undefined) {
+    checkpoint = await algorithm.store.readCheckpoint(resumeCheckpoint)
+    if (checkpoint === null) throw new ProtocolError(`Checkpoint 不存在：${resumeCheckpoint}`)
+    if (checkpoint.version !== algorithm.checkpointCodec.version) {
+      throw new ProtocolError(`Checkpoint 版本不匹配：${checkpoint.version}`)
+    }
+    if (!Object.prototype.hasOwnProperty.call(checkpoint, 'state')) {
+      throw new ProtocolError('Checkpoint 缺少编码状态')
+    }
+    checkpoint = safeJson(
+      algorithm.checkpointCodec.decode(checkpoint.state),
+      'Decoded checkpoint',
+    )
+  }
+  if (!resume) {
+    await algorithm.store.initialize({ state, metadata: normalizedMetadata })
+  } else if (typeof algorithm.store.readMetadata === 'function') {
+    const storedMetadata = await algorithm.store.readMetadata()
+    if (JSON.stringify(storedMetadata) !== JSON.stringify(normalizedMetadata)) {
+      throw new ProtocolError('Algorithm Run 身份与当前插件/配置不一致，拒绝 Resume')
+    }
+  }
   const lifecycle = resume ? algorithm.resume : algorithm.initialize
-  state = safeJson(await lifecycle.call(algorithm, { state, context, store: algorithm.store }), 'Algorithm state')
+  state = safeJson(await lifecycle.call(algorithm, {
+    state, context, store: algorithm.store, checkpoint,
+  }), 'Algorithm state')
   await algorithm.store.writeState(state)
   if (baselineOnly) {
     state = safeJson(

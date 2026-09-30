@@ -1,0 +1,16 @@
+{
+  "name": "harbor-smoke-v1",
+  "description": "Harbor 端到端冒烟测试：两道最小化题目验证 Harbor Adapter 可以完整执行评测",
+  "partitions": {
+    "feedback": {
+      "instanceIds": ["add-numbers", "write-file"]
+    },
+    "selection": {
+      "instanceIds": ["add-numbers"]
+    }
+  },
+  "source": {
+    "protocol": "harbor-task-v1",
+    "revision": "placeholder-will-be-computed"
+  }
+}

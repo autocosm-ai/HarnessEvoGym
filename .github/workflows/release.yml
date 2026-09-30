@@ -1,0 +1,58 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          PREV_TAG=$(git describe --tags --abbrev=0 ${VERSION}^ 2>/dev/null || echo "")
+          if [ -z "$PREV_TAG" ]; then
+            COMMITS=$(git log --pretty=format:"- %s (%h)" ${VERSION})
+          else
+            COMMITS=$(git log --pretty=format:"- %s (%h)" ${PREV_TAG}..${VERSION})
+          fi
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$COMMITS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Write release notes
+        run: |
+          cat > RELEASE_NOTES.md <<'EOF'
+          ## Changes
+          ${{ steps.changelog.outputs.changelog }}
+
+          ## Docker Images
+          All runtime images are available at:
+          - `ghcr.io/${{ github.repository_owner }}/harness-evogym-model-gateway:${{ github.ref_name }}`
+          - `ghcr.io/${{ github.repository_owner }}/harness-evogym-msa-minimal-runtime:${{ github.ref_name }}`
+          - `ghcr.io/${{ github.repository_owner }}/harness-evogym-dsh-runtime:${{ github.ref_name }}`
+          - `ghcr.io/${{ github.repository_owner }}/harness-evogym-omegause-officeval:${{ github.ref_name }}`
+          EOF
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          body_path: RELEASE_NOTES.md
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-alpha') || contains(github.ref_name, '-beta') || contains(github.ref_name, '-rc') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

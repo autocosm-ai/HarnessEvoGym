@@ -178,7 +178,7 @@ Population Mode 与 Module Search 正交。例如，`combined + linear-hill-clim
 - 添加 **Target**：实现 Target Adapter，声明 Source、CandidateSeed、Validator 和 Mutation Catalog。
 - 添加 **Environment**：实现 Environment Adapter，提供任务物化、隔离工作区、Verifier、指标和数据划分。
 - 添加 **SearchStrategy**：实现 SearchStrategy，只返回受信 Catalog 中的 Region ID 和父 Candidate。
-- 注册 **EvolutionAlgorithm**：优先实现 SDK Algorithm v2 的 `initialize/step/resume/report` 生命周期，算法可以保存自己的种群、Beam 或搜索树状态；现有 Population v1 继续兼容。
+- 注册 **EvolutionAlgorithm**：Population Recipe 目前要求受信驱动遵守 PopulationStore/Branch/Budget 契约。Beam、MCTS 等独立算法可以通过 `harness-rsi algorithm run` 使用 SDK v2 的 `initialize/step/resume/report` 生命周期和自己的 RunStore/Checkpoint；这条通用路径目前还没有接入标准 Experiment Recipe 或 Server Run API。
 - 添加 **EvolutionRecipe**：重组现有 Population 拓扑、Branch 数量、预算、共享规则和搜索策略。
 
 完整接口、协议边界、测试矩阵和 PR 要求见 [`CONTRIBUTING.md`](CONTRIBUTING.md)。

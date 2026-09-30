@@ -24,7 +24,6 @@ export function environmentCapabilities(driver) {
   }
   if ((capabilities.supportsFeedback && !capabilities.partitions.includes('feedback'))
       || (capabilities.supportsHiddenFinal && !capabilities.partitions.includes('final'))
-      || (capabilities.supportsTaskRetry && !capabilities.supportsCheckpointResume)
       || (driver.supportsTaskInfrastructureRetries !== undefined
         && driver.supportsTaskInfrastructureRetries !== capabilities.supportsTaskRetry)) {
     throw new ProtocolError('Environment capabilities 与分区或旧重试声明不一致')
@@ -33,6 +32,11 @@ export function environmentCapabilities(driver) {
 }
 
 export function supportsTaskInfrastructureRetries(driver) {
+  return environmentCapabilities(driver).supportsTaskRetry
+}
+
+// Sealed Final 比普通评测更严格：只有环境能在题目级别恢复，才允许进入正式闭环。
+export function supportsTaskCheckpointResume(driver) {
   const capabilities = environmentCapabilities(driver)
   return capabilities.supportsTaskRetry && capabilities.supportsCheckpointResume
 }
