@@ -1,0 +1,63 @@
+apiVersion: harness-rsi/v1alpha1
+kind: EnvironmentAdapter
+
+metadata:
+  id: kernelbench-gpu-smoke
+  name: KernelBench GPU operator environment
+
+spec:
+  protocol: kernelbench-gpu-v1
+
+  source:
+    tasksRoot: benchmarks/kernelbench-smoke-v1/tasks
+    digest: 87a061f23278e686480541da655a31b103b13c27798d4b314db9a7c250863726
+
+  task:
+    workspacePath: /workspace
+    maximumConcurrentTrials: 1
+
+  runtime:
+    imagePrefix: harness-rsi/kernelbench-gpu
+
+  docker:
+    binary: docker
+    network: bridge
+    runAsCurrentUser: true
+    resources:
+      cpus: 8
+      memory: 16g
+      gpus: 1
+      pids: 1024
+      timeoutSeconds: 1800
+
+  modelGateway:
+    image: harness-rsi/model-gateway:v1
+    dockerfile: docker/model-gateway/Dockerfile
+    alias: model-gateway
+    port: 8080
+    egressNetwork: bridge
+    maximumRequestsPerRun: 512
+    maximumConcurrentRequests: 2
+    maximumUpstreamRetries: 5
+    resources:
+      cpus: 1
+      memory: 512m
+      pids: 128
+
+  verifier:
+    resources:
+      cpus: 4
+      memory: 16g
+      pids: 1024
+
+  reward:
+    minimum: 0
+    maximum: 1
+    resolvedThreshold: 1
+
+  feedback:
+    maximumTextBytesPerCase: 32768
+    maximumArtifactEntriesPerCase: 16
+    maximumArtifactBytesPerCase: 1048576
+    maximumHistoryEntries: 10
+    maximumHistoryBytes: 131072

@@ -54,11 +54,12 @@
 - HLE 的 Campaign 可使用五种 Population Mode，并支持暂停后的 Resume。
 - HLE Runtime JSON 已改为相对路径；加载器在运行时按配置文件目录解析并执行目录隔离校验。
 
-### Harbor 与 SDK
+### Harbor、KernelBench 与 SDK
 
 - Harbor Task v1 解析器、任务镜像、Verifier、artifact 检查和 Trial Checkpoint 已有实现与离线测试。
+- KernelBench GPU Smoke 已接入独立的 `kernelbench-gpu-v1` Environment，包含 ReLU/Sigmoid 两个 L1 题、GPU 资源限制、CUDA 正确性/速度评分和按题 Checkpoint；完整上游题库尚未纳入稳定支持。
 - 插件 SDK、Manifest 校验和 Fake Environment 示例已加入仓库。
-- 这两部分目前属于实验性扩展，尚未列入稳定支持环境。
+- 这三部分目前属于实验性扩展，尚未列入稳定支持环境。
 
 ## 验证记录
 
@@ -96,7 +97,7 @@
 - 为稳定发布补充 CI、版本策略、示例数据和最小可复现教程。
 - 把性能工具接入正式运行路径，并用可复现的基准数据给出并发、缓存和恢复收益。
 - 为外部算法插件补充独立进程沙箱、权限边界、版本锁定和失败恢复契约。
-- Harbor、SWE-bench、PutnamBench 等扩展在完成独立隔离和端到端验证前，不列入稳定支持承诺。
+- Harbor、KernelBench、SWE-bench、PutnamBench 等扩展在完成独立隔离和端到端验证前，不列入稳定支持承诺。
 
 ## 分支说明
 

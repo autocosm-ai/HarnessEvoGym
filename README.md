@@ -88,6 +88,7 @@ The prompt tells the Updater *why* and *how* to improve. The MutationLease, sema
 
 - **OmegaUse-OfficeVal**: 91 Linux-compatible tasks (55 feedback/train + 18 selection/validation + 18 sealed final). Solver receives only task description and original Office inputs; scoring runs offline in a separate read-only verifier container.
 - **HLE Text-only Math**: Text-only Math subset with fixed revision, stratified sampling, and sealed test rules. Runtime and sealed broker are independent; see [current boundaries](docs/architecture.md#implemented-paths-and-current-boundary).
+- **KernelBench GPU smoke**: two reproducible L1 operator tasks (ReLU/Sigmoid) with CUDA correctness and speedup scoring. It is an experimental GPU adapter, not the full upstream KernelBench suite; see [`benchmarks/kernelbench-smoke-v1/README.md`](benchmarks/kernelbench-smoke-v1/README.md).
 
 **Targets and Updaters**
 
@@ -106,7 +107,7 @@ The prompt tells the Updater *why* and *how* to improve. The MutationLease, sema
 | Reliability | Provider retries, per-task checkpoints, explicit Resume, sealed Final |
 | Diagnostics | Run progress and usage, Updater failure reports, Diff checks, and layer-aware timeouts |
 
-Harbor, SWE-bench, PutnamBench, and Synthetic Text Reasoning remain experimental or compatibility paths and are not listed as stable environments. See [current boundaries](docs/architecture.md#implemented-paths-and-current-boundary) before reporting results.
+Harbor, KernelBench, SWE-bench, PutnamBench, and Synthetic Text Reasoning remain experimental or compatibility paths and are not listed as stable environments. See [current boundaries](docs/architecture.md#implemented-paths-and-current-boundary) before reporting results.
 
 ## Quick start
 

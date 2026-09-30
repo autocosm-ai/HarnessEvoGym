@@ -14,6 +14,13 @@ function document() {
 
 test('Harbor 校验支持范围、路径和资源', () => {
   assert.equal(validateHarborTaskToml(document(), '/tasks/example').agent.timeoutSeconds, 120)
+  assert.equal(
+    validateHarborTaskToml({
+      ...document(),
+      environment: { gpus: 1 },
+    }, '/tasks/example', { allowGpu: true }).environment.gpus,
+    1,
+  )
   for (const artifact of ['/app', '/app/../secret', '/app//result', '/app/./result', '/outside/result']) {
     assert.throws(() => validateHarborTaskToml({ ...document(), artifacts: [artifact] }), /Harbor/)
   }

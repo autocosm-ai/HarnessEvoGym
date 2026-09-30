@@ -157,7 +157,7 @@ Feedback Packet 应包含聚合指标、代表性成功/失败案例、Trajector
 
 Solver 给出主定理的 proof replacement。独立可信重放把证明放回冻结题面模板，再交给固定 Lean kernel 编译；占位证明、新公理、改题面、危险文件类型和越界写入都会被拒绝。因此，模型可以在没有人工失败分类器的情况下选择变异，而正确性仍由客观内核裁定。
 
-通用标准结果与 Partition API 仍可用于 Adapter 实验；Harbor、SWE-bench、PutnamBench 与 Synthetic Text Reasoning 目前只是实验性或兼容路径，不属于稳定支持环境。
+通用标准结果与 Partition API 仍可用于 Adapter 实验；Harbor、KernelBench GPU Smoke、SWE-bench、PutnamBench 与 Synthetic Text Reasoning 目前只是实验性或兼容路径，不属于稳定支持环境。
 
 ## 子模块更新语义
 

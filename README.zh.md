@@ -95,6 +95,7 @@ Updater 保留完整的分析、假设、自检和编码过程；Controller 不�
 
 - **OmegaUse-OfficeVal**：91 个 Linux 兼容任务（55 feedback/train + 18 selection/validation + 18 sealed final）。Solver 只接收任务描述和原始 Office 输入；评分在独立的只读 Verifier 容器中离线运行。
 - **HLE Text-only Math**：text-only Math 子集，使用固定 revision、分层抽样和 sealed test 规则。Runtime 和 sealed broker 独立；详见 [当前边界](docs/architecture.zh.md#已实现路径与当前边界)。
+- **KernelBench GPU Smoke**：两个可复现的 L1 算子题（ReLU/Sigmoid），在 CUDA 上同时检查数值正确性和速度提升。这是实验性 GPU 适配器，不是完整的上游 KernelBench 题库；详见 [`benchmarks/kernelbench-smoke-v1/README.md`](benchmarks/kernelbench-smoke-v1/README.md)。
 
 **Target 与 Updater**
 
@@ -113,7 +114,7 @@ Updater 保留完整的分析、假设、自检和编码过程；Controller 不�
 | 可靠性     | Provider 重试、按任务 Checkpoint、显式 Resume、sealed Final               |
 | 诊断       | Run 进度与用量记录、Updater 失败报告、Diff 检查和按层级调整的超时          |
 
-Harbor、SWE-bench、PutnamBench 和 Synthetic Text Reasoning 保留为实验性或兼容路径，暂不属于稳定支持承诺。报告结果前请查阅 [当前边界](docs/architecture.zh.md#已实现路径与当前边界)。
+Harbor、KernelBench、SWE-bench、PutnamBench 和 Synthetic Text Reasoning 保留为实验性或兼容路径，暂不属于稳定支持承诺。报告结果前请查阅 [当前边界](docs/architecture.zh.md#已实现路径与当前边界)。
 
 ## 快速开始
 

@@ -1160,7 +1160,7 @@ function harborMemoryMb(value, label) {
   return megabytes
 }
 
-function validateHarborEnvironment({ id, spec, protocol }) {
+function validateHarborEnvironment({ id, spec, protocol, allowGpu = false }) {
   rejectUnknownConfiguration(spec, new Set(['protocol', 'source', 'task', 'runtime', 'docker', 'modelGateway', 'verifier', 'reward', 'feedback', 'solverFailurePolicy']), 'EnvironmentAdapter.spec')
   const source = expectObject(spec.source, 'EnvironmentAdapter.spec.source')
   const task = expectObject(spec.task, 'EnvironmentAdapter.spec.task')
@@ -1181,7 +1181,7 @@ function validateHarborEnvironment({ id, spec, protocol }) {
   rejectUnknownConfiguration(task, new Set(['workspacePath', 'maximumConcurrentTrials']), 'EnvironmentAdapter.spec.task')
   rejectUnknownConfiguration(runtime, new Set(['imagePrefix']), 'EnvironmentAdapter.spec.runtime')
   rejectUnknownConfiguration(docker, new Set(['binary', 'network', 'runAsCurrentUser', 'resources']), 'EnvironmentAdapter.spec.docker')
-  rejectUnknownConfiguration(resources, new Set(['cpus', 'memory', 'pids', 'timeoutSeconds']), 'EnvironmentAdapter.spec.docker.resources')
+  rejectUnknownConfiguration(resources, new Set(['cpus', 'memory', 'pids', 'timeoutSeconds', 'gpus']), 'EnvironmentAdapter.spec.docker.resources')
   rejectUnknownConfiguration(verifier, new Set(['resources']), 'EnvironmentAdapter.spec.verifier')
   rejectUnknownConfiguration(verifierResources, new Set(['cpus', 'memory', 'pids']), 'EnvironmentAdapter.spec.verifier.resources')
   rejectUnknownConfiguration(modelGateway, new Set(['image', 'dockerfile', 'alias', 'port', 'egressNetwork', 'maximumRequestsPerRun', 'maximumConcurrentRequests', 'maximumUpstreamRetries', 'resources']), 'EnvironmentAdapter.spec.modelGateway')
@@ -1209,6 +1209,9 @@ function validateHarborEnvironment({ id, spec, protocol }) {
     throw new ProtocolError('Harbor runtime.imagePrefix 格式无效')
   }
   const dockerMemoryMb = harborMemoryMb(resources.memory, 'docker.resources.memory')
+  const dockerGpus = expectNumber(resources.gpus ?? 0, 'docker.resources.gpus', { integer: true, min: 0, max: 16 })
+  if (!allowGpu && dockerGpus !== 0) throw new ProtocolError('Harbor Environment 不支持 GPU；请使用 kernelbench-gpu-v1')
+  if (allowGpu && dockerGpus < 1) throw new ProtocolError('KernelBench Environment 必须配置至少一张 GPU')
   const verifierMemoryMb = harborMemoryMb(verifierResources.memory, 'verifier.resources.memory')
   const gatewayMemoryMb = harborMemoryMb(gatewayResources.memory, 'modelGateway.resources.memory')
   return {
@@ -1217,7 +1220,7 @@ function validateHarborEnvironment({ id, spec, protocol }) {
     task: { workspacePath, maximumConcurrentTrials: expectNumber(task.maximumConcurrentTrials ?? 1, 'task.maximumConcurrentTrials', { integer: true, min: 1, max: 8 }) },
     runtime: { imagePrefix },
     docker: { binary: expectText(docker.binary, 'docker.binary'), network, runAsCurrentUser: expectBoolean(docker.runAsCurrentUser, 'docker.runAsCurrentUser'), resources: {
-      cpus: expectNumber(resources.cpus, 'docker.resources.cpus', { min: 0.1, max: 32 }), memory: expectText(resources.memory, 'docker.resources.memory'), memoryMb: dockerMemoryMb, pids: expectNumber(resources.pids, 'docker.resources.pids', { integer: true, min: 16, max: 4096 }), timeoutSeconds: expectNumber(resources.timeoutSeconds, 'docker.resources.timeoutSeconds', { integer: true, min: 1, max: 7200 }),
+      cpus: expectNumber(resources.cpus, 'docker.resources.cpus', { min: 0.1, max: 32 }), memory: expectText(resources.memory, 'docker.resources.memory'), memoryMb: dockerMemoryMb, pids: expectNumber(resources.pids, 'docker.resources.pids', { integer: true, min: 16, max: 4096 }), timeoutSeconds: expectNumber(resources.timeoutSeconds, 'docker.resources.timeoutSeconds', { integer: true, min: 1, max: 7200 }), gpus: dockerGpus,
     } },
     verifier: { resources: { cpus: expectNumber(verifierResources.cpus, 'verifier.resources.cpus', { min: 0.1, max: 16 }), memory: expectText(verifierResources.memory, 'verifier.resources.memory'), memoryMb: verifierMemoryMb, pids: expectNumber(verifierResources.pids, 'verifier.resources.pids', { integer: true, min: 16, max: 1024 }) } },
     modelGateway: { image: expectText(modelGateway.image, 'modelGateway.image'), dockerfile: relativePath(modelGateway.dockerfile, 'modelGateway.dockerfile'), alias: gatewayAlias, port: expectNumber(modelGateway.port, 'modelGateway.port', { integer: true, min: 1024, max: 65535 }), egressNetwork,
@@ -1236,6 +1239,9 @@ export function validateEnvironmentAdapter(input) {
   const protocol = expectText(spec.protocol, 'EnvironmentAdapter.spec.protocol')
   if (protocol === 'harbor-task-v1') {
     return validateHarborEnvironment({ id, spec, protocol })
+  }
+  if (protocol === 'kernelbench-gpu-v1') {
+    return validateHarborEnvironment({ id, spec, protocol, allowGpu: true })
   }
   if (protocol === 'text-reasoning-deterministic-v1') {
     return validateTextReasoningEnvironment({ id, spec, protocol })

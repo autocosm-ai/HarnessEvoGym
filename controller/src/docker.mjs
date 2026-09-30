@@ -267,6 +267,12 @@ export class DockerClient {
       '--memory',
       resources.memory,
     ]
+    if (resources.gpus !== undefined) {
+      if (!Number.isInteger(resources.gpus) || resources.gpus < 0 || resources.gpus > 16) {
+        throw new ProtocolError('Docker GPU 数量必须是 0 到 16 的整数')
+      }
+      if (resources.gpus > 0) args.push('--gpus', String(resources.gpus))
+    }
     for (const [nameValue, value] of Object.entries(environment)) {
       if (!/^[A-Za-z_][A-Za-z0-9_]*$/u.test(nameValue)) throw new ProtocolError(`非法环境变量名：${nameValue}`)
       args.push('--env', `${nameValue}=${value}`)
@@ -349,6 +355,12 @@ export class DockerClient {
       '--memory',
       resources.memory,
     ]
+    if (resources.gpus !== undefined) {
+      if (!Number.isInteger(resources.gpus) || resources.gpus < 0 || resources.gpus > 16) {
+        throw new ProtocolError('Docker GPU 数量必须是 0 到 16 的整数')
+      }
+      if (resources.gpus > 0) args.push('--gpus', String(resources.gpus))
+    }
     appendCapabilities(args, capabilities)
     if (hostGateway) args.push('--add-host', 'host.docker.internal:host-gateway')
     if (readOnlyRoot) args.push('--read-only')

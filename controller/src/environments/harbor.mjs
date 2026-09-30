@@ -218,6 +218,7 @@ function solverResources(task, dockerResources) {
     cpus: task.config.environment.cpus,
     memory: `${task.config.environment.memoryMb}m`,
     pids: dockerResources.pids,
+    ...(task.config.environment.gpus > 0 ? { gpus: task.config.environment.gpus } : {}),
   }
 }
 
@@ -234,13 +235,14 @@ async function prepareTaskWorkspace({ docker, image, workspace, containerWorkspa
 }
 
 export class HarborEnvironment {
-  constructor({ environment, benchmark, solverDriver, docker, runRoot, repositoryRoot }) {
+  constructor({ environment, benchmark, solverDriver, docker, runRoot, repositoryRoot, allowGpu = false }) {
     this.environment = environment
     this.benchmark = benchmark
     this.solverDriver = solverDriver
     this.docker = docker
     this.runRoot = runRoot
     this.repositoryRoot = repositoryRoot
+    this.allowGpu = allowGpu
     this.tasks = new Map()
     this.sourceRevision = null
     this.runtimeByTask = new Map()
@@ -268,6 +270,7 @@ export class HarborEnvironment {
     for (const instanceId of this.benchmark.allInstanceIds) {
       const task = await loadHarborTask(tasksRoot, instanceId, {
         workspacePath: this.environment.task.workspacePath,
+        allowGpu: this.allowGpu,
       })
       const hostResources = this.environment.docker?.resources ?? {}
       if (Number.isFinite(hostResources.cpus) && task.config.environment.cpus > hostResources.cpus) {
@@ -275,6 +278,9 @@ export class HarborEnvironment {
       }
       if (Number.isFinite(hostResources.memoryMb) && task.config.environment.memoryMb > hostResources.memoryMb) {
         throw new ProtocolError(`Harbor Task ${instanceId} 的内存预算超过 Environment 上限`)
+      }
+      if (Number.isFinite(hostResources.gpus) && task.config.environment.gpus > hostResources.gpus) {
+        throw new ProtocolError(`Harbor Task ${instanceId} 的 GPU 预算超过 Environment 上限`)
       }
       loaded.set(instanceId, task)
     }
@@ -386,12 +392,21 @@ export class HarborEnvironment {
         { source: submission, target: this.environment.task.workspacePath, readOnly: true },
         { source: verifierLogs, target: '/logs/verifier', readOnly: false },
       ],
-      environment: { HOME: '/tmp/home', TMPDIR: '/tmp', PATH: '/usr/local/bin:/usr/bin:/bin' },
+      // GPU/科学计算镜像通常把 Python 放在 /opt/conda/bin；显式 PATH 不能
+      // 把它截掉，否则 verifier 会在真正执行测试前直接报 python not found。
+      environment: {
+        HOME: '/tmp/home',
+        TMPDIR: '/tmp',
+        PATH: '/opt/conda/bin:/usr/local/bin:/usr/bin:/bin',
+      },
       inheritEnvironment: [],
       network: 'none',
       readOnlyRoot: true,
       capabilities: [],
-      resources: this.environment.verifier.resources,
+      resources: {
+        ...this.environment.verifier.resources,
+        ...(task.config.environment.gpus > 0 ? { gpus: task.config.environment.gpus } : {}),
+      },
       timeoutMs: task.config.verifier.timeoutSeconds * 1000,
     })
     return { reward: await readReward(logs), ctrf: await readCtrf(logs) }

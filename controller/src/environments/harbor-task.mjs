@@ -118,7 +118,7 @@ function validateTimeout(value, label, fallback = 120) {
   return timeout
 }
 
-export function validateHarborTaskToml(input, taskRoot, { workspacePath = '/app' } = {}) {
+export function validateHarborTaskToml(input, taskRoot, { workspacePath = '/app', allowGpu = false } = {}) {
   const document = object(input, 'Harbor task.toml')
   rejectUnknown(document, new Set(['schema_version', 'artifacts', 'metadata', 'verifier', 'agent', 'environment']), 'Harbor task.toml')
   if (document.schema_version !== HARBOR_SCHEMA_VERSION) {
@@ -152,7 +152,12 @@ export function validateHarborTaskToml(input, taskRoot, { workspacePath = '/app'
       && (!Number.isInteger(environment.gpus) || environment.gpus < 0)) {
     throw new ProtocolError('Harbor environment.gpus 必须是非负整数')
   }
-  if ((environment.gpus ?? 0) !== 0) throw new ProtocolError('Harbor Adapter 暂不支持 GPU')
+  if (!allowGpu && (environment.gpus ?? 0) !== 0) {
+    throw new ProtocolError('Harbor Adapter 暂不支持 GPU；请使用支持 GPU 的专用 Environment')
+  }
+  if (allowGpu && (environment.gpus ?? 0) > 16) {
+    throw new ProtocolError('GPU 任务最多请求 16 张 GPU')
+  }
   if (environment.allow_internet !== undefined && typeof environment.allow_internet !== 'boolean') {
     throw new ProtocolError('Harbor environment.allow_internet 必须是布尔值')
   }

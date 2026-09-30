@@ -20,6 +20,7 @@ test('Driver Registry 暴露带版本的内置协议', () => {
   const protocols = registeredDriverProtocols()
   assert.deepEqual(protocols.environment, [
     'harbor-task-v1',
+    'kernelbench-gpu-v1',
     'omegause-officeval-docker-v1',
     'text-reasoning-deterministic-v1',
   ])
@@ -52,6 +53,15 @@ test('受审查的 Contributor Driver 可以注册，编排器只依赖接口', 
   assert.equal(environmentCapabilities(environment).supportsTaskRetry, false)
   assert.ok(createSolverDriver({ target: { solver: { protocol: 'fixture-solver-v1' } } }))
   assert.ok(createUpdaterDriver({ updater: { protocol: 'fixture-updater-v1' } }))
+})
+
+test('KernelBench Driver 使用独立协议并声明 GPU 速度指标', () => {
+  const environment = createEnvironmentRunner({
+    environment: { id: 'kernelbench-gpu-smoke', protocol: 'kernelbench-gpu-v1' },
+  })
+  const capabilities = environmentCapabilities(environment)
+  assert.equal(capabilities.scoreType, 'normalized-speedup')
+  assert.equal(capabilities.artifactType, 'kernel-source')
 })
 
 test('环境能力兼容旧驱动，并拒绝自相矛盾的恢复声明', () => {

@@ -176,7 +176,7 @@ The stable adapters target OmegaUse-OfficeVal and HLE Text-only Math. OfficeVal 
 
 The Solver proposes a replacement for the theorem proof. A separate trusted replay reconstructs that proof in the frozen source template and asks the pinned Lean kernel to compile it. It rejects placeholders, new axioms, changed statements, unsafe file types, and out-of-bound writes. Thus the model chooses mutations without a human-authored failure classifier while correctness remains objective.
 
-The generic normalized-result and partition APIs remain available for adapter experiments. Harbor, SWE-bench, PutnamBench, and Synthetic Text Reasoning remain experimental or compatibility paths rather than stable environments.
+The generic normalized-result and partition APIs remain available for adapter experiments. Harbor, KernelBench GPU smoke, SWE-bench, PutnamBench, and Synthetic Text Reasoning remain experimental or compatibility paths rather than stable environments.
 
 ## Submodule update semantics
 

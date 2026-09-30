@@ -71,3 +71,15 @@ test('Docker 未创建或 CID 损坏不读取或删除同名容器', async (t) =
     assert.deepEqual((await calls()).map((call) => call[0]), ['run'])
   }
 })
+
+test('Docker run 将 GPU 资源限制转换为受控 --gpus 参数', async (t) => {
+  const fixtureState = { ...exited, ExitCode: 0 }
+  const { docker, calls } = await fixture(t, fixtureState)
+  await docker.run({
+    image: 'fixture',
+    name: 'gpu-fixture',
+    resources: { cpus: 1, memory: '1g', pids: 64, timeoutSeconds: 30, gpus: 1 },
+  })
+  const runArgs = (await calls())[0]
+  assert.deepEqual(runArgs.slice(runArgs.indexOf('--gpus'), runArgs.indexOf('--gpus') + 2), ['--gpus', '1'])
+})
