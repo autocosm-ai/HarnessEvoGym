@@ -1,0 +1,5 @@
+# All changes to main require review from Zhou Liu.
+* @DeepThinkingZhouLiu
+
+# Keep the ownership policy under the same review requirement.
+/.github/CODEOWNERS @DeepThinkingZhouLiu
