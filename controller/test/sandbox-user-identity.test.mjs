@@ -13,11 +13,17 @@ const available = process.platform === 'linux' && process.getuid?.() > 0
 for (const preserveUserIdentity of [false, true]) {
   test(`真实沙箱 UID 映射与可写挂载：保留身份=${preserveUserIdentity}`, { skip: !available }, async () => {
     const root = await mkdtemp(join(tmpdir(), 'sandbox-user-identity-'))
+    const hostHomePath = process.env.HOME ?? tmpdir()
+    const hiddenHostPath = join(hostHomePath, '.codex')
     try {
       const invocation = buildBubblewrapInvocation({
         invocation: {
           command: '/usr/bin/sh',
-          args: ['-c', 'id -u; id -g; printf verified > /work/marker; test ! -e /home/ubuntu/.codex'],
+          args: [
+            '-c',
+            'id -u; id -g; printf verified > /work/marker; test ! -e '
+              + JSON.stringify(hiddenHostPath),
+          ],
           cwd: root, env: { PATH: '/usr/bin:/bin' },
         },
         mounts: [{ source: root, destination: '/work', readOnly: false }],

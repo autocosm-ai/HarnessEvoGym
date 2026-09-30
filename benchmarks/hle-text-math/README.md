@@ -13,7 +13,7 @@ export RSI_RUNTIME_ROOT=../.rsi/runtime/hle-text-math
 
 python3 scripts/download-hle-text-math.py \
   --output "$RSI_RUNTIME_ROOT/datasets/hle-text-math/source/eligible.jsonl" \
-  --hf-token-fd 3 <path/to/hf-token-file>
+  --hf-token-fd 3 < "$PWD/../secrets/hf-token-file"
 
 node benchmarks/hle-text-math/prepare-split.mjs \
   --input "$RSI_RUNTIME_ROOT/datasets/hle-text-math/source/eligible.jsonl" \
@@ -31,7 +31,7 @@ Run API-bearing Controller commands through the command-scoped direct launcher b
 node scripts/run-controller-direct.mjs campaign smoke \
   --config benchmarks/hle-text-math/.private/campaign.json \
   --runtime environments/hle-text-math/runtime.json \
-  --tasks 8 --provider-key-fd 3 3</secure/path/to/provider-key
+  --tasks 8 --provider-key-fd 3 3< "$PWD/../secrets/provider-key"
 ```
 
 Evolution is strictly L1 → L2 → L3. A Candidate is kept only on a strict validation-score increase; a tie or drop rolls back. Three consecutive misses advance the level while inheriting the best incumbent. Every proposal names one `before` → `after` variable, and the Controller rejects source edits outside its frozen `intendedFiles`.

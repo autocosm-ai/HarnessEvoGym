@@ -7,6 +7,15 @@
 # 本地 Worktree 与生成报告
 /.worktrees/
 /docs/repo-report/
+/WORKTREE.md
+/.local/
+
+# Agent 阶段报告只在本地归档；正式开发记录统一写入 README.dev.zh.md。
+/P0-*-完成报告.md
+/P1-*-完成报告.md
+/P0-P1-*.md
+/docs/solver-failure-feedback-main-review.zh.md
+/docs/solver-failure-feedback-validation.zh.md
 
 # 凭据与本地覆盖
 /.env

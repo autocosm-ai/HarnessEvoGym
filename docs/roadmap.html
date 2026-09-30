@@ -499,7 +499,7 @@
             </ul>
 
             <div class="callout">
-                <strong>测试覆盖：</strong>npm test 通过 572 个 Node.js 测试，npm run test:eval 通过 14 个 Python 评测测试。Controller 代码约 29,600 行。
+                <strong>测试覆盖：</strong>npm test 本地验证为 710 项通过、2 项跳过、0 项失败，npm run test:eval 通过 14 个 Python 评测测试；Docker Harbor 冒烟需单独运行 npm run test:docker。跳过项需要真实 OfficeVal 数据集或显式 Docker E2E；Controller 代码约 29,600 行。
             </div>
         </div>
 
@@ -1568,7 +1568,7 @@
                 </tr>
                 <tr>
                     <td>测试覆盖率</td>
-                    <td>572 Node + 14 Python</td>
+                    <td>710 通过 + 2 跳过 + 14 Python</td>
                     <td>+ E2E Smoke in CI</td>
                     <td>> 90% 覆盖</td>
                 </tr>

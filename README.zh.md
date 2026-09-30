@@ -25,7 +25,7 @@
   <img alt="研究预览版" src="https://img.shields.io/badge/status-research_preview-f4a261?style=flat-square" />
   <img alt="MIT License" src="https://img.shields.io/badge/controller-MIT-4c8bf5?style=flat-square" />
   <img alt="五种 Population Mode" src="https://img.shields.io/badge/population_modes-5-8b5cf6?style=flat-square" />
-  <img alt="572 tests" src="https://img.shields.io/badge/tests-572%20Node%20%2B%2014%20Python-20a36a?style=flat-square" />
+  <a href="https://github.com/autocosm-ai/HarnessEvoGym/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/autocosm-ai/HarnessEvoGym/actions/workflows/ci.yml/badge.svg" /></a>
 </p>
 
 ---
@@ -111,6 +111,7 @@ Updater 保留完整的分析、假设、自检和编码过程；Controller 不�
 | Population | Single、Independent、Mutualism、Competition、Combined                     |
 | 模块搜索   | Linear hill climb、Progressive risk expansion、Docker strategy API        |
 | 可靠性     | Provider 重试、按任务 Checkpoint、显式 Resume、sealed Final               |
+| 诊断       | Run 进度与用量记录、Updater 失败报告、Diff 检查和按层级调整的超时          |
 
 Harbor、SWE-bench、PutnamBench 和 Synthetic Text Reasoning 保留为实验性或兼容路径，暂不属于稳定支持承诺。报告结果前请查阅 [当前边界](docs/architecture.zh.md#已实现路径与当前边界)。
 
@@ -210,6 +211,7 @@ Population Mode 与 Module Search 正交。例如，`combined + linear-hill-clim
 | Region 搜索          | [Search strategy](docs/search-strategy.md)              |
 | OfficeVal 任务与评测 | [OmegaUse Cowork 运行手册](docs/cowork-mvp.zh.md)      |
 | 扩展或审查平台       | [贡献指南](CONTRIBUTING.md)                             |
+| 开发进度与验证边界   | [开发日志](README.dev.zh.md)                            |
 
 ## 许可证
 

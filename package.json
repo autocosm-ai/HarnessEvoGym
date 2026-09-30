@@ -12,8 +12,10 @@
   },
   "scripts": {
     "rsi": "node ./controller/src/cli.mjs",
-    "check": "find controller/src controller/test server/src server/test docker benchmarks/hle-text-math scripts strategies -name '*.mjs' -print0 | xargs -0 -n1 node --check && python3 -c \"compile(open('scripts/download-hle-text-math.py', encoding='utf-8').read(), 'scripts/download-hle-text-math.py', 'exec'); compile(open('docker/omegause-officeval/run-verifier.py', encoding='utf-8').read(), 'docker/omegause-officeval/run-verifier.py', 'exec')\" && bash -n ./scripts/setup-putnambench-runtime.sh ./scripts/setup-hle-runtime.sh",
+    "check": "find controller/src controller/test server/src server/test docker benchmarks/hle-text-math scripts strategies -name '*.mjs' -print0 | xargs -0 -n1 node --check && python3 -c \"compile(open('scripts/download-hle-text-math.py', encoding='utf-8').read(), 'scripts/download-hle-text-math.py', 'exec'); compile(open('docker/omegause-officeval/run-verifier.py', encoding='utf-8').read(), 'docker/omegause-officeval/run-verifier.py', 'exec')\" && bash -n ./scripts/setup-putnambench-runtime.sh ./scripts/setup-hle-runtime.sh && npm run check:paths",
+    "check:paths": "node ./scripts/check-portable-paths.mjs",
     "test": "node --test ./controller/test/*.test.mjs ./server/test/*.test.mjs",
+    "test:docker": "RSI_RUN_DOCKER_E2E=1 node ./controller/test/harbor-e2e-smoke.test.mjs",
     "server": "node ./server/src/main.mjs",
     "test:eval": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s eval -p 'test_*.py'"
   },

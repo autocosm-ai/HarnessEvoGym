@@ -18,14 +18,15 @@
   <a href="README.zh.md">中文</a> ·
   <a href="#quick-start">Quick start</a> ·
   <a href="docs/architecture.md">Architecture</a> ·
-  <a href="CONTRIBUTING.md">Contributor guide</a>
+  <a href="CONTRIBUTING.md">Contributor guide</a> ·
+  <a href="README.dev.zh.md">Development log</a>
 </p>
 
 <p align="center">
   <img alt="status research preview" src="https://img.shields.io/badge/status-research_preview-f4a261?style=flat-square" />
   <img alt="license MIT" src="https://img.shields.io/badge/controller_license-MIT-4c8bf5?style=flat-square" />
   <img alt="population modes five" src="https://img.shields.io/badge/population_modes-5-8b5cf6?style=flat-square" />
-  <img alt="Node and Python tests" src="https://img.shields.io/badge/tests-Node_%2B_Python-20a36a?style=flat-square" />
+  <a href="https://github.com/autocosm-ai/HarnessEvoGym/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/autocosm-ai/HarnessEvoGym/actions/workflows/ci.yml/badge.svg" /></a>
 </p>
 
 ---
@@ -103,6 +104,7 @@ The prompt tells the Updater *why* and *how* to improve. The MutationLease, sema
 | Population topologies | Single, Independent, Mutualism, Competition, Combined |
 | Module search | Linear hill climb, progressive risk expansion, Docker strategy API |
 | Reliability | Provider retries, per-task checkpoints, explicit Resume, sealed Final |
+| Diagnostics | Run progress and usage, Updater failure reports, Diff checks, and layer-aware timeouts |
 
 Harbor, SWE-bench, PutnamBench, and Synthetic Text Reasoning remain experimental or compatibility paths and are not listed as stable environments. See [current boundaries](docs/architecture.md#implemented-paths-and-current-boundary) before reporting results.
 
@@ -204,6 +206,7 @@ The full file map, protocols, extension checklist, and test matrix are in the [C
 | Understand Region search         | [Search strategy](docs/search-strategy.md)               |
 | Run the Cowork experiment        | [OmegaUse Cowork runbook](docs/cowork-mvp.md)            |
 | Extend or review the platform    | [Contributor guide](CONTRIBUTING.md)                     |
+| Check development and validation | [Development log](README.dev.zh.md)                     |
 
 The Controller is [MIT licensed](LICENSE). Vendored and submodule Sources keep
 their own licenses and notices.

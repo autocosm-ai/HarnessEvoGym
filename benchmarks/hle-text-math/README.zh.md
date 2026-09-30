@@ -13,7 +13,7 @@ export RSI_RUNTIME_ROOT=../.rsi/runtime/hle-text-math
 
 python3 scripts/download-hle-text-math.py \
   --output "$RSI_RUNTIME_ROOT/datasets/hle-text-math/source/eligible.jsonl" \
-  --hf-token-fd 3 <path/to/hf-token-file>
+  --hf-token-fd 3 < "$PWD/../secrets/hf-token-file"
 
 node benchmarks/hle-text-math/prepare-split.mjs \
   --input "$RSI_RUNTIME_ROOT/datasets/hle-text-math/source/eligible.jsonl" \
@@ -31,7 +31,7 @@ node benchmarks/hle-text-math/prepare-split.mjs \
 node scripts/run-controller-direct.mjs campaign smoke \
   --config benchmarks/hle-text-math/.private/campaign.json \
   --runtime environments/hle-text-math/runtime.json \
-  --tasks 8 --provider-key-fd 3 3</secure/path/to/provider-key
+  --tasks 8 --provider-key-fd 3 3< "$PWD/../secrets/provider-key"
 ```
 
 进化严格按 L1 → L2 → L3。只有 validation 分数严格上涨才保留 Candidate；持平或下降立即回退。连续三次无效才进入下一层，并继承此前最优 incumbent。每轮 Proposal 必须只声明一个 `before` → `after` 变量，Controller 会拒绝冻结 `intendedFiles` 之外的任何源码改动。

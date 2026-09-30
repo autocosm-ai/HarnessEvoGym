@@ -2,6 +2,13 @@
 **/.git
 .rsi
 .worktrees
+.local
+WORKTREE.md
+P0-*-完成报告.md
+P1-*-完成报告.md
+P0-P1-*.md
+docs/solver-failure-feedback-main-review.zh.md
+docs/solver-failure-feedback-validation.zh.md
 node_modules
 **/node_modules
 .pnpm-store

@@ -156,7 +156,7 @@ node --test controller/test/harbor-e2e-smoke.test.mjs
    spec:
      protocol: my-protocol-v1
      source:
-       datasetRoot: /path/to/dataset
+       datasetRoot: ../datasets/my-environment
      runtime:
        image: harness-rsi/my-env:v1
      verifier:
@@ -293,8 +293,8 @@ test('OmegaUse 离线验证', { skip: skipTest }, async () => { ... })
 **A**: 需要设置环境变量：
 
 ```bash
-export RSI_OFFICEVAL_DATASET_ROOT=/path/to/OmegaUse-OfficeVal-Dataset
-export RSI_OFFICEVAL_EVALUATOR_ROOT=/path/to/OmegaUse-OfficeVal
+export RSI_OFFICEVAL_DATASET_ROOT="$PWD/../datasets/OmegaUse-OfficeVal-Dataset"
+export RSI_OFFICEVAL_EVALUATOR_ROOT="$PWD/../datasets/OmegaUse-OfficeVal"
 node --test controller/test/omegause-offline-e2e.test.mjs
 ```
 
@@ -392,6 +392,6 @@ omegause-officeval.mjs
 
 ## 获得帮助
 
-- 查看 [已知问题](../P0-P1-TASKS.md)
+- 查看 [开发进度与已知边界](../README.dev.zh.md)
 - 阅读 [测试用例](../controller/test/) 作为示例
 - 提交 Issue 描述问题

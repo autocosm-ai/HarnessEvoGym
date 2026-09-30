@@ -10,3 +10,6 @@
 - 新增 Target、Updater 或 Environment 时优先扩展 Adapter，不把具体 Agent 的分支逻辑写死在 Controller 中。
 - 任何密钥只能在运行时注入，不得提交到仓库、反馈包、轨迹或 Mutation Report。
 - 中英文 README 的架构结论应保持一致。
+- 对外能力说明写入中英文 README；长期开发进度、验证结果和限制统一维护在 `README.dev.zh.md`。
+- Agent 的阶段报告、审查明细和临时任务清单放在被忽略的 `.local/development-reports/`，不得提交根目录 `P0/P1-完成报告` 等重复状态文件。`WORKTREE.md` 是本地工作树说明，也不得跟踪提交。
+- 清理报告前保留可恢复副本，更新仍需保留的文档链接；不得用 `*.md` 忽略所有 Markdown，也不得删除架构、协议、教程、许可证或真实实验数据。

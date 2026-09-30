@@ -303,7 +303,7 @@ export function buildBubblewrapInvocation({
   }
 }
 
-/** Return the immutable distribution root for /root/bin/tool style paths. */
+/** Return the immutable distribution root for root/bin/tool style paths. */
 export function executableDistributionRoot(executablePath) {
   const executable = absolutePath(executablePath, 'tool executable')
   if (within('/usr', executable)) return null

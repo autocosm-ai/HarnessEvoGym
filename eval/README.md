@@ -49,9 +49,9 @@
 - 可选 `RSI_SOLVER_IMAGE`、`RSI_RUN_VERIFIER`：覆盖镜像和仓库 verifier 入口。
 
 ```bash
-python3 eval/run_eval.py --config /path/to/eval.json --out .rsi/eval/example --dry-run
-python3 eval/run_eval.py --config /path/to/eval.json --out .rsi/eval/example
-python3 eval/run_eval.py --config /path/to/eval.json --out .rsi/eval/example --resume
+python3 eval/run_eval.py --config eval/configs/cowork-main16.json --out .rsi/eval/example --dry-run
+python3 eval/run_eval.py --config eval/configs/cowork-main16.json --out .rsi/eval/example
+python3 eval/run_eval.py --config eval/configs/cowork-main16.json --out .rsi/eval/example --resume
 ```
 
 `--dry-run` 检查配置、候选、题目和 Verifier 文件；不需要 Key，不调用 Docker/API，

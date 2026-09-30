@@ -82,7 +82,7 @@ node controller/src/cli.mjs run experiments/reasoning-msa-smoke-single.json
 
 **数据集要求**：
 - 需要下载 OmegaUse-OfficeVal 数据集
-- 设置环境变量：`RSI_OFFICEVAL_DATASET_ROOT=/path/to/dataset`
+- 设置环境变量：`RSI_OFFICEVAL_DATASET_ROOT=$PWD/../datasets/OmegaUse-OfficeVal-Dataset`
 
 ### Harbor 代码协作任务
 
@@ -223,10 +223,10 @@ export OPENAI_API_KEY="sk-..."
 export ANTHROPIC_API_KEY="sk-ant-..."
 
 # 数据集路径（Text Reasoning）
-export RSI_HLE_TEXT_MATH_DATASET_ROOT="/path/to/hle-text-math"
+export RSI_HLE_TEXT_MATH_DATASET_ROOT="$PWD/../datasets/hle-text-math"
 
 # 数据集路径（OmegaUse）
-export RSI_OFFICEVAL_DATASET_ROOT="/path/to/omegause-officeval"
+export RSI_OFFICEVAL_DATASET_ROOT="$PWD/../datasets/OmegaUse-OfficeVal-Dataset"
 ```
 
 ### 可选环境变量

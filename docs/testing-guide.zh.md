@@ -101,11 +101,11 @@ test('Harbor 端到端冒烟测试', async () => {
 **运行**：
 
 ```bash
-# 冒烟测试（不依赖外部数据）
-node --test controller/test/harbor-e2e-smoke.test.mjs
+# Harbor Docker 冒烟测试（需要 Docker；普通 npm test 默认跳过）
+npm run test:docker
 
 # 完整 E2E（需要数据集）
-export RSI_OFFICEVAL_DATASET_ROOT=/path/to/dataset
+export RSI_OFFICEVAL_DATASET_ROOT="$PWD/../datasets/OmegaUse-OfficeVal-Dataset"
 node --test controller/test/omegause-offline-e2e.test.mjs
 ```
 
@@ -505,7 +505,7 @@ newgrp docker
 grep -r "process.env" controller/test/*.test.mjs
 
 # 设置环境变量
-export RSI_OFFICEVAL_DATASET_ROOT=/path/to/dataset
+export RSI_OFFICEVAL_DATASET_ROOT="$PWD/../datasets/OmegaUse-OfficeVal-Dataset"
 ```
 
 ### 超时

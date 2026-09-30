@@ -163,11 +163,11 @@ async copyFrom(container, source, destination, { owner = null } = {}) {
 grep -r "skip:" controller/test/*.test.mjs
 
 # OmegaUse 测试需要
-export RSI_OFFICEVAL_DATASET_ROOT=/path/to/dataset
-export RSI_OFFICEVAL_EVALUATOR_ROOT=/path/to/evaluator
+export RSI_OFFICEVAL_DATASET_ROOT="$PWD/../datasets/OmegaUse-OfficeVal-Dataset"
+export RSI_OFFICEVAL_EVALUATOR_ROOT="$PWD/../datasets/OmegaUse-OfficeVal"
 
 # Harbor 测试需要
-export RSI_HARBOR_DATASET_ROOT=/path/to/harbor-dataset
+export RSI_HARBOR_DATASET_ROOT="$PWD/../datasets/harbor"
 ```
 
 ### 测试超时
@@ -430,8 +430,8 @@ Error: OmegaUse Dataset Root 不存在
 ls -la $RSI_OFFICEVAL_DATASET_ROOT
 
 # 设置正确路径
-export RSI_OFFICEVAL_DATASET_ROOT=/data/workspace/.../OmegaUse-OfficeVal-Dataset
-export RSI_OFFICEVAL_EVALUATOR_ROOT=/data/workspace/.../OmegaUse-OfficeVal
+export RSI_OFFICEVAL_DATASET_ROOT="$PWD/../OmegaUse-OfficeVal-Dataset"
+export RSI_OFFICEVAL_EVALUATOR_ROOT="$PWD/../OmegaUse-OfficeVal"
 
 # 添加到 ~/.bashrc
 echo 'export RSI_OFFICEVAL_DATASET_ROOT=...' >> ~/.bashrc

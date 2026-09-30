@@ -19,7 +19,9 @@ import { tmpdir } from 'node:os'
 import { HarborEnvironment } from '../src/environments/harbor.mjs'
 import { DockerClient } from '../src/docker.mjs'
 
-test('Harbor 冒烟测试：端到端运行两道题', async (t) => {
+const dockerE2eEnabled = process.env.RSI_RUN_DOCKER_E2E === '1'
+
+test('Harbor 冒烟测试：端到端运行两道题', { skip: !dockerE2eEnabled }, async (t) => {
   const benchmarkRoot = join(process.cwd(), 'benchmarks/examples/harbor-smoke-v1')
   const tasksRoot = join(benchmarkRoot, 'tasks')
   const runRoot = join(tmpdir(), `harbor-smoke-e2e-${Date.now()}`)

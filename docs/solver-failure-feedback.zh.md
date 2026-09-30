@@ -39,12 +39,10 @@ MSA 通过宿主私有 CID 文件关联 `docker inspect .State`，在清理容�
 
 确定性的恢复不兼容返回 CLI 退出码 3；正式五 Mode Launcher 会停在 `BLOCKED_INCOMPATIBLE`，不会每分钟无限重试。原有临时基础设施暂停机制不变。
 
-**验证与最小真实实验**
+**验证与证据边界**
 
 离线测试包含真实本地网关、MSA Driver、实际 Python fixture、OmegaUse Trial/Partition、Cowork Controller 与 Population 五 Mode。只有 Docker 执行底座、Verifier rubric 和 Updater 行为使用明确标注的 fixture；这些结果不能当作真实 benchmark 成绩。
 
-真实 smoke 配置及日志位于本 worktree `.rsi/failure-feedback-smoke/`，训练仅使用原 Feedback 的 `officeval_003`，总候选预算 2，单 Branch/单 Trial；Solver 为 Terra/high，官方 Codex 0.153.4 Updater 为 Terra/xhigh。Benchmark 显式设置 `finalEvaluation: disabled`，Final 为空且 Finalizer 会拒绝领取 Final Attempt。独立网关镜像为 `harness-rsi/model-gateway:failure-feedback-smoke-v1`，没有修改正式网关 Tag。
+当前验证结果与未验证范围统一见 [开发日志](../README.dev.zh.md)。具体 Run 的配置、轨迹和评分仍保存在本地 `.rsi/`，不作为开发报告提交。真实闭环是否遇到可修复失败、Updater 是否实际修改 L3、以及分数是否提升，必须分别报告，不能用离线注入修复冒充真实进化结果。
 
-真实闭环是否遇到可修复失败、Updater 是否实际修改 L3、以及分数是否提升，必须分别报告；离线注入修复不能冒充真实进化结果。最终结果和版本边界见 [验证记录](solver-failure-feedback-validation.zh.md)。
-
-主进程后续完成了独立单题 B2 真实检查：H0/g001/g002 的 Reward 分别为 0/0/0.333333，g002 晋升。这次使用 3 步的工程检查配置，不是正式 12 步成绩；实际改动只有 Agent/Prompt，没有改 `model.py`。随后补齐了长反馈文件可读回的边界，完整版本与证据说明见 [主进程收尾记录](solver-failure-feedback-main-review.zh.md)。
+2026-09-06 的单题工程检查不是正式 Benchmark 成绩。需要复核当时执行版本与真实实验记录时，可阅读 Git 历史中的 [原始验证记录](https://github.com/autocosm-ai/HarnessEvoGym/blob/816f180f4c89c7c1dd01a3b7ada55b2ae1698a02/docs/solver-failure-feedback-validation.zh.md) 和 [收尾记录](https://github.com/autocosm-ai/HarnessEvoGym/blob/816f180f4c89c7c1dd01a3b7ada55b2ae1698a02/docs/solver-failure-feedback-main-review.zh.md)；它们不代表当前版本的运行状态。

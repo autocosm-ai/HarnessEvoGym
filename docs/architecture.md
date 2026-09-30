@@ -97,6 +97,8 @@ pin Source Revision
 
 ## Runtime layout
 
+Portability rule: host datasets, persistent roots, scratch roots, and CLI installations must be supplied through Runtime JSON relative paths or RSI_* environment references; a machine user's home directory must never be committed. /workspace, /candidate, /opt/harness-rsi, and /usr/bin/... are fixed container or system-toolchain protocol paths and remain absolute because they define the sandbox boundary. npm run check:paths blocks common machine-specific paths from re-entering the repository.
+
 OfficeVal and HLE campaigns keep mutable state outside the Git checkout. The repository, persistent root, and scratch root must be pairwise disjoint; the sealed-test subtree is never mounted into an untrusted phase. Runtime JSON uses relative paths and resolves them beside the repository into `.rsi/`:
 
 ```text

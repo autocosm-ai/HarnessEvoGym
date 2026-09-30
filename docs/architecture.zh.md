@@ -86,6 +86,8 @@ EvolutionAlgorithm 与 SearchStrategy 的职责分开：Algorithm 决定搜索�
 
 ## 运行目录
 
+路径可移植性规则是：宿主机数据集、持久化根、scratch 根和 CLI 安装目录只能通过 Runtime JSON 的相对路径或 RSI_* 环境变量注入，不能把某台机器的用户目录写进源码。/workspace、/candidate、/opt/harness-rsi 和 /usr/bin/... 等是容器或系统工具链的固定协议路径，属于沙箱边界的一部分，不能机械地改成相对路径。npm run check:paths 会阻止常见的机器专属路径重新进入仓库。
+
 OfficeVal 与 HLE Campaign 的可变状态位于 Git 工作区之外。仓库、持久化根与临时根必须两两分离；sealed test 子树不会挂载进任何非可信阶段。Runtime JSON 只写相对路径，默认解析到仓库旁边的 `.rsi/`：
 
 ```text
