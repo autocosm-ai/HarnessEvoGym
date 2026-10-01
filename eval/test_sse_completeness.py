@@ -16,6 +16,12 @@ class FakeResp:
         self.headers = {"content-type": ctype}
     def read(self, n=None):
         return self._b
+    def readline(self):
+        if not self._b:
+            return b""
+        line, separator, rest = self._b.partition(b"\n")
+        self._b = rest
+        return line + separator
 
 
 def sse(*events, done=False):
@@ -46,6 +52,11 @@ r = m._read_response(FakeResp(sse(delta("hel"), delta("lo", "stop"), done=True))
 check("normal: saw_terminator", r["saw_terminator"], True)
 check("normal: finish_reason", r["finish_reason"], "stop")
 check("normal: text", r["text"], "hello")
+
+# [DONE] 后即使网关连接还残留无关字节，也应立即返回，不等待 socket EOF。
+trailing = sse(delta("ok", "stop"), done=True) + "data: {not-json}\n"
+r = m._read_response(FakeResp(trailing))
+check("DONE returns before trailing bytes", r["text"], "ok")
 
 # 2. 正常但无 [DONE]，只有 finish_reason（宽容路径）
 r = m._read_response(FakeResp(sse(delta("hel"), delta("lo", "stop"), done=False)))

@@ -47,9 +47,9 @@ def _response_result(
 
 
 def _read_response(response: http.client.HTTPResponse) -> dict:
-    raw = response.read().decode("utf-8", errors="replace")
     content_type = response.headers.get("content-type", "").lower()
     if "text/event-stream" not in content_type:
+        raw = response.read().decode("utf-8", errors="replace")
         payload = json.loads(raw)
         choices = payload.get("choices", [])
         if not choices or not isinstance(choices[0], dict):
@@ -74,7 +74,8 @@ def _read_response(response: http.client.HTTPResponse) -> dict:
     saw_reasoning = False
     refused = False
     saw_terminator = False
-    for line in raw.splitlines():
+    for raw_line in iter(response.readline, b""):
+        line = raw_line.decode("utf-8", errors="replace").rstrip("\r\n")
         if not line.startswith("data:"):
             continue
         data = line[5:].strip()
@@ -82,7 +83,7 @@ def _read_response(response: http.client.HTTPResponse) -> dict:
             continue
         if data == "[DONE]":
             saw_terminator = True
-            continue
+            break
         event = json.loads(data)
         if event.get("error") is not None:
             raise RetryableModelError("model gateway streamed an upstream error")
@@ -113,7 +114,7 @@ def _read_response(response: http.client.HTTPResponse) -> dict:
         current_finish = choice.get("finish_reason")
         if isinstance(current_finish, str):
             finish_reason = current_finish
-    # 兼容只有 finish_reason 或只有 [DONE] 的网关，但绝不接收半截流。
+    # 兼容只有 finish_reason 的网关，但绝不接收半截流。
     if not saw_terminator and finish_reason is None:
         raise RetryableModelError("model gateway stream ended without terminal response")
     text = "".join(parts)
