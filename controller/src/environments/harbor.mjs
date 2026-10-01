@@ -140,7 +140,7 @@ async function readReward(logs) {
   return normalizedReward(value)
 }
 
-async function readCtrf(logs) {
+async function readCtrf(logs, metricNames = []) {
   const pathValue = join(logs, 'verifier', 'ctrf.json')
   const present = await lstat(pathValue).catch((error) => {
     if (error.code === 'ENOENT') return null
@@ -151,7 +151,7 @@ async function readCtrf(logs) {
     const source = await readRegularBytes(pathValue, 'Harbor CTRF 报告', MAXIMUM_CTRF_BYTES)
     const report = JSON.parse(source.toString('utf8'))
     if (!report || typeof report !== 'object' || Array.isArray(report)) throw new Error('CTRF 必须是对象')
-    const summary = summarizeCtrf(report, 'Harbor ctrf.json')
+    const summary = summarizeCtrf(report, 'Harbor ctrf.json', { metricNames })
     if (summary.error) throw new ProtocolError(summary.error)
     // 只把受限的结构化摘要送进反馈和结果记录；原始 CTRF 留在 verifier 日志目录，
     // 避免把任意大小的测试输出直接喂给 Updater。
@@ -193,6 +193,8 @@ function harborRecord({ task, partition, reward, trials, feedbackLimit }) {
       taskInstruction: Buffer.from(task.instruction).subarray(0, feedbackLimit).toString('utf8').replace(/\ufffd$/u, ''),
       verifierReward: reward,
       ctrf: trials.map((trial) => trial.ctrf).filter(Boolean).join('\n\n') || null,
+      // FeedbackPacket 读取的是 verifierFeedback；保留 ctrf 兼容已有结果消费者。
+      verifierFeedback: trials.map((trial) => trial.ctrf).filter(Boolean).join('\n\n') || '',
       errors: trials.filter((trial) => trial.solverFailure).map((trial) => (
         `${trial.solverFailure.category}: ${trial.solverFailure.code}`
       )),
@@ -409,7 +411,7 @@ export class HarborEnvironment {
       },
       timeoutMs: task.config.verifier.timeoutSeconds * 1000,
     })
-    return { reward: await readReward(logs), ctrf: await readCtrf(logs) }
+    return { reward: await readReward(logs), ctrf: await readCtrf(logs, this.verifierMetricNames) }
   }
 
   async runTrial({ candidateId, candidateDigest, candidateWorkspace, model, partition, task, seed, trialIndex, executionId }) {

@@ -38,3 +38,19 @@ test('UTF-8 截断不超过字节上限', () => {
   assert.ok(Buffer.byteLength(value, 'utf8') <= 64)
   assert.match(value, /\[TRUNCATED\]$/u)
 })
+
+test('CTRF 只透传环境允许的有限数值指标，默认不泄漏 metrics', () => {
+  const report = {
+    results: {
+      summary: { tests: 1, passed: 1, failed: 0, skipped: 0, pending: 0, other: 0 },
+      tests: [{ name: 'correctness', status: 'passed' }],
+    },
+    metrics: { speedup: 2.5, candidate_ms: Infinity, reference_ms: 'secret', arbitrary: 42 },
+  }
+  assert.doesNotMatch(summarizeCtrf(report).summary, /METRIC/u)
+  const summary = summarizeCtrf(report, 'kernelbench', {
+    metricNames: ['speedup', 'candidate_ms', 'reference_ms'],
+  }).summary
+  assert.match(summary, /METRIC speedup=2.5/u)
+  assert.doesNotMatch(summary, /Infinity|secret|arbitrary/u)
+})

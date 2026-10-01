@@ -10,7 +10,7 @@ spec:
 
   source:
     tasksRoot: benchmarks/kernelbench-smoke-v1/tasks
-    digest: 87a061f23278e686480541da655a31b103b13c27798d4b314db9a7c250863726
+    digest: 928f5f36b6bbc213aaa70b06b99f665360bba6e08935ff88dc1d657034b9e890
 
   task:
     workspacePath: /workspace

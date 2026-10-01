@@ -118,6 +118,7 @@ test('Harbor Environment 为每题构建运行时并按题 Resume Checkpoint', a
     assert.equal(copyCalls.length, 4)
     assert.equal(buildCalls.filter((call) => call.dockerfile.endsWith('environment/Dockerfile')).length, 2)
     assert.match(JSON.parse((await readFile(outputPath, 'utf8')).split('\n')[0]).feedback.ctrf, /tests=1/u)
+    assert.match(first.get('task-a').feedback.verifierFeedback, /tests=1/u)
     const outputBeforeResume = (await readFile(outputPath, 'utf8')).trim().split('\n').map((line) => JSON.parse(line))
     await environmentDriver.runCandidatePartition(runOptions)
     assert.equal(solverCalls.length, 4, '第二次运行应复用已提交的题目 checkpoint')

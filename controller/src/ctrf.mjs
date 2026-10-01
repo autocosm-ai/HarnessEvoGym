@@ -31,7 +31,7 @@ function assertionSummary(testCase) {
   )
 }
 
-export function summarizeCtrf(value, label = 'ctrf.json') {
+export function summarizeCtrf(value, label = 'ctrf.json', { metricNames = [] } = {}) {
   const results = value?.results
   const summary = results?.summary
   const tests = results?.tests
@@ -61,6 +61,14 @@ export function summarizeCtrf(value, label = 'ctrf.json') {
   }
   if (failed.length > MAXIMUM_FAILURES) {
     lines.push(`FAILED ... ${failed.length - MAXIMUM_FAILURES} more failures omitted`)
+  }
+  // 只有环境显式声明的有限数值能进入反馈，不能透传任意 metrics 内容。
+  for (const name of metricNames.slice(0, 16)) {
+    if (!/^[a-z][a-z0-9_]{0,63}$/u.test(name)) continue
+    const metric = value?.metrics?.[name]
+    if (typeof metric === 'number' && Number.isFinite(metric) && metric >= 0) {
+      lines.push(`METRIC ${name}=${metric}`)
+    }
   }
   return { error: null, summary: lines.join('\n') }
 }

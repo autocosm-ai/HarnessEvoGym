@@ -12,6 +12,8 @@ export class KernelBenchEnvironment extends HarborEnvironment {
   constructor(options) {
     super({ ...options, allowGpu: true })
     this.allowGpu = true
+    this.verifierMetricNames = Object.freeze(['reference_ms', 'candidate_ms', 'speedup', 'correctness_trials'])
+    this.checkedGpuImages = new Set()
   }
 
   describeCapabilities() {
@@ -39,5 +41,33 @@ export class KernelBenchEnvironment extends HarborEnvironment {
       }
     }
     return status
+  }
+
+  async ensureRuntime(task = null) {
+    const runtime = await super.ensureRuntime(task)
+    if (!task) return runtime
+    const key = `${runtime.solverImage}:${task.config.environment.gpus}`
+    if (!this.checkedGpuImages.has(key)) {
+      try {
+        // 在付费模型请求之前，用真正的 Solver 镜像自检 PyTorch/CUDA。
+        // 镜像构建阶段没有 GPU，不能用 Dockerfile HEALTHCHECK 代替此检查。
+        await this.docker.run({
+          image: runtime.solverImage,
+          name: `kernelbench-gpu-check-${task.name}-${process.pid}`,
+          command: ['/opt/conda/bin/python', '-c', 'import torch; assert torch.cuda.is_available(), "CUDA unavailable"; x=torch.ones(1,device="cuda"); assert x.sum().item()==1; print("CUDA ready")'],
+          environment: { HOME: '/tmp/home', PYTHONDONTWRITEBYTECODE: '1' },
+          inheritEnvironment: [],
+          network: 'none',
+          readOnlyRoot: true,
+          capabilities: [],
+          resources: { ...this.environment.verifier.resources, gpus: task.config.environment.gpus },
+          timeoutMs: 60000,
+        })
+      } catch (error) {
+        throw new ProtocolError('KernelBench Solver 镜像的 PyTorch/CUDA 自检失败；尚未开始模型调用', [error.message])
+      }
+      this.checkedGpuImages.add(key)
+    }
+    return runtime
   }
 }

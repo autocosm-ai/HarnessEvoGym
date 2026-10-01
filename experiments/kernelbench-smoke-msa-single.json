@@ -5,7 +5,7 @@
   "spec": {
     "recipe": "recipes/population-smoke/single.yml",
     "adapters": {
-      "target": "adapters/targets/msa-minimal.yml",
+      "target": "adapters/targets/msa-minimal-cowork-rsi.yml",
       "updater": "adapters/updaters/deepseek-harness.yml",
       "environment": "environments/kernelbench-gpu.yml",
       "provider": "adapters/providers/zcloud-openai.yml",

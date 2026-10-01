@@ -3,6 +3,7 @@
 .rsi
 .worktrees
 .local
+ref-code
 WORKTREE.md
 P0-*-完成报告.md
 P1-*-完成报告.md
