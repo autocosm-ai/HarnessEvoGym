@@ -44,10 +44,18 @@ class Response:
     def __init__(self, status=200, raw=None):
         self.status = status
         self.raw = sse("<final>ok</final>", "stop", True) if raw is None else raw
-    def read(self, *args):
-        if isinstance(self.raw, Exception):
-            raise self.raw
-        return self.raw
+        def read(self, *args):
+            if isinstance(self.raw, Exception):
+                raise self.raw
+            return self.raw
+        def readline(self):
+            if isinstance(self.raw, Exception):
+                raise self.raw
+            if not self.raw:
+                return b""
+            line, separator, rest = self.raw.partition(b"\n")
+            self.raw = rest
+            return line + separator
 
 def run(responses):
     requests, closed, delays = [], [], []
