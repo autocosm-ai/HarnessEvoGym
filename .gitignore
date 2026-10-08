@@ -20,6 +20,9 @@
 /docs/solver-failure-feedback-main-review.zh.md
 /docs/solver-failure-feedback-validation.zh.md
 
+# shared-final 评测配置引用了内部实验 run 路径，仅供本地使用。
+/experiments/shared-final-*.json
+
 # 凭据与本地覆盖
 /.env
 /.env.*

@@ -4,12 +4,30 @@
 H0 来源必须在评测前通过 `baselineFrom` 固定，不能根据哪个基线分数低再选。
 五份最终报告引用同一份 H0 结果摘要，直接比较平均 Reward 和配对差值。
 
+配置文件需按自己已关闭的 Population Run 编写，仓库不附带具体实验的配置。最小示例
+（`id`、`baselineFrom`、`populations` 必填，其余字段有默认值）：
+
+```json
+{
+  "id": "shared-final-example",
+  "baselineFrom": "single",
+  "maximumConcurrentTrialsPerEntry": 1,
+  "populations": [
+    { "label": "single", "run": ".rsi/runs/populations/<run-id>-single" },
+    { "label": "independent", "run": ".rsi/runs/populations/<run-id>-independent" },
+    { "label": "mutualism", "run": ".rsi/runs/populations/<run-id>-mutualism" },
+    { "label": "competition", "run": ".rsi/runs/populations/<run-id>-competition" },
+    { "label": "combined", "run": ".rsi/runs/populations/<run-id>-combined" }
+  ]
+}
+```
+
 ```bash
 npm run rsi -- experiment finalize-suite \
-  --config experiments/shared-final-main16-train8-test8-20260914.json
+  --config experiments/<shared-final>.json
 # 同一套冻结代码、配置、题目、Candidate、Runtime 和模型下恢复：
 npm run rsi -- experiment finalize-suite \
-  --config experiments/shared-final-main16-train8-test8-20260914.json --resume
+  --config experiments/<shared-final>.json --resume
 ```
 
 单个 Controller 进程并发调度六份评测，各自仍需要 Solver/Verifier 容器。

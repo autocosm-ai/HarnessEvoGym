@@ -5,6 +5,10 @@ metadata:
   id: zcloud-openai
   name: ZCloud OpenAI-Compatible Gateway
 
+# 感谢 ZCloud（https://console.zcloudapi.com/）为 HarnessEvoGym 实验提供 API 支持。
+# 使用本 Provider 时设置 RSI_PROVIDER_BASE_URL=https://api.zcloudapi.com/v1；
+# 也可以换成任意 OpenAI 兼容端点。
+
 spec:
   # 连接和凭据在 Solver/Updater 之间共享，真实值只通过运行时环境变量注入。
   protocol: openai-chat-completions

@@ -30,6 +30,21 @@
 
 ---
 
+## 🤝 API 支持
+
+> [!TIP]
+> **感谢 [ZCloud](https://console.zcloudapi.com/) 为 HarnessEvoGym 提供模型 API 支持。**
+> 我们实验中的模型调用通过 ZCloud 的 OpenAI / Anthropic 兼容网关完成。
+>
+> | | |
+> | :--- | :--- |
+> | **控制台** | [console.zcloudapi.com](https://console.zcloudapi.com/) |
+> | **API 端点** | `https://api.zcloudapi.com/v1` |
+>
+> 也可以使用任意 OpenAI 兼容端点，只需设置 `RSI_PROVIDER_BASE_URL`。
+
+---
+
 **核心能力**
 
 | 你控制什么 | 它如何工作 |
