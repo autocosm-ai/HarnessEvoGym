@@ -8,6 +8,25 @@ import { ProtocolError, writeJsonFile } from './protocol.mjs'
 const DIRECTORY_MODE = 0o755
 const FILE_MODE = 0o644
 
+// 本地运行缓存不是 Candidate / Seed 内容：字节码与测试缓存不该进入 Seed 内容摘要，
+// 也不该被复制进 Candidate，否则同一份源码会因为本机是否跑过 Python 而得出不同的 seedDigest。
+// 注意：这是**可选**过滤，只在 Seed 摘要与 Seed 复制处显式启用。Candidate 工作区的
+// mutation diff 绝不能默认跳过任何路径，否则 Updater 可以把内容藏进被忽略目录来规避 Diff Guard。
+const IGNORED_TREE_DIRECTORIES = new Set([
+  '__pycache__',
+  '.pytest_cache',
+  '.mypy_cache',
+  '.ruff_cache',
+  '.ipynb_checkpoints',
+])
+const IGNORED_TREE_FILES = new Set(['.DS_Store', 'Thumbs.db'])
+
+export function isIgnoredTreeEntry(relativePath) {
+  const segments = relativePath.split('/')
+  if (segments.some((segment) => IGNORED_TREE_DIRECTORIES.has(segment))) return true
+  return IGNORED_TREE_FILES.has(segments[segments.length - 1])
+}
+
 async function assertRegularTreeEntry(pathValue, label) {
   const info = await lstat(pathValue)
   if (info.isSymbolicLink()) throw new ProtocolError(`${label} 包含符号链接，拒绝实例化：${pathValue}`)
@@ -15,7 +34,7 @@ async function assertRegularTreeEntry(pathValue, label) {
   return info
 }
 
-export async function copyRegularTree(sourceRoot, destinationRoot) {
+export async function copyRegularTree(sourceRoot, destinationRoot, { exclude = null } = {}) {
   try {
     await stat(destinationRoot)
     throw new ProtocolError(`目标目录已存在，拒绝覆盖：${destinationRoot}`)
@@ -32,6 +51,7 @@ export async function copyRegularTree(sourceRoot, destinationRoot) {
     for (const entry of entries) {
       const sourcePath = join(source, entry.name)
       const destinationPath = join(destination, entry.name)
+      if (exclude !== null && exclude(normalizeRelativePath(relative(sourceRoot, sourcePath)))) continue
       const info = await assertRegularTreeEntry(sourcePath, '候选模板')
       if (info.isDirectory()) {
         await mkdir(destinationPath, { mode: DIRECTORY_MODE })
@@ -58,7 +78,7 @@ async function hashFile(filePath) {
   return createHash('sha256').update(data).digest('hex')
 }
 
-export async function snapshotTree(root, { maximumFileBytes = Infinity, maximumTreeEntries = Infinity } = {}) {
+export async function snapshotTree(root, { maximumFileBytes = Infinity, maximumTreeEntries = Infinity, exclude = null } = {}) {
   const files = new Map()
   let treeEntries = 0
 
@@ -66,6 +86,9 @@ export async function snapshotTree(root, { maximumFileBytes = Infinity, maximumT
     const entries = await readdir(directory, { withFileTypes: true })
     entries.sort((left, right) => left.name.localeCompare(right.name))
     for (const entry of entries) {
+      const absolute = join(directory, entry.name)
+      const relativePath = normalizeRelativePath(relative(root, absolute))
+      if (exclude !== null && exclude(relativePath)) continue
       treeEntries += 1
       if (treeEntries > maximumTreeEntries) {
         throw new ProtocolError('Candidate 目录项数量超过上限', [
@@ -73,8 +96,6 @@ export async function snapshotTree(root, { maximumFileBytes = Infinity, maximumT
           `limit=${maximumTreeEntries}`,
         ])
       }
-      const absolute = join(directory, entry.name)
-      const relativePath = normalizeRelativePath(relative(root, absolute))
       const info = await assertRegularTreeEntry(absolute, 'Candidate')
       if (info.isDirectory()) {
         files.set(relativePath, {
