@@ -506,3 +506,19 @@ npm run render:gif
 - [OmegaUse Cowork Runbook](docs/cowork-mvp.zh.md)
 
 - [评测协议](evaluation/README.md)
+
+扩展与运维文档：
+
+- [Algorithm SDK v2](docs/algorithm-sdk-v2.zh.md)、[自定义算法示例](docs/custom-strategy-examples.zh.md)、[算法测试指南](docs/algorithm-testing-guide.zh.md)
+
+- [Mutation Policy 参考](docs/mutation-policy-reference.zh.md)、[HLE 变异流程](docs/hle-mutation-workflow.zh.md)
+
+- [Harbor 环境](docs/harbor-environment.zh.md)、[Docker 资源限制验证](docs/docker-resources-validation.zh.md)
+
+- [Solver 失败反馈](docs/solver-failure-feedback.zh.md)、[Updater Provider 与断点](docs/updater-providers-and-checkpoints.zh.md)、[故障排查](docs/troubleshooting.zh.md)
+
+- [Baseline pack](docs/baseline-pack.zh.md)、[共享 Final 评测](docs/shared-final-suite.zh.md)、[Final 重试](docs/final-evaluation-retry.zh.md)
+
+- [CI/CD 指南](docs/ci-cd-guide.zh.md)、[测试指南](docs/testing-guide.zh.md)、[贡献者快速入门](docs/contributor-quick-start.zh.md)
+
+除架构、Controller Mode、搜索策略、Cowork Runbook、评测运行模式和 PutnamBench 协议外，`docs/` 下的参考文档目前只有中文版。

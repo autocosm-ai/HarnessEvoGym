@@ -207,14 +207,29 @@ Full file map, protocols, extension checklist, and test matrix: [Contributor gui
 
 ## Documentation
 
-| Goal | Read |
-| :--- | :--- |
-| Understand the trust boundaries | [Architecture](docs/architecture.md) |
-| Understand Mode and Branch | [Controller modes](docs/controller-modes.md) |
-| Understand Region search | [Search strategy](docs/search-strategy.md) |
-| Run the Cowork experiment | [OmegaUse Cowork runbook](docs/cowork-mvp.md) |
-| Extend or review the platform | [Contributor guide](CONTRIBUTING.md) |
-| Check development and validation | [Development log](README.dev.zh.md) |
+| Goal                             | Read                                             |
+| :------------------------------- | :----------------------------------------------- |
+| Understand the trust boundaries  | [Architecture](docs/architecture.md)             |
+| Understand Mode and Branch       | [Controller modes](docs/controller-modes.md)     |
+| Understand Region search         | [Search strategy](docs/search-strategy.md)       |
+| Understand result reuse          | [Evaluation run modes](docs/evaluation-modes.md) |
+| Run the Cowork experiment        | [OmegaUse Cowork runbook](docs/cowork-mvp.md)    |
+| Extend or review the platform    | [Contributor guide](CONTRIBUTING.md)             |
+| Check development and validation | [Development log](README.dev.zh.md)              |
+
+Additional reference documentation is Chinese-only:
+
+- **Custom search algorithms**: [Algorithm SDK v2](docs/algorithm-sdk-v2.zh.md), [testing guide](docs/algorithm-testing-guide.zh.md), [examples](docs/custom-strategy-examples.zh.md)
+- **Mutation policy**: [Mutation policy reference](docs/mutation-policy-reference.zh.md)
+- **Baseline reuse**: [Baseline pack](docs/baseline-pack.zh.md)
+- **Shared Final suite**: [Shared final suite](docs/shared-final-suite.zh.md), [Final retry](docs/final-evaluation-retry.zh.md)
+- **Cowork experiment setup**: [Experiment protocol](docs/cowork-main-experiment-protocol.zh.md)
+- **Environment setup**: [Harbor environment](docs/harbor-environment.zh.md), [Docker resource limits](docs/docker-resources-validation.zh.md)
+- **HLE mutation workflow**: [HLE mutation workflow](docs/hle-mutation-workflow.zh.md)
+- **Run troubleshooting**: [Solver failure feedback](docs/solver-failure-feedback.zh.md), [Troubleshooting](docs/troubleshooting.zh.md)
+- **Updater providers**: [Updater providers and checkpoints](docs/updater-providers-and-checkpoints.zh.md)
+- **CI/CD**: [CI/CD guide](docs/ci-cd-guide.zh.md)
+- **Contributor onboarding**: [Contributor quick start](docs/contributor-quick-start.zh.md), [testing guide](docs/testing-guide.zh.md)
 
 ---
 

@@ -4,11 +4,11 @@
 
 ## Workflow 总览
 
-| 文件 | 触发条件 | 作用 |
-| --- | --- | --- |
-| `.github/workflows/ci.yml` | push 到 `lz-dev` / `main`，以及所有 Pull Request | 语法检查、离线测试、覆盖率采样、Docker 构建验证、依赖审计 |
-| `.github/workflows/docker-build.yml` | push 到 `main`、推送 `v*` tag、手动触发 | 构建并推送四个运行时镜像到 GHCR |
-| `.github/workflows/release.yml` | 推送 `v*` tag、手动触发 | 生成 Changelog 并创建 GitHub Release |
+| 文件                                 | 触发条件                                         | 作用                                                      |
+| ------------------------------------ | ------------------------------------------------ | --------------------------------------------------------- |
+| `.github/workflows/ci.yml`           | push 到 `lz-dev` / `main`，以及所有 Pull Request | 语法检查、离线测试、覆盖率采样、Docker 构建验证、依赖审计 |
+| `.github/workflows/docker-build.yml` | push 到 `main`、推送 `v*` tag、手动触发          | 构建并推送四个运行时镜像到 GHCR                           |
+| `.github/workflows/release.yml`      | 推送 `v*` tag、手动触发                          | 生成 Changelog 并创建 GitHub Release                      |
 
 ## ci.yml：离线测试
 

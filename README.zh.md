@@ -220,14 +220,29 @@ Population Mode 与 Module Search 正交。例如，`combined + linear-hill-clim
 
 ## 文档入口
 
-| 你想了解什么         | 入口                                                    |
-| -------------------- | ------------------------------------------------------- |
-| 信任边界和数据流     | [架构](docs/architecture.zh.md)                         |
-| Mode、Branch 和预算  | [Controller modes](docs/controller-modes.md)            |
-| Region 搜索          | [Search strategy](docs/search-strategy.md)              |
-| OfficeVal 任务与评测 | [OmegaUse Cowork 运行手册](docs/cowork-mvp.zh.md)      |
-| 扩展或审查平台       | [贡献指南](CONTRIBUTING.md)                             |
-| 开发进度与验证边界   | [开发日志](README.dev.zh.md)                            |
+| 你想了解什么         | 入口                                              |
+| -------------------- | ------------------------------------------------- |
+| 信任边界和数据流     | [架构](docs/architecture.zh.md)                   |
+| Mode、Branch 和预算  | [Controller modes](docs/controller-modes.md)      |
+| Region 搜索          | [Search strategy](docs/search-strategy.md)        |
+| 结果能否复用         | [评测运行模式](docs/evaluation-modes.zh.md)       |
+| OfficeVal 任务与评测 | [OmegaUse Cowork 运行手册](docs/cowork-mvp.zh.md) |
+| 扩展或审查平台       | [贡献指南](CONTRIBUTING.md)                       |
+| 开发进度与验证边界   | [开发日志](README.dev.zh.md)                      |
+
+扩展与运维参考（多数目前只有中文版）：
+
+- **自定义搜索算法**：[Algorithm SDK v2](docs/algorithm-sdk-v2.zh.md)、[测试指南](docs/algorithm-testing-guide.zh.md)、[示例](docs/custom-strategy-examples.zh.md)
+- **变异策略**：[Mutation policy 参考](docs/mutation-policy-reference.zh.md)
+- **基线复用**：[Baseline pack](docs/baseline-pack.zh.md)
+- **共享 Final 评测**：[共享 Final 评测](docs/shared-final-suite.zh.md)、[Final 重试](docs/final-evaluation-retry.zh.md)
+- **Cowork 实验配置**：[实验协议](docs/cowork-main-experiment-protocol.zh.md)
+- **Environment 配置**：[Harbor 环境](docs/harbor-environment.zh.md)、[Docker 资源限制](docs/docker-resources-validation.zh.md)
+- **HLE 变异流程**：[HLE mutation workflow](docs/hle-mutation-workflow.zh.md)
+- **失败排查**：[Solver 失败反馈](docs/solver-failure-feedback.zh.md)、[故障排查](docs/troubleshooting.zh.md)
+- **Updater 与断点**：[Updater providers and checkpoints](docs/updater-providers-and-checkpoints.zh.md)
+- **CI/CD**：[CI/CD 指南](docs/ci-cd-guide.zh.md)
+- **新人上手**：[贡献者快速入门](docs/contributor-quick-start.zh.md)、[测试指南](docs/testing-guide.zh.md)
 
 ## 许可证
 
