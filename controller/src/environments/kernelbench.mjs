@@ -64,6 +64,17 @@ export class KernelBenchEnvironment extends HarborEnvironment {
           timeoutMs: 60000,
         })
       } catch (error) {
+        // --gpus 依赖宿主安装 NVIDIA Container Toolkit；缺失时 Docker 会以
+        // "unknown flag: --gpus" 或 "could not select device driver" 失败。
+        // 这类宿主缺少 GPU 运行时的问题必须与镜像内 CUDA 自检失败区分开，
+        // 否则排查方向会被误导到模型或镜像上。
+        const stderr = error.processResult?.stderr ?? ''
+        if (/unknown flag: --gpus|could not select device driver|no such device/iu.test(stderr)) {
+          throw new ProtocolError(
+            '宿主 Docker 缺少 GPU 运行时（--gpus 不可用）；请安装 NVIDIA Container Toolkit 或改用 CPU Environment',
+            [error.message],
+          )
+        }
         throw new ProtocolError('KernelBench Solver 镜像的 PyTorch/CUDA 自检失败；尚未开始模型调用', [error.message])
       }
       this.checkedGpuImages.add(key)

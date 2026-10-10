@@ -345,11 +345,11 @@ async function finalizeSuiteCommand(args) {
   if (!['completed', 'validated'].includes(result.status)) process.exitCode = 2
 }
 
-function positiveIntegerOption(options, name, fallback, { max = 100_000 } = {}) {
+function boundedIntegerOption(options, name, fallback, { min = 0, max = 100_000 } = {}) {
   if (!options.has(name)) return fallback
   const value = Number(options.get(name))
-  if (!Number.isSafeInteger(value) || value < 0 || value > max) {
-    throw new ProtocolError(`--${name} 必须是 0-${max} 的整数`)
+  if (!Number.isSafeInteger(value) || value < min || value > max) {
+    throw new ProtocolError(`--${name} 必须是 ${min}-${max} 的整数`)
   }
   return value
 }
@@ -378,7 +378,8 @@ async function genericAlgorithmRunCommand(args) {
   const initialState = options.has('initial-state')
     ? await readJsonFile(resolveInside(REPOSITORY_ROOT, options.get('initial-state'), 'Algorithm initial state 路径'))
     : undefined
-  const steps = positiveIntegerOption(options, 'steps', 1)
+  // --steps 0 会产出一个没有任何搜索的 steps:0 报告，容易被误读成"已搜索"；下界固定为 1。
+  const steps = boundedIntegerOption(options, 'steps', 1, { min: 1 })
   const store = new FileAlgorithmRunStore(runRoot)
   const driver = createGenericEvolutionAlgorithmDriver({ algorithm, options: { store } })
   const result = await runGenericEvolution({

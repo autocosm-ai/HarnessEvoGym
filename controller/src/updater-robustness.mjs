@@ -295,8 +295,10 @@ export function diagnoseUpdaterFailure(error, context) {
   if (error.name === 'UpdaterRunError'
       && (error.result?.timedOut === true || error.stage === 'updater-timeout')) {
     diagnosis.failureKind = 'timeout'
+    // context 默认是 {}；缺失时不能把 undefined/1000 写成 NaN 落盘。
+    const timeoutMs = Number.isFinite(error.context?.timeoutMs) ? error.context.timeoutMs : null
     diagnosis.possibleCauses.push(
-      `Updater 执行超过 ${error.context.timeoutMs / 1000}s 限制`,
+      timeoutMs === null ? 'Updater 执行超过配置的超时上限' : `Updater 执行超过 ${timeoutMs / 1000}s 限制`,
       '任务复杂度超出预期',
       'API 响应缓慢',
     )

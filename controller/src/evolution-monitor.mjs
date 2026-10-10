@@ -1,5 +1,4 @@
 import { writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
 
 /**
  * Evolution 运行时监控与统计
@@ -11,10 +10,16 @@ import { join } from 'node:path'
  * - 统计失败类型分布
  * - 生成监控报告
  */
+const MAXIMUM_EVENTS = 20_000
+
 export class EvolutionMonitor {
   constructor() {
     this.startTime = Date.now()
     this.events = []
+    // 事件只用于报告时间线；长跑时不能让内存无界增长。超过上限后丢弃最旧的事件，
+    // 但 recordedEvents 仍保留真实总数，summary.events 语义不变。
+    this.recordedEvents = 0
+    this.droppedEvents = 0
     this.generationStats = new Map()
     this.tokenUsage = {
       solver: { prompt: 0, completion: 0, total: 0 },
@@ -38,7 +43,12 @@ export class EvolutionMonitor {
       message,
       ...extra,
     }
+    this.recordedEvents += 1
     this.events.push(event)
+    if (this.events.length > MAXIMUM_EVENTS) {
+      this.droppedEvents += this.events.length - MAXIMUM_EVENTS
+      this.events.splice(0, this.events.length - MAXIMUM_EVENTS)
+    }
   }
 
   /**
@@ -151,7 +161,9 @@ export class EvolutionMonitor {
       tokenUsage: this.tokenUsage,
       phaseTimings: phaseTimingSummary,
       generationSummary,
-      events: this.events.length,
+      events: this.recordedEvents,
+      retainedEvents: this.events.length,
+      droppedEvents: this.droppedEvents,
     }
   }
 
@@ -248,7 +260,7 @@ export class EvolutionMonitor {
   // 恢复累计统计，不把上次进程退出后的等待时间算作某个阶段的执行时间。
   snapshot() {
     return structuredClone({
-      startTime: this.startTime, events: this.events,
+      startTime: this.startTime, events: this.events, recordedEvents: this.recordedEvents, droppedEvents: this.droppedEvents,
       generationStats: [...this.generationStats], tokenUsage: this.tokenUsage,
       phaseTimings: [...this.phaseTimings],
     })
@@ -259,6 +271,8 @@ export class EvolutionMonitor {
     const copy = structuredClone(snapshot)
     this.startTime = copy.startTime
     this.events = copy.events
+    this.recordedEvents = copy.recordedEvents ?? copy.events.length
+    this.droppedEvents = copy.droppedEvents ?? 0
     this.generationStats = new Map(copy.generationStats)
     this.tokenUsage = copy.tokenUsage
     this.phaseTimings = new Map(copy.phaseTimings)

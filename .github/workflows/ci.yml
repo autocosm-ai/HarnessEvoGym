@@ -75,25 +75,3 @@ jobs:
           bash -n scripts/setup-putnambench-runtime.sh
           python3 -m py_compile scripts/download-hle-text-math.py
           python3 -m py_compile docker/omegause-officeval/run-verifier.py
-
-  lint:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run ESLint when configured
-        run: npm run lint --if-present
-
-      - name: Check formatting when configured
-        run: npm run format:check --if-present

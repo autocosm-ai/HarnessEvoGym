@@ -192,8 +192,8 @@ function harborRecord({ task, partition, reward, trials, feedbackLimit }) {
     record.feedback = {
       taskInstruction: Buffer.from(task.instruction).subarray(0, feedbackLimit).toString('utf8').replace(/\ufffd$/u, ''),
       verifierReward: reward,
-      ctrf: trials.map((trial) => trial.ctrf).filter(Boolean).join('\n\n') || null,
-      // FeedbackPacket 读取的是 verifierFeedback；保留 ctrf 兼容已有结果消费者。
+      // FeedbackPacket 只读取 verifierFeedback；不要再写一份同内容的 ctrf 副本，
+      // 否则同一份 CTRF 摘要在结果文件里出现两次，反馈预算也会被重复计账。
       verifierFeedback: trials.map((trial) => trial.ctrf).filter(Boolean).join('\n\n') || '',
       errors: trials.filter((trial) => trial.solverFailure).map((trial) => (
         `${trial.solverFailure.category}: ${trial.solverFailure.code}`
@@ -245,6 +245,9 @@ export class HarborEnvironment {
     this.runRoot = runRoot
     this.repositoryRoot = repositoryRoot
     this.allowGpu = allowGpu
+    // 基类显式声明：子类可覆盖为需要保留的 CTRF 指标名。默认不保留任何指标，
+    // 避免依赖 readCtrf 的默认参数兜底。
+    this.verifierMetricNames = Object.freeze([])
     this.tasks = new Map()
     this.sourceRevision = null
     this.runtimeByTask = new Map()

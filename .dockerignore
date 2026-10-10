@@ -4,6 +4,8 @@
 .worktrees
 .local
 ref-code
+# HLE 是受控数据集；私有分区与题目不得进入任何构建上下文。
+benchmarks/hle-text-math/.private
 WORKTREE.md
 P0-*-完成报告.md
 P1-*-完成报告.md
