@@ -123,8 +123,6 @@ def _read_response(response: http.client.HTTPResponse) -> dict:
         current_finish = choice.get("finish_reason")
         if isinstance(current_finish, str):
             finish_reason = current_finish
-            # 明确的 finish_reason 就是终止事件；继续 readline 会一直阻塞到 socket 超时。
-            break
     text = "".join(parts)
     return _response_result(
         text if text else final_message,

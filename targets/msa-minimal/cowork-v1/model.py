@@ -114,9 +114,7 @@ def _read_response(response: http.client.HTTPResponse) -> dict:
         current_finish = choice.get("finish_reason")
         if isinstance(current_finish, str):
             finish_reason = current_finish
-            # 明确的 finish_reason 同样是终止事件；继续 readline 会一直阻塞到 socket 超时。
-            break
-    # 只有既没收到 [DONE] 也没有 finish_reason 时才算半截流。
+    # 兼容只有 finish_reason 的网关，但绝不接收半截流。
     if not saw_terminator and finish_reason is None:
         raise RetryableModelError("model gateway stream ended without terminal response")
     text = "".join(parts)
