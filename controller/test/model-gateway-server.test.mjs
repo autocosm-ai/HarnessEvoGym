@@ -696,7 +696,7 @@ test('Model Gateway 在预缓冲、大量异步分块和慢客户端下原样转
   }
 })
 
-test('Model Gateway 在客户端提前关闭时停止上游并标记 Usage 不完整', async () => {
+async function assertClientClose(completed) {
   const providerKey = 'provider-key-for-abort-test'
   const legacyToken = 'a'.repeat(64)
   const controlToken = 'b'.repeat(64)
@@ -706,13 +706,17 @@ test('Model Gateway 在客户端提前关闭时停止上游并标记 Usage 不�
     request.resume()
     request.once('end', () => {
       response.writeHead(200, { 'content-type': 'text/event-stream' })
-      response.write('data: {"choices":[{"delta":{"content":"first"}}]}\n\n')
-      const timer = setTimeout(() => response.end([
+      const finalEvents = [
         'data: {"choices":[],"usage":{"prompt_tokens":7,"completion_tokens":5}}',
         '',
         'data: [DONE]',
         '',
-      ].join('\n')), 250)
+        '',
+      ].join('\n')
+      // 不结束 HTTP 响应，模拟客户端依据 SSE 的 DONE 主动停止读取。
+      response.write('data: {"choices":[{"delta":{"content":"first"},"finish_reason":"stop"}]}\n\n'
+        + (completed ? finalEvents : ''))
+      const timer = setTimeout(() => response.end(completed ? '' : finalEvents), 5_000)
       response.once('close', () => clearTimeout(timer))
     })
   })
@@ -755,9 +759,18 @@ test('Model Gateway 在客户端提前关闭时停止上游并标记 Usage 不�
       }),
     })
     assert.equal(configured.status, 200)
+    const trialId = `close-${completed ? 'after-done' : 'before-done'}`
+    const registered = await fetch(`${gatewayUrl}/rsi/trials`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${controlToken}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ trialId, candidateId: 'h0', candidateDigest: 'e'.repeat(64),
+        partition: 'feedback', instanceId: 'fixture-task', seed: 1 }),
+    })
+    assert.equal(registered.status, 200)
+    const { token: trialToken } = await registered.json()
     assert.equal(await abortAfterFirstResponseChunk(
       `${gatewayUrl}/chat/completions`,
-      solverToken,
+      trialToken,
       JSON.stringify({ messages: [{ role: 'user', content: 'abort' }] }),
     ), 200)
 
@@ -767,23 +780,41 @@ test('Model Gateway 在客户端提前关闭时停止上游并标记 Usage 不�
         headers: { authorization: `Bearer ${controlToken}` },
       })
       usage = await response.json()
-      if (usage.activeRequests === 0 && usage.unknownUsageResponses === 1) break
+      if (usage.activeRequests === 0 && usage.usageResponses + usage.unknownUsageResponses === 1) break
       await delay(10)
     }
     assert.deepEqual(usage, {
       acceptedRequests: 1,
       activeRequests: 0,
-      usageResponses: 0,
-      unknownUsageResponses: 1,
-      inputTokens: 0,
-      outputTokens: 0,
+      usageResponses: completed ? 1 : 0,
+      unknownUsageResponses: completed ? 0 : 1,
+      inputTokens: completed ? 7 : 0,
+      outputTokens: completed ? 5 : 0,
       cacheReadTokens: 0,
       reasoningTokens: 0,
     })
+    const snapshot = await fetch(`${gatewayUrl}/rsi/trials`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${controlToken}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ trialId, close: true }),
+    })
+    assert.equal(snapshot.status, 200)
+    const diagnostics = await snapshot.json()
+    assert.equal(diagnostics.complete, true)
+    assert.equal(diagnostics.requests.length, 1)
+    assert.equal(diagnostics.requests[0].done, completed)
+    assert.equal(diagnostics.requests[0].responseComplete, completed)
+    assert.equal(diagnostics.requests[0].transportError, !completed)
+    assert.equal(diagnostics.requests[0].finishReason, 'stop')
     assert.equal((await fetch(`${gatewayUrl}/healthz`)).status, 200)
   } finally {
     child.kill('SIGTERM')
     if (child.exitCode === null) await new Promise((resolveExit) => child.once('exit', resolveExit))
     await new Promise((resolveClose) => upstream.close(resolveClose))
   }
-})
+}
+
+for (const completed of [false, true]) {
+  test(`Model Gateway 在客户端${completed ? '收到 DONE 后' : '提前'}关闭时正确记录诊断和 Usage`,
+    () => assertClientClose(completed))
+}

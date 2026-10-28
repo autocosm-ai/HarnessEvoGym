@@ -404,6 +404,11 @@ function recordForTask({ layout, partition, trials, runRoot, feedbackLimit }) {
     status: meanReward >= 1 ? 'resolved' : 'unresolved',
     reward: meanReward,
     trial_rewards: trials.map((trial) => trial.reward),
+    ...(trials.every((trial) => Number.isFinite(trial.rawScore)) ? {
+      score_details: { metric: 'officeval-raw-ratio-v1',
+        value: trials.reduce((sum, trial) => sum + trial.rawScore, 0) / trials.length,
+        trial_values: trials.map((trial) => trial.rawScore) },
+    } : {}),
     trial_seeds: trials.map((trial) => trial.seed),
     seed_controlled: false,
     ...(usageComplete
@@ -768,6 +773,7 @@ export class OmegaUseOfficeValEnvironment {
     return {
       seed,
       reward,
+      rawScore: result.status === 'ok' && result.max_score > 0 ? result.total_score / result.max_score : null,
       latencyMs: Date.now() - startedAt,
       inputTokens: solver.modelUsage?.complete ? solver.modelUsage.inputTokens : null,
       outputTokens: solver.modelUsage?.complete ? solver.modelUsage.outputTokens : null,

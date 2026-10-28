@@ -45,6 +45,9 @@ jobs:
       - name: Run standalone evaluator offline tests
         run: npm run test:eval
 
+      - name: Exercise offline evolution, cross-process resume, and champion evaluation
+        run: npm run demo
+
       - name: Generate test coverage report
         run: |
           set -o pipefail

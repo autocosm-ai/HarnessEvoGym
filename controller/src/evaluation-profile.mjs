@@ -152,6 +152,10 @@ function assertIdentityShape(identity, label) {
 
 function collectDifferences(previous, next, path = '') {
   if (Object.is(previous, next)) return []
+  if (Array.isArray(previous) && Array.isArray(next)) {
+    if (previous.length !== next.length) return [path || '$']
+    return previous.flatMap((value, index) => collectDifferences(value, next[index], `${path}[${index}]`))
+  }
   if (!isPlainObject(previous) || !isPlainObject(next)) return [path || '$']
   const keys = [...new Set([...Object.keys(previous), ...Object.keys(next)])].sort()
   return keys.flatMap((key) => collectDifferences(previous[key], next[key], path ? `${path}.${key}` : key))

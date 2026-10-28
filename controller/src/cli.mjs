@@ -6,6 +6,8 @@ import { assertEvolutionAlgorithmAvailable } from './evolution-algorithm.mjs'
 import { assertPathKind, readConfigFile, REPOSITORY_ROOT, resolveInside } from './config.mjs'
 import { evaluateBenchmark } from './evaluator.mjs'
 import { autoRegisterPlugin } from './plugin-loader.mjs'
+import { loadLocalProviderEnvironment } from './local-provider.mjs'
+import { runEvaluationJob } from './evaluation-job.mjs'
 import {
   createGenericEvolutionAlgorithmDriver,
   FileAlgorithmRunStore,
@@ -44,12 +46,13 @@ const HELP = `HarnessEvoGym Controller
   harness-rsi runtime build --experiment <experiment.json>
   harness-rsi experiment baseline --config <experiment.json> [--run-id <id>]
   harness-rsi experiment baseline-pack-export --run <run> --output <pack.json> --id <id> [--branch <branch-id>]
-  harness-rsi experiment run --config <experiment.json> [--run-id <id>]
+  harness-rsi experiment run --config <experiment.json> [--run-id <id>] [--round-limit <waves>]
   harness-rsi experiment resume --run <population-run>
   harness-rsi experiment fork --run <population-run> [--checkpoint <checkpoint.json>] [--config <experiment.json>] [--run-id <id>]
   harness-rsi experiment finalize --run <single-run | population-run> [--recover-infrastructure] [--final-only] [--infrastructure-retries 0..10]
   harness-rsi experiment finalize-suite --config <shared-final.json> [--resume] [--validate-only]
   harness-rsi algorithm run --plugin <plugin-dir> --algorithm <id> --run-root <relative-dir> [--steps <n>] [--resume] [--resume-checkpoint <name>] [--baseline-only]
+  harness-rsi evaluate run --config <evaluation.json> [--resume] [--dry-run]
   harness-rsi benchmark validate --config <benchmark.json> [--output <report.json>]
   harness-rsi evaluate compare \\
     --benchmark <benchmark.json> \\
@@ -199,11 +202,12 @@ async function buildRuntimeCommand(args) {
 }
 
 async function evolveRunCommand(args) {
-  const { options } = parseOptions(args, { valueOptions: new Set(['config', 'run-id', 'output']) })
+  const { options } = parseOptions(args, { valueOptions: new Set(['config', 'run-id', 'output', 'round-limit']) })
   const result = await runConfiguredEvolution({
     repositoryRoot: REPOSITORY_ROOT,
     experimentPath: requiredPath(options, 'config'),
     ...(options.get('run-id') ? { runId: options.get('run-id') } : {}),
+    roundLimit: boundedIntegerOption(options, 'round-limit', 0, { min: 0, max: 10000 }),
     onEvent: progress,
   })
   await emit({
@@ -501,6 +505,23 @@ async function main() {
   if (!group || group === '--help' || group === '-h') {
     process.stdout.write(HELP)
     return
+  }
+  if (group === 'evaluate' && action === 'run') {
+    const { options, flags } = parseOptions(args, { valueOptions: new Set(['config']), booleanFlags: new Set(['resume', 'dry-run']) })
+    await loadLocalProviderEnvironment({ repositoryRoot: REPOSITORY_ROOT, includeSecrets: !flags.has('dry-run') })
+    const report = await runEvaluationJob({ repositoryRoot: REPOSITORY_ROOT,
+      configPath: requiredPath(options, 'config'), resume: flags.has('resume'), dryRun: flags.has('dry-run'), onEvent: progress })
+    await emit(report)
+    if (report.complete === false) process.exitCode = 2
+    return
+  }
+  if (group === 'experiment' || group === 'runtime') {
+    await loadLocalProviderEnvironment({
+      repositoryRoot: REPOSITORY_ROOT,
+      includeSecrets: group === 'experiment'
+        && ['run', 'resume', 'fork', 'baseline', 'finalize', 'finalize-suite', 'preflight'].includes(action)
+        && !args.includes('--skip-secrets') && !args.includes('--validate-only'),
+    })
   }
   if (group === 'adapter' && action === 'validate') return await validateAdapterCommand(args)
   if (group === 'experiment' && action === 'validate') return await validateExperimentCommand(args)

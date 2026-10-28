@@ -1,5 +1,6 @@
 import { OmegaUseOfficeValEnvironment } from './environments/omegause-officeval.mjs'
 import { TextReasoningEnvironment } from './environments/text-reasoning.mjs'
+import { HleTextMathEnvironment } from './environments/hle-text-math.mjs'
 import { HarborEnvironment } from './environments/harbor.mjs'
 import { KernelBenchEnvironment } from './environments/kernelbench.mjs'
 import { diffModelUsage } from './cowork-model-gateway.mjs'
@@ -270,6 +271,7 @@ function createDshUpdaterDriver({
 
 registerEnvironmentDriver('omegause-officeval-docker-v1', (options) => new OmegaUseOfficeValEnvironment(options))
 registerEnvironmentDriver('text-reasoning-deterministic-v1', (options) => new TextReasoningEnvironment(options))
+registerEnvironmentDriver('hle-text-math-docker-v1', (options) => new HleTextMathEnvironment(options))
 registerEnvironmentDriver('harbor-task-v1', (options) => new HarborEnvironment(options))
 registerEnvironmentDriver('kernelbench-gpu-v1', (options) => new KernelBenchEnvironment(options))
 registerSolverDriver('dsh-headless-docker-v1', createDshSolverDriver)

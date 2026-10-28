@@ -26,6 +26,41 @@ test('Provider 反射密钥到 Request ID 时不保存该 ID，也不保存 reas
   assert.doesNotMatch(JSON.stringify(record), new RegExp(secret, 'u'))
 })
 
+test('合法 DONE 后关闭连接仍是完整回答；finish_reason 后但 DONE 前断流不能判为完成', () => {
+  for (const done of [false, true]) {
+    const record = { ...valid, responseComplete: false, done: false, transportError: false,
+      contentBytes: 0, responseBytes: 0 }
+    const observer = responseObserver(record)
+    observer.chunk(Buffer.from('data: {"choices":[{"delta":{"content":"answer"},"finish_reason":"stop"}]}\n\n'))
+    assert.equal(record.responseComplete, false)
+    if (done) {
+      observer.chunk(Buffer.from('data: [DO'))
+      observer.chunk(Buffer.from('NE]\r\n\r\n'))
+    }
+    observer.error()
+    assert.equal(record.responseComplete, done)
+    assert.equal(record.transportError, !done)
+    assert.equal(classifySolverFailure({ process: processEvidence,
+      diagnostics: { complete: true, requests: [record] } }).category, done ? 'candidate' : 'provider')
+  }
+})
+
+test('DONE 不掩盖此前的流错误、畸形事件或传输错误', () => {
+  for (const failure of ['transport', 'stream', 'malformed']) {
+    const record = { ...valid, responseComplete: false, done: false, transportError: false,
+      contentBytes: 0, responseBytes: 0 }
+    const observer = responseObserver(record)
+    observer.chunk(Buffer.from('data: {"choices":[{"delta":{"content":"answer"},"finish_reason":"stop"}]}\n\n'))
+    if (failure === 'transport') observer.error()
+    else observer.chunk(Buffer.from(failure === 'stream'
+      ? 'data: {"error":{"code":"upstream_failure"}}\n\n' : 'data: {broken}\n\n'))
+    observer.chunk(Buffer.from('data: [DONE]\n\n'))
+    observer.end()
+    assert.notEqual(classifySolverFailure({ process: processEvidence,
+      diagnostics: { complete: true, requests: [record] } }).category, 'candidate')
+  }
+})
+
 test('Solver 归因只依赖可信观测：有效输出后解析失败可进化；reasoning-only 与无契约 tools 未定责', () => {
   const classify = (request, overrides = {}) => classifySolverFailure({
     process: processEvidence, diagnostics: { complete: true, requests: [request] }, ...overrides,

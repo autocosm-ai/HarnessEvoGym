@@ -116,8 +116,8 @@ Updater 保留完整的分析、假设、自检和编码过程；Controller 不�
 
 | Target                 | Updater 选项                           | 搜索空间                            |
 | ---------------------- | -------------------------------------- | ----------------------------------- |
-| MSA Minimal Cowork     | 隔离 Codex CLI、Claude Code CLI        | L1 prompt/skills + L2 agent loop/tool runtime |
-| MSA Minimal Reasoning  | 隔离 Codex CLI、Claude Code CLI        | L1 prompt/skills + L2 agent loop/tool runtime |
+| MSA Minimal Cowork     | 隔离 Codex CLI、Claude Code CLI、DSH Docker | L1 prompt/skills + L2 agent loop/tool runtime |
+| MSA Minimal Reasoning  | 隔离 Codex CLI、Claude Code CLI、DSH Docker | L1 prompt/skills + L2 agent loop/tool runtime |
 | DeepSeek Harness path  | DeepSeek Harness                       | DeepSeek 特定模块                   |
 
 **Population 与搜索**
@@ -132,6 +132,12 @@ Updater 保留完整的分析、假设、自检和编码过程；Controller 不�
 Harbor、KernelBench、SWE-bench、PutnamBench 和 Synthetic Text Reasoning 保留为实验性或兼容路径，暂不属于稳定支持承诺。报告结果前请查阅 [当前边界](docs/architecture.zh.md#已实现路径与当前边界)。
 
 ## 快速开始
+
+**先跑完整离线示例**
+
+安装 Node.js 20+ 和 Python 3，执行 `npm ci` 后运行 `npm run demo`。无需 Key、Docker 或数据集，
+即可看到真实编排、候选修改、检查点、跨进程恢复和冠军评测。Solver / Updater 使用明确的离线替身，
+示例分数不能用于声称模型能力提升。结果保存在 `.rsi/demo-*`。
 
 **安装并校验**
 
@@ -154,6 +160,18 @@ npm run rsi -- experiment validate \
 ```
 
 **准备运行时凭据**
+
+所有 `experiments/*smoke*.json` 入门配置默认使用 `gpt-6.1-sol`，Solver 和 Updater 的思考深度均为 `medium`。历史 main16、formal32、消融及 HLE Campaign 保留其固定模型，不会被个人配置隐式覆盖。
+
+若要复用本机 Codex 的 `zcloud` Provider，在仓库内创建被 Git 忽略的 `.local/provider.json`：
+
+```json
+{"source":"codex","provider":"zcloud"}
+```
+
+`npm run rsi -- experiment ...` 和 `npm run server` 会从 `$CODEX_HOME/config.toml`（未设置时为 `~/.codex/config.toml`）读取该 Provider 的 URL，并在执行时通过 `env_key`、直接令牌或 `auth.command` 获取 Key。不会修改个人 Codex 配置，也不会保存 Key 副本。配置校验不执行凭据命令。显式提供的一整对 `RSI_PROVIDER_BASE_URL` / `RSI_PROVIDER_API_KEY` 优先；不要只覆盖其中一个。此入口适用于标准 Experiment；旧 HLE Campaign 仍按其 Runtime 和 `--provider-key-fd` 契约运行。
+
+未创建本地配置时，继续按下面的方式显式注入凭据。
 
 真实运行只在运行时注入凭据。任何密钥不能写入 Experiment、Adapter、Candidate、Trace 或 Git。
 
@@ -209,6 +227,16 @@ Population Mode 与 Module Search 正交。例如，`combined + linear-hill-clim
 **Server API / Core Engine**：`server/` 负责创建 Run、查询状态、Resume/Cancel、事件流和版本摘要；`controller/src/` 继续作为 Core Engine，负责受信实验执行。Population Run 可以通过 `POST /v1/runs/:runId/fork` 从已提交 Checkpoint 创建新 Run。详见 [`server/README.zh.md`](server/README.zh.md)。
 
 **独立评测器**：独立的 [OfficeVal 评测器](eval/README.md) 接受 candidate/task/model 配置，可以 resume 已完成的任务分数。它是兼容性运行器，独立于 Controller 的 sealed-final 审计链。
+
+**统一冠军评测**：新评测使用 `npm run rsi -- evaluate run --config evaluation-job.json`，可直接选择训练冠军、预算检查点或独立候选目录。探索评测允许覆盖模型并创建新报告，正式评测继续走原封存授权。OfficeVal 原始分数与归一化分数分别记录。配置和恢复说明见 [统一评测指南](docs/evaluation-jobs.zh.md)。
+
+**HLE Docker 路径**：`scripts/import-hle-parquet.py` 可导入带来源信息的 HLE 数据，`scripts/prepare-hle-docker.mjs` 生成独立分区和 Experiment。新适配器复用 MSA Docker Solver、原有可信 HLE Judge、逐题检查点和公共冠军评测；旧 Campaign 路径仍保留。
+
+**真实小规模验收**：准备好数据集、Provider 和 Docker Runtime 后，运行
+`npm run test:acceptance -- --config experiments/cowork-msa-acceptance.json --run-id office-acceptance-001`。
+该配置使用完整的 12 步 Office Solver 和两次变异预算。脚本在 B1 退出，在新进程中恢复到 B2，
+评测冠军，再确认已完成的评测结果可以复用。此命令会调用真实模型并产生 API 费用。
+HLE 配置准备和证据边界见 [统一评测指南](docs/evaluation-jobs.zh.md#真实小规模验收)。
 
 ## 信任与可复现性
 
