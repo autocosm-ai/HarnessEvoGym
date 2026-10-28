@@ -99,7 +99,13 @@ export function responseObserver(record, { secretValues = [] } = {}) {
   function inspect(line) {
     if (!line.startsWith('data:')) return
     const raw = line.slice(5).trim()
-    if (raw === '[DONE]') { record.done = true; return }
+    if (raw === '[DONE]') {
+      // SSE 已逻辑结束；客户端此时关闭连接不代表回答被截断。
+      // 保留此前已经记录的流错误，不能让末尾 DONE 洗掉异常。
+      record.done = true
+      record.responseComplete = true
+      return
+    }
     if (!raw) return
     let value
     try { value = JSON.parse(raw) } catch { record.malformedEvents += 1; return }
@@ -170,6 +176,6 @@ export function responseObserver(record, { secretValues = [] } = {}) {
       buffer = ''
       record.responseComplete = true
     },
-    error() { record.transportError = true },
+    error() { if (!record.done) record.transportError = true },
   }
 }

@@ -670,7 +670,8 @@ const server = http.createServer((request, response) => {
       upstream.on('error', (error) => {
         if (scheduleRetry()) return
         if (diagnostic) {
-          diagnostic.transportError = true
+          // 与响应观察器一致：合法 DONE 后的连接清理不算上游断流。
+          if (!diagnostic.done) diagnostic.transportError = true
           diagnostic.httpStatus ??= 502
         }
         recordUnknownUsage()

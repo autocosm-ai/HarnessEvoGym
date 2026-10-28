@@ -116,8 +116,8 @@ Updater 保留完整的分析、假设、自检和编码过程；Controller 不�
 
 | Target                 | Updater 选项                           | 搜索空间                            |
 | ---------------------- | -------------------------------------- | ----------------------------------- |
-| MSA Minimal Cowork     | 隔离 Codex CLI、Claude Code CLI        | L1 prompt/skills + L2 agent loop/tool runtime |
-| MSA Minimal Reasoning  | 隔离 Codex CLI、Claude Code CLI        | L1 prompt/skills + L2 agent loop/tool runtime |
+| MSA Minimal Cowork     | 隔离 Codex CLI、Claude Code CLI、DSH Docker | L1 prompt/skills + L2 agent loop/tool runtime |
+| MSA Minimal Reasoning  | 隔离 Codex CLI、Claude Code CLI、DSH Docker | L1 prompt/skills + L2 agent loop/tool runtime |
 | DeepSeek Harness path  | DeepSeek Harness                       | DeepSeek 特定模块                   |
 
 **Population 与搜索**
@@ -231,6 +231,12 @@ Population Mode 与 Module Search 正交。例如，`combined + linear-hill-clim
 **统一冠军评测**：新评测使用 `npm run rsi -- evaluate run --config evaluation-job.json`，可直接选择训练冠军、预算检查点或独立候选目录。探索评测允许覆盖模型并创建新报告，正式评测继续走原封存授权。OfficeVal 原始分数与归一化分数分别记录。配置和恢复说明见 [统一评测指南](docs/evaluation-jobs.zh.md)。
 
 **HLE Docker 路径**：`scripts/import-hle-parquet.py` 可导入带来源信息的 HLE 数据，`scripts/prepare-hle-docker.mjs` 生成独立分区和 Experiment。新适配器复用 MSA Docker Solver、原有可信 HLE Judge、逐题检查点和公共冠军评测；旧 Campaign 路径仍保留。
+
+**真实小规模验收**：准备好数据集、Provider 和 Docker Runtime 后，运行
+`npm run test:acceptance -- --config experiments/cowork-msa-acceptance.json --run-id office-acceptance-001`。
+该配置使用完整的 12 步 Office Solver 和两次变异预算。脚本在 B1 退出，在新进程中恢复到 B2，
+评测冠军，再确认已完成的评测结果可以复用。此命令会调用真实模型并产生 API 费用。
+HLE 配置准备和证据边界见 [统一评测指南](docs/evaluation-jobs.zh.md#真实小规模验收)。
 
 ## 信任与可复现性
 

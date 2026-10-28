@@ -108,8 +108,8 @@ Target × Environment × EvolutionAlgorithm × EvolutionRecipe
 
 | Target | Updater options | Search space |
 | :--- | :--- | :--- |
-| MSA Minimal Cowork | Codex CLI, Claude Code CLI | L1 prompt/skills + L2 agent loop/tool runtime |
-| MSA Minimal Reasoning | Codex CLI, Claude Code CLI | L1 prompt/skills + L2 agent loop/tool runtime |
+| MSA Minimal Cowork | Codex CLI, Claude Code CLI, DSH Docker | L1 prompt/skills + L2 agent loop/tool runtime |
+| MSA Minimal Reasoning | Codex CLI, Claude Code CLI, DSH Docker | L1 prompt/skills + L2 agent loop/tool runtime |
 | DeepSeek Harness path | DeepSeek Harness | DeepSeek-specific modules |
 
 **Population and search**
@@ -191,6 +191,13 @@ OfficeVal raw ratios and normalized rewards are reported separately. See the [ev
 `scripts/prepare-hle-docker.mjs` prepares disjoint task partitions and a standard Experiment.
 The `hle-text-math-docker-v1` adapter shares the MSA Docker Solver, existing trusted HLE Judge,
 task checkpoints, and public evaluation runner. The original HLE Campaign path remains available.
+
+**Live acceptance:** after preparing the dataset, provider, and Docker runtime, run
+`npm run test:acceptance -- --config experiments/cowork-msa-acceptance.json --run-id office-acceptance-001`.
+This preset uses the full 12-step Office Solver and a two-attempt budget. The script exits at B1,
+resumes in a new process to B2, evaluates the champion, and verifies reuse of completed evaluation results.
+It calls real models and incurs API costs. HLE preparation and evidence boundaries are covered in the
+[evaluation guide](docs/evaluation-jobs.zh.md#真实小规模验收) (Chinese).
 
 ## Population modes
 

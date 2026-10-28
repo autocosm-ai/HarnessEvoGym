@@ -78,3 +78,55 @@ Solver 与 Updater 是仓库内的受信离线替身，不代表真实模型能�
 真实实验可使用 `experiment run --round-limit 1` 在一个 Population wave 后退出，再用
 `experiment resume` 恢复。这个上限控制本次进程推进多少波，不改变原实验总预算。
 只有实验中确实发生代码修改并执行模型/Verifier，才算真实进化验收。
+
+## 真实小规模验收
+
+这些命令使用真实模型，产生 API 费用；普通 `npm test` 和 CI 不会自动执行。
+先按 README 配好 Provider，并安装 Docker。OfficeVal 还需按
+[运行手册](cowork-mvp.zh.md) 准备原始数据、评测器及对应的路径环境变量。
+
+```bash
+npm run rsi -- experiment validate --config experiments/cowork-msa-acceptance.json
+npm run test:acceptance -- --config experiments/cowork-msa-acceptance.json --run-id office-acceptance-001 --dry-run
+npm run rsi -- runtime build --experiment experiments/cowork-msa-acceptance.json
+npm run test:acceptance -- --config experiments/cowork-msa-acceptance.json --run-id office-acceptance-001
+```
+
+`--dry-run` 仅校验验收配置，不构建镜像、不调用模型、不创建 Run 或证据目录。
+该配置使用 MSA Docker Solver、DSH Docker Updater、`gpt-6.1-sol / medium` 和独立 Verifier。
+`msa-minimal-cowork-rsi.yml` 允许 12 步交互；不要换成仅允许一步的 `msa-minimal.yml`，
+后者只能验证连通性，模型可能刚检查完文件就结束。三个分区各一题，单 Branch，预算 B2，
+L1 变异。验收沿用宽松的 smoke 晋升门槛，同分候选也可能晋升；这不是证明能力提升的实验。
+
+HLE 需要先下载有权使用的 Parquet 数据，并在项目自己的 Python 环境安装 `pyarrow`。
+以下输入路径是示例，`--source` 和 `--revision` 必须填写实际数据来源及版本：
+
+```bash
+python scripts/import-hle-parquet.py \
+  --input .local/datasets/hle/test.parquet \
+  --output .rsi/hle-acceptance/eligible.jsonl \
+  --source YOUR_DATASET --revision YOUR_REVISION
+node scripts/prepare-hle-docker.mjs \
+  --input .rsi/hle-acceptance/eligible.jsonl \
+  --source YOUR_DATASET --revision YOUR_REVISION \
+  --output .rsi/hle-acceptance/run --per-partition 1
+npm run rsi -- runtime build --experiment .rsi/hle-acceptance/run/experiment.json
+npm run test:acceptance -- --config .rsi/hle-acceptance/run/experiment.json --run-id hle-acceptance-001
+```
+
+脚本按 source ID 哈希排序选题，生成互不重叠的 feedback、selection 和 final 分区，
+不会按模型得分挑题。来源记录和含答案数据留在被忽略的 `.rsi/` 中，不要提交。
+
+`test:acceptance` 会启动独立 CLI 进程，在 B1 保存后退出，恢复到 B2，再通过公共
+`evaluate run` 评测训练冠军，最后用 `--resume` 检查结果复用。
+证据位于 `.rsi/acceptance-results/<run-id>/`：`start.log`、`resume.log`、
+`evaluation/summary.json`、`evaluate-resume.log` 和 `acceptance.json`。
+只有整条链完成后才写 `acceptance.json`；只看到目录或 B2 状态不等于验收通过。
+每次新实验使用新的 Run ID。失败时保留已有目录，先诊断并恢复原运行，不要删除记录来伪装重试成功。
+
+这里的 final 指独立测试分区，评测模式仍是 `exploratory`，不替代正式 `sealed-final` 审计。
+两次变异、每个分区一题只证明工程链路可运行；要报告提升，还需更多题目、重复实验和正式协议。
+
+2026-10-29 的两组真实验收均完成 B1 退出、B2 恢复、冠军评测及结果复用。HLE 使用明确标注来源的
+公开镜像，OfficeVal 中途有一次重复输出后的人工续跑；完整记录及分数见
+[开发日志](../README.dev.zh.md#2026-10-29真实-b2-验收完成与诊断修复)。

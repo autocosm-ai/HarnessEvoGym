@@ -7,14 +7,31 @@ import { loadExperimentBundle } from '../controller/src/adapters.mjs'
 
 // 显式调用才会消耗模型费用；普通 npm test 不运行本脚本。
 const args = process.argv.slice(2)
+const dryRun = args.at(-1) === '--dry-run'
+if (dryRun) args.pop()
 if (args.length !== 4 || args[0] !== '--config' || args[2] !== '--run-id' || !/^[a-z0-9][a-z0-9.-]{2,80}$/u.test(args[3])) {
-  throw new Error('用法：npm run test:acceptance -- --config <experiment.json> --run-id <新的唯一ID>')
+  throw new Error('用法：npm run test:acceptance -- --config <experiment.json> --run-id <新的唯一ID> [--dry-run]')
 }
 const config = resolve(REPOSITORY_ROOT, args[1]), runId = args[3]
 const bundle = await loadExperimentBundle(config, REPOSITORY_ROOT)
 if (bundle.recipe.spec.population.concurrency.n_branches !== 1 || bundle.recipe.spec.population.budget.total_budget !== 2
     || !bundle.recipe.spec.checkpointing?.budgetMilestones.includes(1)) {
   throw new Error('真实验收配置必须为单 Branch、预算 2、包含 B1 检查点')
+}
+const solverMaximumSteps = bundle.target.solver.runtime?.maximumSteps ?? null
+if (bundle.environment.protocol === 'omegause-officeval-docker-v1'
+    && bundle.target.solver.protocol === 'msa-minimal-docker-v1' && solverMaximumSteps === 1) {
+  throw new Error('完整 OfficeVal 验收不能使用 maximumSteps=1 的连通性配置；请使用 adapters/targets/msa-minimal-cowork-rsi.yml')
+}
+const partitions = Object.fromEntries(['feedback', 'selection', 'final']
+  .map((partition) => [partition, bundle.benchmark.partitions[partition].instanceIds.length]))
+if (Object.values(partitions).some((count) => count === 0)) {
+  throw new Error('真实验收需要非空的 feedback、selection 和 final 分区')
+}
+if (dryRun) {
+  console.log(JSON.stringify({ kind: 'LiveAcceptancePlan', dryRun: true, runId,
+    experiment: relative(REPOSITORY_ROOT, config), budget: 2, solverMaximumSteps, partitions }))
+  process.exit(0)
 }
 const root = join(REPOSITORY_ROOT, '.rsi/acceptance-results', runId)
 await mkdir(join(root, '..'), { recursive: true })
@@ -28,7 +45,7 @@ async function cli(stage, command) {
   let stdout = '', stderr = ''
   child.stdout.on('data', (chunk) => { stdout += chunk })
   child.stderr.on('data', (chunk) => { stderr += chunk; process.stderr.write(chunk) })
-  const code = await new Promise((done, reject) => { child.once('error', reject); child.once('exit', done) })
+  const code = await new Promise((done, reject) => { child.once('error', reject); child.once('close', done) })
   await writeFile(join(root, `${stage}.log`), stderr + '\n' + stdout, { mode: 0o600, flag: 'wx' })
   if (code !== 0) throw new Error(`${stage} 失败；已保留日志和运行检查点，退出码 ${code}`)
   return JSON.parse(stdout)
