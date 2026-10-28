@@ -125,6 +125,13 @@ Harbor, KernelBench, SWE-bench, PutnamBench, and Synthetic Text Reasoning remain
 
 ## Quick start
 
+**Run the complete offline example first**
+
+With Node.js 20+ and Python 3 installed, run `npm ci` and `npm run demo`. No API key, Docker, or private
+dataset is needed. Three successive processes exercise the real population controller, candidate changes,
+checkpoints, resume, and champion evaluation. The Solver and Updater are explicit trusted offline stand-ins;
+their scores are not evidence of model improvement. Results are saved under `.rsi/demo-*`.
+
 **Requirements:** Linux, Docker, Node.js 20+, npm, Git.
 
 ```bash
@@ -145,10 +152,22 @@ npm run rsi -- experiment validate \
 
 **Run with runtime credentials**
 
+All introductory `experiments/*smoke*.json` presets use `gpt-6.1-sol` with `medium` reasoning for both Solver and Updater. Historical main16, formal32, ablation, and HLE Campaign configurations retain their pinned models; personal settings do not silently override them.
+
+To reuse the local Codex `zcloud` provider, create the Git-ignored `.local/provider.json` in this repository:
+
+```json
+{"source":"codex","provider":"zcloud"}
+```
+
+`npm run rsi -- experiment ...` and `npm run server` read its URL from `$CODEX_HOME/config.toml` (or `~/.codex/config.toml`) and obtain credentials through `env_key`, a direct bearer token, or `auth.command` at execution time. They do not modify personal Codex settings or save a copy of the key. Configuration validation never executes the credential command. An explicitly supplied pair of `RSI_PROVIDER_BASE_URL` / `RSI_PROVIDER_API_KEY` takes precedence; partial overrides are rejected. This integration covers standard Experiments; legacy HLE Campaigns still use their Runtime and `--provider-key-fd` contract.
+
+Without this local configuration, continue injecting credentials explicitly as below.
+
 Real runs inject credentials only at runtime. Never write a real key into an Experiment, Adapter, Candidate, trace, or Git.
 
 ```bash
-export RSI_PROVIDER_BASE_URL=https://api.zcloudapi.com/v1   # or any OpenAI-compatible endpoint
+export RSI_PROVIDER_BASE_URL=https://provider.example/v1
 read -rsp 'Provider API Key: ' RSI_PROVIDER_API_KEY
 export RSI_PROVIDER_API_KEY
 
@@ -162,6 +181,16 @@ unset RSI_PROVIDER_API_KEY
 ```
 
 For OfficeVal dataset setup, task images, Resume, and sealed Final, see the [Cowork runbook](docs/cowork-mvp.md). For HLE setup, see the [HLE Text-only Math runbook](benchmarks/hle-text-math/README.zh.md).
+
+**Unified champion evaluation:** `npm run rsi -- evaluate run --config evaluation-job.json` accepts a training
+champion, registered budget checkpoint, or standalone candidate workspace. Exploratory evaluations may use a
+new model with a new output directory; sealed-final evaluations retain the existing authorization checks.
+OfficeVal raw ratios and normalized rewards are reported separately. See the [evaluation guide](docs/evaluation-jobs.zh.md) (Chinese).
+
+**HLE Docker integration:** `scripts/import-hle-parquet.py` records dataset provenance, and
+`scripts/prepare-hle-docker.mjs` prepares disjoint task partitions and a standard Experiment.
+The `hle-text-math-docker-v1` adapter shares the MSA Docker Solver, existing trusted HLE Judge,
+task checkpoints, and public evaluation runner. The original HLE Campaign path remains available.
 
 ## Population modes
 

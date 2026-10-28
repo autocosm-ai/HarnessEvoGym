@@ -1237,6 +1237,18 @@ export function validateEnvironmentAdapter(input) {
   const id = metadataId(input, 'EnvironmentAdapter')
   const spec = expectObject(input.spec, 'EnvironmentAdapter.spec')
   const protocol = expectText(spec.protocol, 'EnvironmentAdapter.spec.protocol')
+  if (protocol === 'hle-text-math-docker-v1') {
+    const { judge, ...base } = spec
+    const config = expectObject(judge, 'EnvironmentAdapter.spec.judge')
+    rejectUnknownConfiguration(config, new Set(['model', 'reasoningEffort', 'maxTokens', 'timeoutSeconds']), 'HLE Judge')
+    const model = validateModel({ provider: 'judge', ...config }, 'HLE Judge')
+    if (model.maxTokens < 64 || model.maxTokens > 4096) throw new ProtocolError('HLE Judge maxTokens 必须为 64..4096')
+    if (model.reasoningEffort === 'minimal') throw new ProtocolError('HLE Judge 不支持 minimal 思考深度')
+    return { ...validateTextReasoningEnvironment({ id, spec: base, protocol }), judge: {
+      model: model.model, reasoningEffort: model.reasoningEffort ?? 'medium', maxTokens: model.maxTokens,
+      timeoutSeconds: expectNumber(config.timeoutSeconds, 'HLE Judge.timeoutSeconds', { integer: true, min: 30, max: 600 }),
+    } }
+  }
   if (protocol === 'harbor-task-v1') {
     return validateHarborEnvironment({ id, spec, protocol })
   }

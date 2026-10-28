@@ -4,10 +4,12 @@ import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 
 import { REPOSITORY_ROOT } from '../../controller/src/config.mjs'
+import { loadLocalProviderEnvironment } from '../../controller/src/local-provider.mjs'
 import { CoreEngine } from './core-engine.mjs'
 import { createServer } from './http-api.mjs'
 
 const repositoryRoot = resolve(process.env.HARNESS_REPOSITORY_ROOT ?? REPOSITORY_ROOT)
+await loadLocalProviderEnvironment({ repositoryRoot })
 const engine = new CoreEngine({ repositoryRoot })
 let version = '0.1.0'
 try { version = JSON.parse(await readFile(resolve(repositoryRoot, 'package.json'), 'utf8')).version } catch {}

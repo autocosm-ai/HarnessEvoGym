@@ -13,6 +13,24 @@
 | 工作树状态 | 运行 git status --short 查询；本地清理改动不会写死在此处 |
 | 项目定位 | Agent Harness 的 RSI 训练场研究预览版 |
 
+## 2026-10-29：完整示例、统一评测与环境验收
+
+- 新增 `npm run demo`：真实 Population/Candidate/Diff/Checkpoint/评测流程，使用显式离线 Solver/Updater 替身；三个进程分别启动一轮、恢复、评测未见输入。
+- 新增 `evaluate run`：直接读取训练冠军、预算检查点或候选目录；探索评测单独落盘，正式模式委托原封存流程。结果缺题、未完成或损坏时不生成有效均分。
+- 修复评测身份比较把内容相同但重新读取的数组误判为变化的问题。
+- OfficeVal 同时保留归一化评分与有版本标识的原始比值，不静默修改历史独立脚本分数。
+- 为文本推理补齐逐题提交与恢复；新增 HLE Docker Adapter，复用现有 MSA 执行器、可信 HLE Judge、检查点及公共评测。
+- 新增带来源说明的 HLE Parquet 导入和验收配置准备脚本。公开镜像 `macabdul9/hle_text_only` 的固定版本含 2370 条记录，本地导出 1061 条纯文本数学题；未证明它与旧官方固定 revision 完全一致，因此只用于单独标记的工程验收。
+- CI 增加完整离线示例；真实 Provider/Docker 验收结果在实际运行完成后另行记录，不用离线替身冒充。
+
+## 2026-10-29：更新入门模型与本机 Provider 接入
+
+- 14 个 smoke 入门配置的 Solver / Updater 使用 `gpt-6.1-sol` 与 `medium`；历史固定实验、HLE Campaign、冻结候选及运行结果不做隐式改写。
+- 标准 Experiment CLI 与 Server 启动入口支持被 Git 忽略的 `.local/provider.json`，从本机 Codex 指定 Provider 读取 URL，并在运行时获得凭据。个人 Codex 配置只读，Key 不保存到项目文件。
+- 显式环境变量必须成对设置；配置校验只解析 URL、不执行凭据命令。凭据命令失败时不把 stdout/stderr 写进错误信息。
+- 已实测 `gpt-6.1-sol / medium` 的 Chat Completions 与 Responses 请求均返回 HTTP 200；Responses 收到完整完成事件。此记录是接口连通验证，不代表已经重跑完整进化实验。
+- 语法、路径检查、KernelBench 配置校验和本地 Server 启动通过。全量测试首次为 686 通过、3 跳过、1 个旧模型名断言失败；更新该断言后，相关模块及新增凭据测试共 15 项复测全部通过。3 个真实环境端到端测试本轮未执行。
+
 ## 2026-10-10：开源审查与死代码清理
 
 本轮针对外部可复现性和仓库可信度做了一轮清理，重点修掉一个会让干净检出直接失败的缺陷。

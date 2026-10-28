@@ -14,8 +14,8 @@
     "benchmark": "benchmarks/kernelbench-smoke-v1/benchmark.json",
     "policy": "evaluation/policies/cowork-rsi-smoke.json",
     "models": {
-      "solver": { "provider": "zcloud-openai", "model": "gpt-5.6-terra", "maxTokens": 4096 },
-      "updater": { "provider": "zcloud-openai", "model": "gpt-5.6-terra", "maxTokens": 4096 }
+      "solver": { "provider": "zcloud-openai", "model": "gpt-6.1-sol", "maxTokens": 4096, "reasoningEffort": "medium" },
+      "updater": { "provider": "zcloud-openai", "model": "gpt-6.1-sol", "maxTokens": 4096, "reasoningEffort": "medium" }
     },
     "evolution": { "mutationLevel": "l1", "generations": 1, "trialsPerInstance": 1, "seeds": [20261001] }
   }

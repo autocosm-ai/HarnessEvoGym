@@ -2764,6 +2764,7 @@ export async function runPopulationEvolution({
   onEvent = () => {},
   baselineOnly = false,
   forkProvenance = null,
+  roundLimit = 0,
 }) {
   safeRunId(runId)
   const controllerRevision = await trustedControllerRevision(repositoryRoot)
@@ -2841,7 +2842,7 @@ export async function runPopulationEvolution({
     const baselineResult = baselineOnly && initialized.status !== 'PAUSED_INFRASTRUCTURE'
       ? await orchestrator.freezeBaseline()
       : null
-    const state = baselineResult === null ? await orchestrator.run() : baselineResult.state
+    const state = baselineResult === null ? await orchestrator.run({ roundLimit }) : baselineResult.state
     if (state.status === 'PAUSED_INFRASTRUCTURE') {
       throw new ProtocolError('Population 因基础设施故障暂停，拒绝把本次运行报告为成功', [
         `runRoot=${orchestrator.store.root}`,
@@ -3034,6 +3035,9 @@ export async function resumePopulationEvolution({
 /** 旧 Experiment 保持原单 Champion 目录格式；显式 Recipe 进入通用 Population。 */
 export async function runConfiguredEvolution(options) {
   const experiment = await loadExperimentBundle(resolve(options.experimentPath), options.repositoryRoot)
+  if (experiment.experiment.recipePath === null && options.roundLimit) {
+    throw new ProtocolError('round-limit 需要显式 Population Recipe')
+  }
   return experiment.experiment.recipePath === null
     ? await runEvolution(options)
     : await runPopulationEvolution(options)
