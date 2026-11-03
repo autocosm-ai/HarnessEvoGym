@@ -197,7 +197,10 @@ export function createGenericEvolutionAlgorithmDriver({ algorithm, options = {} 
 function normalizeStepResult(result, previous) {
   if (result === undefined || result === null) return { state: previous, done: false, checkpoint: null, event: null }
   const value = object(result, 'Algorithm step result')
-  const state = value.state === undefined ? previous : safeJson(value.state, 'Algorithm step state')
+  let state = value.state === undefined ? previous : safeJson(value.state, 'Algorithm step state')
+  if (value.done === true && !['completed', 'failed', 'paused'].includes(state.status)) {
+    state = { ...state, status: 'completed' }
+  }
   return {
     state,
     done: value.done === true || ['completed', 'failed', 'paused'].includes(state.status),

@@ -129,3 +129,16 @@ test('同一 Algorithm Run 只能由一个进程持有，失败后会释放锁',
   const result = await runGenericEvolution({ driver: first, maxSteps: 1 })
   assert.equal(result.steps, 1)
 })
+
+test('插件返回 done 就持久化完成状态，恢复后不能多做一个搜索步骤', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'harness-generic-done-'))
+  let calls = 0
+  const makeDriver = () => ({ ...driver(join(root, 'run')),
+    async step({ state }) { calls += 1; return { state: { ...state, tree: [1, 2] }, done: true } } })
+  const result = await runGenericEvolution({ driver: makeDriver(), maxSteps: 10 })
+  assert.equal(result.complete, true)
+  assert.equal(result.state.status, 'completed')
+  const resumed = await runGenericEvolution({ driver: makeDriver(), resume: true, maxSteps: 10 })
+  assert.equal(resumed.complete, true)
+  assert.equal(calls, 1)
+})
