@@ -1,9 +1,10 @@
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { appendFile, lstat, mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 
 import { normalizeEvolutionAlgorithm } from './evolution-algorithm-reference.mjs'
 import { ProtocolError } from './protocol.mjs'
+import { acquireCampaignLock } from './campaign-lock.mjs'
 
 const ALGORITHM_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u
 const CHECKPOINT_VERSION = /^v[0-9]+$/u
@@ -81,6 +82,12 @@ export class FileAlgorithmRunStore {
     await writeFile(this.eventsPath, '', { encoding: 'utf8', flag: 'wx', mode: 0o600 })
   }
 
+  async acquireLease() {
+    return acquireCampaignLock({ campaignsRoot: dirname(this.root),
+      campaignId: `algorithm-${createHash('sha256').update(this.root).digest('hex').slice(0, 24)}`,
+      command: 'algorithm run' })
+  }
+
   async readState() {
     return safeJson(JSON.parse(await readFile(this.statePath, 'utf8')), 'RunStore state')
   }
@@ -107,7 +114,7 @@ export class FileAlgorithmRunStore {
       if (this.eventSequence >= MAX_EVENTS) {
         throw new ProtocolError(`Algorithm 事件数量超过上限 ${MAX_EVENTS}`)
       }
-      const record = { sequence: this.eventSequence + 1, ...value }
+      const record = { ...value, sequence: this.eventSequence + 1 }
       const serialized = JSON.stringify(record)
       if (Buffer.byteLength(serialized, 'utf8') > MAX_EVENT_BYTES) {
         throw new ProtocolError(`Algorithm 事件超过 ${MAX_EVENT_BYTES} 字节上限`)
@@ -216,7 +223,14 @@ async function writeCheckpointWithCollisionRetry(store, baseName, checkpoint) {
 }
 
 /** 通用算法宿主只理解生命周期和 Checkpoint，不理解算法的私有状态结构。 */
-export async function runGenericEvolution({
+export async function runGenericEvolution(options = {}) {
+  const driver = validateGenericEvolutionAlgorithm(options.driver)
+  const release = await driver.store.acquireLease?.()
+  try { return await runLockedEvolution({ ...options, driver }) }
+  finally { await release?.() }
+}
+
+async function runLockedEvolution({
   driver,
   initialState = { status: 'active', step: 0 },
   context = {},
@@ -231,6 +245,10 @@ export async function runGenericEvolution({
   if (!Number.isSafeInteger(maxSteps) || maxSteps < 0 || maxSteps > 100_000) {
     throw new ProtocolError('通用 Algorithm maxSteps 必须是 0..100000 的整数')
   }
+  if (typeof checkpointPrefix !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,80}$/u.test(checkpointPrefix)) {
+    throw new ProtocolError('Checkpoint prefix 必须是安全文件名')
+  }
+  if (resumeCheckpoint !== null && !resume) throw new ProtocolError('选择 Checkpoint 必须同时指定 Resume')
   let state = resume
     ? await algorithm.store.readState()
     : safeJson(initialState, 'Algorithm initialState')

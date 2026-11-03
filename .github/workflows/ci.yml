@@ -51,7 +51,10 @@ jobs:
         run: npm run test:eval
 
       - name: Exercise offline evolution, cross-process resume, and champion evaluation
-        run: npm run demo
+        run: |
+          npm run demo
+          npm run demo:plugins
+          python3 -c "compile(open('docker/kernelbench-runtime/evaluate.py').read(), 'kernelbench-evaluate', 'exec')"
 
       - name: Generate test coverage report
         run: |

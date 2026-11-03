@@ -12,8 +12,15 @@ export class KernelBenchEnvironment extends HarborEnvironment {
   constructor(options) {
     super({ ...options, allowGpu: true })
     this.allowGpu = true
-    this.verifierMetricNames = Object.freeze(['reference_ms', 'candidate_ms', 'speedup', 'correctness_trials'])
+    this.nativeCodeCache = true
+    this.verifierMetricNames = Object.freeze(['reference_ms', 'candidate_ms', 'speedup', 'correctness_trials', 'timing_rounds'])
+    this.resultSemantics = 'kernelbench-correctness-v1'
     this.checkedGpuImages = new Set()
+  }
+
+  trialsResolved(trials) {
+    // speedup/(1+speedup) 永远小于 1；正确性通过与是否加速分别表达。
+    return trials.length > 0 && trials.every((trial) => trial.reward > 0 && !trial.solverFailure)
   }
 
   describeCapabilities() {
@@ -46,7 +53,9 @@ export class KernelBenchEnvironment extends HarborEnvironment {
   async ensureRuntime(task = null) {
     const runtime = await super.ensureRuntime(task)
     if (!task) return runtime
-    const key = `${runtime.solverImage}:${task.config.environment.gpus}`
+    const needsCompiler = task.config.metadata.tags.includes('requires-cuda-compiler')
+    const needsTriton = task.config.metadata.tags.includes('requires-triton')
+    const key = `${runtime.solverImage}:${task.config.environment.gpus}:${needsCompiler}:${needsTriton}`
     if (!this.checkedGpuImages.has(key)) {
       try {
         // 在付费模型请求之前，用真正的 Solver 镜像自检 PyTorch/CUDA。
@@ -54,8 +63,24 @@ export class KernelBenchEnvironment extends HarborEnvironment {
         await this.docker.run({
           image: runtime.solverImage,
           name: `kernelbench-gpu-check-${task.name}-${process.pid}`,
-          command: ['/opt/conda/bin/python', '-c', 'import torch; assert torch.cuda.is_available(), "CUDA unavailable"; x=torch.ones(1,device="cuda"); assert x.sum().item()==1; print("CUDA ready")'],
+          command: ['/opt/conda/bin/python', '-c', [
+            'import torch, shutil, importlib.util',
+            'assert torch.cuda.is_available(), "CUDA unavailable"',
+            'x=torch.ones(1,device="cuda"); assert x.sum().item()==1',
+            ...(needsCompiler ? ['assert shutil.which("nvcc") and shutil.which("c++") and shutil.which("ninja"), "CUDA build tools unavailable"'] : []),
+            ...(needsCompiler ? [
+              'import subprocess, ctypes',
+              'subprocess.run(["c++", "-shared", "-fPIC", "-x", "c++", "-o", "/kernel-cache/probe.so", "-"], input=b\'extern "C" int probe(){return 42;}\', check=True, capture_output=True)',
+              'assert ctypes.CDLL("/kernel-cache/probe.so").probe() == 42, "native cache cannot load shared libraries"',
+            ] : []),
+            ...(needsTriton ? [
+              'assert importlib.util.find_spec("triton"), "Triton unavailable"',
+              'assert torch.cuda.get_device_capability(0) >= (7, 0), "Triton requires compute capability >= 7.0"',
+            ] : []),
+            'print("CUDA ready", torch.cuda.get_device_name(0), torch.cuda.get_device_capability(0))',
+          ].join('; ')],
           environment: { HOME: '/tmp/home', PYTHONDONTWRITEBYTECODE: '1' },
+          nativeCodeCache: true,
           inheritEnvironment: [],
           network: 'none',
           readOnlyRoot: true,
@@ -69,6 +94,12 @@ export class KernelBenchEnvironment extends HarborEnvironment {
         // 这类宿主缺少 GPU 运行时的问题必须与镜像内 CUDA 自检失败区分开，
         // 否则排查方向会被误导到模型或镜像上。
         const stderr = error.processResult?.stderr ?? ''
+        if (/Triton requires compute capability|Triton unavailable/iu.test(stderr)) {
+          throw new ProtocolError('该 KernelBench 任务要求 Triton 及 compute capability >= 7.0 的 GPU；请换兼容设备或选择 CUDA 任务')
+        }
+        if (/CUDA build tools unavailable/iu.test(stderr)) {
+          throw new ProtocolError('该 KernelBench 任务要求 NVCC/C++/Ninja；请先构建 kernelbench-dev 镜像')
+        }
         if (/unknown flag: --gpus|could not select device driver|no such device/iu.test(stderr)) {
           throw new ProtocolError(
             '宿主 Docker 缺少 GPU 运行时（--gpus 不可用）；请安装 NVIDIA Container Toolkit 或改用 CPU Environment',

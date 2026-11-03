@@ -83,3 +83,17 @@ test('Docker run 将 GPU 资源限制转换为受控 --gpus 参数', async (t) =
   const runArgs = (await calls())[0]
   assert.deepEqual(runArgs.slice(runArgs.indexOf('--gpus'), runArgs.indexOf('--gpus') + 2), ['--gpus', '1'])
 })
+
+test('CUDA 缓存是独立限容量的可执行目录，CPU 默认隔离不变且不能覆盖缓存配置', async (t) => {
+  const { docker, calls } = await fixture(t, { ...exited, ExitCode: 0 })
+  const base = { image: 'fixture', name: 'cache-test', resources: { cpus: 1, memory: '2g', pids: 64, gpus: 1 } }
+  await docker.run(base)
+  await docker.run({ ...base, nativeCodeCache: true })
+  const [ordinary, native] = await calls()
+  assert.equal(ordinary.some((arg) => arg.includes('/kernel-cache')), false)
+  assert.ok(native.includes('/tmp:rw,nosuid,nodev,size=1g'))
+  assert.ok(native.includes('/kernel-cache:rw,exec,nosuid,nodev,size=1g,mode=1777'))
+  assert.ok(native.includes('TORCH_EXTENSIONS_DIR=/kernel-cache/torch'))
+  await assert.rejects(() => docker.run({ ...base, nativeCodeCache: true, resources: { ...base.resources, gpus: 0 } }), /只对 GPU/u)
+  await assert.rejects(() => docker.run({ ...base, nativeCodeCache: true, environment: { TORCH_EXTENSIONS_DIR: '/tmp' } }), /不能覆盖/u)
+})

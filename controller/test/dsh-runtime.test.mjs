@@ -72,6 +72,7 @@ test('DSH Solver 写入显式模型上限，并把一次性令牌作为秘密环
     task: '---\n完成任务',
     name: 'solver-test',
     timeoutMs: 1000,
+    nativeCodeCache: true,
   })
 
   const settings = await readFile(join(dshHome, 'settings.yaml'), 'utf8')
@@ -94,6 +95,7 @@ test('DSH Solver 写入显式模型上限，并把一次性令牌作为秘密环
   assert.equal(runOptions.environment.RSI_PROVIDER_API_KEY, undefined)
   assert.equal(runOptions.secretEnvironment.RSI_PROVIDER_API_KEY, 'ephemeral-token')
   assert.equal(runOptions.network, 'internal-net')
+  assert.equal(runOptions.nativeCodeCache, true)
   assert.equal(runOptions.environment.HTTP_PROXY, '')
   assert.deepEqual(runOptions.command, [
     'dsh', '--profile', 'headless', '--preset', 'cowork-rsi', '--', '---\n完成任务',

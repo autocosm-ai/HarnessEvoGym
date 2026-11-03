@@ -283,6 +283,7 @@ export async function runMsaMinimalCoworkSolver({
   name,
   timeoutMs,
   resources,
+  nativeCodeCache = false,
   containerWorkspace = '/workspace',
 }) {
   validateModel({ model, provider })
@@ -319,6 +320,7 @@ export async function runMsaMinimalCoworkSolver({
   const answerPath = join(output, answerFile)
   const tracePath = join(output, traceFile)
   const result = await docker.run({
+    ...(nativeCodeCache ? { nativeCodeCache: true } : {}),
     image: requiredText(image, 'MSA Solver Image'),
     name: requiredText(name, 'MSA Solver Container Name'),
     command: [

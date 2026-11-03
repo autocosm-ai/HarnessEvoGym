@@ -111,6 +111,7 @@ Updater 保留完整的分析、假设、自检和编码过程；Controller 不�
 - **OmegaUse-OfficeVal**：91 个 Linux 兼容任务（55 feedback/train + 18 selection/validation + 18 sealed final）。Solver 只接收任务描述和原始 Office 输入；评分在独立的只读 Verifier 容器中离线运行。
 - **HLE Text-only Math**：text-only Math 子集，使用固定 revision、分层抽样和 sealed test 规则。Runtime 和 sealed broker 独立；详见 [当前边界](docs/architecture.zh.md#已实现路径与当前边界)。
 - **KernelBench GPU Smoke**：两个可复现的 L1 算子题（ReLU/Sigmoid），在 CUDA 上同时检查数值正确性和速度提升。这是实验性 GPU 适配器，不是完整的上游 KernelBench 题库；详见 [`benchmarks/kernelbench-smoke-v1/README.md`](benchmarks/kernelbench-smoke-v1/README.md)。
+- **KernelBench 原始任务接入（实验性）**：可从固定上游提交导入 L1/L2 原始任务，保留原始输入形状；独立 CUDA 开发镜像含 NVCC/C++/Ninja，支持 JIT 编译和多 seed 评分。准备与验证见 [CUDA 运行手册](docs/kernelbench-cuda.zh.md)。
 
 **Target 与 Updater**
 
@@ -221,6 +222,10 @@ Population Mode 与 Module Search 正交。例如，`combined + linear-hill-clim
 - 添加 **Environment**：实现 Environment Adapter，提供任务物化、隔离工作区、Verifier、指标和数据划分。
 - 添加 **SearchStrategy**：实现 SearchStrategy，只返回受信 Catalog 中的 Region ID 和父 Candidate。
 - 注册 **EvolutionAlgorithm**：Population Recipe 目前要求受信驱动遵守 PopulationStore/Branch/Budget 契约。Beam、MCTS 等独立算法可以通过 `harness-rsi algorithm run` 使用 SDK v2 的 `initialize/step/resume/report` 生命周期和自己的 RunStore/Checkpoint；这条通用路径目前还没有接入标准 Experiment Recipe 或 Server Run API。
+
+运行 `npm run demo:plugins` 可体验独立任务插件与 Beam Search 的完整离线组合，包括候选代码、跨进程恢复和冠军测试。
+[示例目录](sdk/examples/affine-search/README.md) 可以复制到主仓外，使用 `--plugins` 显式加载。
+恢复会核对插件源码、依赖和任务配置，同一 Run 禁止并发写入。示例变异器是确定性枚举，不调用模型。
 - 添加 **EvolutionRecipe**：重组现有 Population 拓扑、Branch 数量、预算、共享规则和搜索策略。
 
 完整接口、协议边界、测试矩阵和 PR 要求见 [`CONTRIBUTING.md`](CONTRIBUTING.md)。

@@ -1,0 +1,13 @@
+identity:
+  name: affine-tasks
+  version: 0.1.0
+protocol:
+  kind: environment
+  version: v1
+  implementation: affine-tasks-v1
+runtime:
+  type: node
+  node:
+    entrypoint: index.mjs
+trust:
+  mode: trusted
