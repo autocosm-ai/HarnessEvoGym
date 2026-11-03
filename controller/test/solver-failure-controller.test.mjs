@@ -8,6 +8,7 @@ import { normalizeEvolutionRecipe } from '../src/evolution-recipe.mjs'
 import { PopulationOrchestrator } from '../src/population-orchestrator.mjs'
 import { stageUpdaterContext } from '../src/runtimes/dsh.mjs'
 import { runProcess } from '../src/process.mjs'
+import { UpdaterExecutionError } from '../src/updater-watchdog.mjs'
 import { runtimeFixture, failingRun, hash, repositoryRoot, startFixtureGateway } from './fixtures/solver-failure-runtime.mjs'
 
 function recipe(mode) {
@@ -32,12 +33,14 @@ function zeroUsage(requests) {
 async function branchFixture(t, {
   mode = 'single', providerFailure = false, failureBranch = null, invalidProposal = false,
   allowRuntimeFailurePromotion = false,
+  updaterFailures = 0,
 } = {}) {
   const fixture = await runtimeFixture(t)
   const bundle = fixture.bundle
   bundle.recipe = recipe(mode)
   bundle.benchmark = fixture.benchmark
   bundle.experiment.baselinePack = null
+  bundle.updater.supervision = { maximumRetries: 2, idleTimeoutSeconds: 600, retryDelayMs: 0 }
   bundle.experimentPath = 'fixture-experiment.json'
   bundle.target.materialization = { ...bundle.target.materialization,
     protocol: 'controller-owned-overlay-v1', baselinePath: 'fixture-candidate' }
@@ -80,6 +83,7 @@ async function branchFixture(t, {
         const original = await readFile(join(options.candidateWorkspace, 'run.py'), 'utf8')
         const content = total >= 2 ? original.replace('answer = json.loads(text)', 'answer = text') : original
         await writeFile(join(options.candidateWorkspace, 'run.py'), `${content}\n# fixture candidate ${total}\n`)
+        if (total <= updaterFailures) throw new UpdaterExecutionError('updater-repetitive-output')
         if (providerFailure && total === 1 && (!failureBranch || gatewayScope.endsWith(failureBranch))) {
           gatewayModes.set('valid', 'http502')
         }
@@ -107,6 +111,40 @@ async function branchFixture(t, {
   return { ...fixture, bundle, frozen, createBranch, packets, updateCounts,
     changeAuditRevision() { revision = 'b'.repeat(40) } }
 }
+
+test('Updater 自动恢复接入真实 Controller：失败尝试不额外扣 Candidate 预算，成功后重启不重复更新', async (t) => {
+  const fixture = await branchFixture(t, { updaterFailures: 1 })
+  const runRoot = join(fixture.root, 'branch-run')
+  const branch = fixture.createBranch('branch-001', runRoot)
+  await branch.initialize()
+  const result = await branch.advanceOne({ stepId: 'recovery-step', coordination: {} })
+  assert.equal(result.budgetConsumed, 1)
+  assert.equal([...fixture.updateCounts.values()][0], 2)
+  const state = JSON.parse(await readFile(join(runRoot, 'state.json')))
+  assert.equal(state.spec.generationsCompleted, 1)
+  assert.equal(state.spec.ledger.updaterUsage.requests, 2)
+  const restored = fixture.createBranch('branch-001', runRoot)
+  await restored.restore()
+  await restored.advanceOne({ stepId: 'recovery-step', coordination: {} })
+  assert.equal([...fixture.updateCounts.values()][0], 2)
+})
+
+test('Updater 持续故障会暂停，跨进程恢复不能反复重置自动重试次数', async (t) => {
+  const fixture = await branchFixture(t, { updaterFailures: 100 })
+  const runRoot = join(fixture.root, 'branch-run')
+  const first = fixture.createBranch('branch-001', runRoot)
+  await first.initialize()
+  await assert.rejects(first.advanceOne({ stepId: 'recovery-step', coordination: {} }),
+    (error) => error.code === 'updater-retry-exhausted')
+  const state = JSON.parse(await readFile(join(runRoot, 'state.json')))
+  assert.equal(state.spec.generationsCompleted, 0)
+  assert.equal(state.spec.ledger.updaterUsage.requests, 3)
+  const restored = fixture.createBranch('branch-001', runRoot)
+  await restored.restore()
+  await assert.rejects(restored.advanceOne({ stepId: 'recovery-step', coordination: {} }),
+    (error) => error.code === 'updater-retry-exhausted')
+  assert.equal([...fixture.updateCounts.values()][0], 3)
+})
 
 test('完整 Controller 闭环：Champion 训练失败进入 Updater，Rejected 详细病例进入下一轮且允许 L3', async (t) => {
   const fixture = await branchFixture(t)

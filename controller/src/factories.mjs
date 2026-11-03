@@ -8,6 +8,7 @@ import { assertPathKind } from './config.mjs'
 import { ProtocolError } from './protocol.mjs'
 import { environmentCapabilities } from './environment-capabilities.mjs'
 import { resolve } from 'node:path'
+import { superviseUpdater } from './updater-watchdog.mjs'
 import {
   ensureDshRuntime,
   runDshSolver,
@@ -244,8 +245,13 @@ function createDshUpdaterDriver({
           'updater',
           modelRolePolicy(options.model, provider),
         )
+        await modelGateway.updaterProgress?.(true)
         result = await runWithUsage(modelGateway, measuredUsage, 'updater', async () =>
-          await runDshUpdater({ ...options, docker, runtime: updater.runtime, provider, modelAccess }))
+          await superviseUpdater({
+            idleTimeoutMs: (updater.supervision?.idleTimeoutSeconds ?? 600) * 1000,
+            sample: modelGateway.updaterProgress ? () => modelGateway.updaterProgress() : undefined,
+            execute: ({ signal }) => runDshUpdater({ ...options, signal, docker, runtime: updater.runtime, provider, modelAccess }),
+          }))
       } catch (error) {
         operationError = error
       }

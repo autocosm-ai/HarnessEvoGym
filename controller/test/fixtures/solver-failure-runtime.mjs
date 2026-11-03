@@ -44,7 +44,9 @@ export async function startFixtureGateway(t, { modes = new Map() } = {}) {
       }
       const delta = mode === 'reasoning' ? { reasoning_content: 'PRIVATE_REASONING_MUST_NOT_LEAK' }
         : mode === 'tools' ? { tool_calls: [{ index: 0, function: { name: 'bash', arguments: '{}' } }] }
-          : { content: 'valid final content but not JSON' }
+          : { content: mode === 'repeated'
+            ? 'Before editing, inspect the existing labels and preserve the document content. '.repeat(90)
+            : 'valid final content but not JSON' }
       response.write(`data: ${JSON.stringify({ choices: [{ delta }] })}\n\n`)
       if (mode === 'interrupt') {
         setTimeout(() => response.destroy(), 5)

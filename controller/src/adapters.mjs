@@ -21,6 +21,7 @@ import { normalizeRelativePath } from './path-policy.mjs'
 import { ProtocolError, readJsonFile, validateBenchmark, validateEvaluationPolicy } from './protocol.mjs'
 import { normalizeCoworkEvolutionRecipe, normalizeEvolutionRecipe } from './evolution-recipe.mjs'
 import { MAXIMUM_UPSTREAM_RETRIES } from './retry-policy.mjs'
+import { updaterSupervision } from './updater-watchdog.mjs'
 
 const MUTATION_LEVELS = ['l1', 'l2', 'l3']
 const FULL_GIT_SHA = /^[0-9a-f]{40}$/u
@@ -508,6 +509,7 @@ export function validateUpdaterAdapter(input) {
         : validateClaudeCodeUpdaterRuntime(spec.runtime, 'UpdaterAdapter.spec.runtime'),
       promptPath: relativePath(prompt.path, 'UpdaterAdapter.spec.prompt.path'),
       mutationReportName,
+      supervision: updaterSupervision(spec.supervision),
     }
   }
   const source = expectObject(spec.source, 'UpdaterAdapter.spec.source')
@@ -526,6 +528,7 @@ export function validateUpdaterAdapter(input) {
     runtime: validateRuntime(spec.runtime, 'UpdaterAdapter.spec.runtime'),
     promptPath: relativePath(prompt.path, 'UpdaterAdapter.spec.prompt.path'),
     mutationReportName,
+    supervision: updaterSupervision(spec.supervision),
   }
 }
 

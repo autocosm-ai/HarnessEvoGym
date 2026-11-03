@@ -304,6 +304,7 @@ export async function runDshUpdater({
   reportName,
   name,
   timeoutMs,
+  signal,
 }) {
   if (!modelAccess) throw new ProtocolError('DSH Updater 缺少 Model Gateway Access')
   for (const nameValue of runtime.secretEnvironment) {
@@ -352,6 +353,7 @@ export async function runDshUpdater({
     inheritEnvironment: [],
     network: modelAccess.network,
     timeoutMs,
+    signal,
   })
 
   let report

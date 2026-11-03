@@ -8,6 +8,7 @@ import { evaluateBenchmark } from './evaluator.mjs'
 import { autoRegisterPlugin } from './plugin-loader.mjs'
 import { loadLocalProviderEnvironment } from './local-provider.mjs'
 import { runEvaluationJob } from './evaluation-job.mjs'
+import { runDoctor } from './doctor.mjs'
 import {
   createGenericEvolutionAlgorithmDriver,
   FileAlgorithmRunStore,
@@ -53,6 +54,7 @@ const HELP = `HarnessEvoGym Controller
   harness-rsi experiment finalize-suite --config <shared-final.json> [--resume] [--validate-only]
   harness-rsi algorithm run --plugin <plugin-dir> --algorithm <id> --run-root <relative-dir> [--steps <n>] [--resume] [--resume-checkpoint <name>] [--baseline-only]
   harness-rsi evaluate run --config <evaluation.json> [--resume] [--dry-run]
+  harness-rsi doctor --config <experiment.json> [--probe-models] [--output <report.json>]
   harness-rsi benchmark validate --config <benchmark.json> [--output <report.json>]
   harness-rsi evaluate compare \\
     --benchmark <benchmark.json> \\
@@ -504,6 +506,16 @@ async function main() {
   const [group, action, ...args] = process.argv.slice(2)
   if (!group || group === '--help' || group === '-h') {
     process.stdout.write(HELP)
+    return
+  }
+  if (group === 'doctor') {
+    const { options, flags } = parseOptions(process.argv.slice(3), {
+      valueOptions: new Set(['config', 'output']), booleanFlags: new Set(['probe-models']),
+    })
+    const report = await runDoctor({ repositoryRoot: REPOSITORY_ROOT,
+      experimentPath: requiredPath(options, 'config'), probeModels: flags.has('probe-models') })
+    await emit(report, options.get('output'))
+    if (!report.ready) process.exitCode = 2
     return
   }
   if (group === 'evaluate' && action === 'run') {

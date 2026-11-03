@@ -458,8 +458,10 @@ function proxyToUpstream({
   maxErrorBytes,
   wireProtocol,
   anthropicBeta,
+  streamWatch,
 }) {
   return new Promise((resolve) => {
+    streamWatch?.start(requestId)
     const transport = endpoint.protocol === 'https:' ? https : http
     let upstreamRequest
     let upstreamResponse
@@ -474,6 +476,7 @@ function proxyToUpstream({
     const finish = (status, usage, failureType) => {
       if (finished) return
       finished = true
+      streamWatch?.end(requestId)
       cleanup()
       resolve({ status, usage, failureType })
     }
@@ -555,6 +558,7 @@ function proxyToUpstream({
       const collector = new SseUsageCollector(wireProtocol)
       response.on('data', (chunk) => {
         if (finished) return
+        streamWatch?.chunk(requestId, chunk)
         collector.push(chunk)
         if (!downstreamResponse.destroyed && !downstreamResponse.write(chunk)) response.pause()
       })
@@ -636,6 +640,7 @@ function normalizeOptions(options) {
     maxErrorBytes,
     candidateApiKey,
     audit: options.audit ?? (() => {}),
+    streamWatch: options.streamWatch,
     apiKeyLoader: makeApiKeyLoader(options),
   }
 }
@@ -791,6 +796,7 @@ export function createModelGateway(options) {
           maxErrorBytes: config.maxErrorBytes,
           wireProtocol: config.wireProtocol,
           anthropicBeta,
+          streamWatch: config.streamWatch,
         })
         await audit(outcome.status, outcome.usage, 'upstream', outcome.failureType)
       } finally {

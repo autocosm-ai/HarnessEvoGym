@@ -141,7 +141,8 @@ Harbor、KernelBench、SWE-bench、PutnamBench 和 Synthetic Text Reasoning 保�
 
 **安装并校验**
 
-需要 Linux、Docker、Node.js 20+、npm 和 Git。
+需要 Linux、Docker、Node.js 20+、npm 和 Git。CLI Updater 和完整测试还需要
+`bubblewrap`、`util-linux`，Ubuntu/Debian 可用 `sudo apt-get install bubblewrap util-linux` 安装。
 
 ```bash
 git clone https://github.com/autocosm-ai/HarnessEvoGym.git
@@ -158,6 +159,12 @@ npm run test:eval
 npm run rsi -- experiment validate \
   --config experiments/reasoning-msa-progressive-strict-smoke.json
 ```
+
+**启动前检查**：`npm run rsi -- doctor --config experiments/cowork-msa-acceptance.json`
+会检查依赖、磁盘、数据、Docker、镜像和 Provider 配置，默认不调用模型。
+显式加 `--probe-models` 才会验证 Solver/Updater 模型接口并产生 API 费用。
+标准 Experiment 还会监测 Updater 卡住或重复输出，保留失败现场后进行有界重试；
+重试次数持久化，已完成任务继续复用。配置和边界见 [运行检查与自动恢复](docs/runtime-health.zh.md)。
 
 **准备运行时凭据**
 

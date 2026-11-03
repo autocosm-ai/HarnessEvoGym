@@ -5,6 +5,7 @@ LABEL io.harness-rsi.model-gateway="v1"
 WORKDIR /app
 COPY --chmod=0444 docker/model-gateway/server.mjs /app/server.mjs
 COPY --chmod=0444 docker/model-gateway/diagnostics.mjs /app/diagnostics.mjs
+COPY --chmod=0444 docker/model-gateway/stream-watch.mjs /app/stream-watch.mjs
 
 USER node
 EXPOSE 8080

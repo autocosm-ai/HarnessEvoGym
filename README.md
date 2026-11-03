@@ -132,7 +132,8 @@ dataset is needed. Three successive processes exercise the real population contr
 checkpoints, resume, and champion evaluation. The Solver and Updater are explicit trusted offline stand-ins;
 their scores are not evidence of model improvement. Results are saved under `.rsi/demo-*`.
 
-**Requirements:** Linux, Docker, Node.js 20+, npm, Git.
+**Requirements:** Linux, Docker, Node.js 20+, npm, Git. CLI Updaters and the complete test suite also
+require `bubblewrap` and `util-linux` (`sudo apt-get install bubblewrap util-linux` on Ubuntu/Debian).
 
 ```bash
 git clone https://github.com/autocosm-ai/HarnessEvoGym.git
@@ -149,6 +150,13 @@ npm run test:eval
 npm run rsi -- experiment validate \
   --config experiments/reasoning-msa-progressive-strict-smoke.json
 ```
+
+**Check runtime readiness:** `npm run rsi -- doctor --config experiments/cowork-msa-acceptance.json`
+checks local dependencies, disk space, data, Docker, images, and provider settings without calling models.
+Add `--probe-models` to explicitly test Solver and Updater model access; this incurs API costs.
+Standard Experiments also monitor stalled or repetitive Updater output and retry failed sessions within
+a persisted limit, preserving failed workspaces and completed task results. See
+[runtime health and recovery](docs/runtime-health.zh.md) (Chinese) for configuration and boundaries.
 
 **Run with runtime credentials**
 

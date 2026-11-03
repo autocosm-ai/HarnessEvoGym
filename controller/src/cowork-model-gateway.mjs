@@ -60,6 +60,7 @@ async function gatewayDefinition(repositoryRoot, dockerfile) {
   const dockerfilePath = resolve(repositoryRoot, dockerfile)
   const serverPath = resolve(repositoryRoot, 'docker/model-gateway/server.mjs')
   const diagnosticsPath = resolve(repositoryRoot, 'docker/model-gateway/diagnostics.mjs')
+  const watchSource = await readFile(resolve(repositoryRoot, 'docker/model-gateway/stream-watch.mjs'))
   let dockerfileSource
   let serverSource
   let diagnosticsSource
@@ -78,6 +79,7 @@ async function gatewayDefinition(repositoryRoot, dockerfile) {
     .update('\0server.mjs\0')
     .update(serverSource)
     .update('\0diagnostics.mjs\0').update(diagnosticsSource)
+    .update('\0stream-watch.mjs\0').update(watchSource)
     .digest('hex')
   return {
     digest,
@@ -343,6 +345,29 @@ export class ModelGateway {
       command: ['node', '--input-type=module', '--eval', script],
       secretValues: [],
     })
+  }
+
+  async updaterProgress(reset = false) {
+    const url = `http://127.0.0.1:${this.config.port}/rsi/updater-progress`
+    const result = await this.docker.exec({
+      container: this.container.name,
+      timeoutMs: 10_000,
+      command: ['node', '--input-type=module', '--eval', [
+        `const response = await fetch(${JSON.stringify(url)}, {`,
+        `method: '${reset ? 'POST' : 'GET'}', signal: AbortSignal.timeout(5000),`,
+        'headers: { authorization: `Bearer ${process.env.GATEWAY_CONTROL_TOKEN}` } })',
+        'if (!response.ok) throw new Error(`Progress HTTP ${response.status}`)',
+        'console.log(JSON.stringify(await response.json()))',
+      ].join('\n')],
+      secretValues: [],
+    })
+    const value = JSON.parse(result.stdout)
+    if (!Number.isFinite(value.lastProgressAt) || !Number.isSafeInteger(value.receivedBytes)
+        || !Number.isSafeInteger(value.activeStreams)
+        || ![null, 'updater-repetitive-output', 'updater-stream-event-too-large'].includes(value.failureCode)) {
+      throw new ProtocolError('Updater 进度响应无效')
+    }
+    return value
   }
 
   async rotateRoleToken(roleInput) {

@@ -36,6 +36,11 @@ jobs:
       - name: Install Node dependencies
         run: npm ci
 
+      - name: Install Linux sandbox dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y bubblewrap util-linux
+
       - name: Check source syntax and scripts
         run: npm run check
 
