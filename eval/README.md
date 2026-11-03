@@ -5,6 +5,10 @@
 > Environment 插件，也不提供 HLE 评测入口。新的环境应实现 Environment Adapter，并由
 > Controller 的公共 Runner 调度。
 
+新评测优先使用 `npm run rsi -- evaluate run --config evaluation-job.json`。
+该入口支持选取训练冠军和预算检查点，详见 [统一评测指南](../docs/evaluation-jobs.zh.md)。
+历史脚本及结果继续保留，不静默转换旧分数；公共入口另行记录 OfficeVal 原始比值和归一化指标。
+
 这是 MSA Cowork 候选的兼容评测工具：复制冻结候选，在副本内替换带请求级重试的
 `model.py`；逐题复制数据，Solver 和离线 Verifier 在容器中工作。
 它不替代 Controller 的 sealed-final 审计链，也不支持 HLE 或任意 Solver。

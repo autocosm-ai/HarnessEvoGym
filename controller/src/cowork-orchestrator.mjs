@@ -57,6 +57,7 @@ import { ProtocolError, readJsonFile, writeJsonFile } from './protocol.mjs'
 import { runProcess, secretValuesFromEnvironment } from './process.mjs'
 import { createSearchStrategyDriver } from './search-strategy.mjs'
 import { withGlobalPermit } from './global-concurrency.mjs'
+import { recoverUpdater, readUpdaterJournal } from './updater-recovery.mjs'
 import { resolveTargetSource } from './target-sources.mjs'
 import { assertEvolutionAlgorithmAvailable, createEvolutionAlgorithmDriver } from './evolution-algorithm.mjs'
 import { supportsTaskInfrastructureRetries } from './environment-capabilities.mjs'
@@ -301,6 +302,14 @@ function buildLedger({
     costUsd: null,
     wallTimeMs: (previousLedger?.wallTimeMs ?? 0) + Date.now() - startedAt,
   }
+}
+
+function updaterUsage(context) {
+  const usage = context.updaterDriver.usage()
+  if (!context.unprovenUpdaterUsage) return usage
+  // 恢复到 Updater 提交与主状态落盘之间时，不能把丢失的用量冒充为零。
+  return { ...usage, complete: false,
+    ...Object.fromEntries(COMPLETE_USAGE_FIELDS.map((field) => [field, null])) }
 }
 
 function publicDecision(decision) {
@@ -610,7 +619,30 @@ async function materializeH0({ context, runRoot, seedWorkspace = null, seedMetad
   return { id: 'h0', root: candidateRoot, workspace, digest: treeDigest(snapshot) }
 }
 
-async function runUpdaterGeneration({
+async function runUpdaterGeneration(options) {
+  const { context, runRoot, generation, parent, mutationPolicy, onEvent } = options
+  const candidateId = `g${String(generation).padStart(3, '0')}-${context.bundle.experiment.evolution.mutationLevel}`
+  const previous = await readUpdaterJournal(runRoot, candidateId)
+  if (previous?.status === 'succeeded' || (previous?.status === 'running' && previous.attempts.length)) {
+    context.unprovenUpdaterUsage = true
+  }
+  return recoverUpdater({
+    runRoot, candidateId, parentDigest: parent.digest,
+    mutationIdentity: canonicalJsonDigest(mutationPolicy),
+    supervision: context.bundle.updater.supervision,
+    onEvent,
+    operation: () => runUpdaterGenerationOnce(options),
+    verifyResult: async (result) => {
+      const snapshot = await snapshotTree(result.workspace, {
+        maximumFileBytes: context.bundle.target.mutation.limits.maximumFileBytes,
+        maximumTreeEntries: context.bundle.target.mutation.limits.maximumTreeEntries,
+      })
+      if (treeDigest(snapshot) !== result.digest) throw new ProtocolError('已完成 Updater 的 Candidate 内容发生变化')
+    },
+  })
+}
+
+async function runUpdaterGenerationOnce({
   context,
   runRoot,
   generation,
@@ -1253,6 +1285,9 @@ export async function archiveIncompleteCoworkGeneration({
   }
   const level = state.spec.mutationLevel
   const nextCandidateId = safeCandidateId(`g${String(generation).padStart(3, '0')}-${level}`)
+  // Updater 已提交但 Controller 尚未提交 inFlight 时，也保留可验证的成功结果。
+  const updaterJournal = await readUpdaterJournal(runRoot, nextCandidateId)
+  if (updaterJournal?.status === 'succeeded') return null
   const candidateIds = new Set([
     nextCandidateId,
     ...state.spec.candidates
@@ -1361,7 +1396,7 @@ export function createCoworkBranchEvolutionDriver({
 
   async function persist() {
     await diagnostics.persist({ state, runRoot,
-      solverUsage: context.solverDriver.usage(), updaterUsage: context.updaterDriver.usage() })
+      solverUsage: context.solverDriver.usage(), updaterUsage: updaterUsage(context) })
   }
 
   function ledger(generations) {
@@ -1370,7 +1405,7 @@ export function createCoworkBranchEvolutionDriver({
       candidatesEvaluated,
       startedAt,
       solverUsage: context.solverDriver.usage(),
-      updaterUsage: context.updaterDriver.usage(),
+      updaterUsage: updaterUsage(context),
       previousLedger: ledgerOffset,
     })
   }
@@ -2043,6 +2078,7 @@ export function createCoworkBranchEvolutionDriver({
       await writeJsonFile(join(generationRoot, 'feedback-packet.json'), feedbackPacket)
       phase = 'update'
       proposal = inFlight?.proposal ? materializedCandidates.get(inFlight.proposal.id) : await runUpdaterGeneration({
+        onEvent,
         context,
         runRoot,
         generation,
@@ -2527,6 +2563,7 @@ export async function runEvolution({
         monitor.startPhase('update')
         onEvent({ stage: 'update', generation, message: `启动 ${state.spec.mutationLevel.toUpperCase()} Updater Session` })
         proposal = await runUpdaterGeneration({
+          onEvent,
           context,
           runRoot,
           generation,
@@ -2609,7 +2646,7 @@ export async function runEvolution({
             candidatesEvaluated,
             startedAt,
             solverUsage: context.solverDriver.usage(),
-            updaterUsage: context.updaterDriver.usage(),
+            updaterUsage: updaterUsage(context),
           }),
         })
         diagnostics.observeRecords({ generation, candidateId: proposal.id, partition: decisionPartition, records: candidateRecords })
@@ -2725,14 +2762,14 @@ export async function runEvolution({
       })
 
       await diagnostics.persist({ state, runRoot,
-        solverUsage: context.solverDriver.usage(), updaterUsage: context.updaterDriver.usage() })
+        solverUsage: context.solverDriver.usage(), updaterUsage: updaterUsage(context) })
       if (observed.exhausted) break
     }
   } catch (error) {
     state.metadata.status = 'failed'
     state.spec.failure = { message: error.message, details: error.details ?? [] }
     await diagnostics.persist({ state, runRoot,
-      solverUsage: context.solverDriver.usage(), updaterUsage: context.updaterDriver.usage() })
+      solverUsage: context.solverDriver.usage(), updaterUsage: updaterUsage(context) })
     throw error
   } finally {
     const cleanupErrors = await stopContextModelGateways(context)
@@ -2747,11 +2784,11 @@ export async function runEvolution({
     candidatesEvaluated,
     startedAt,
     solverUsage: context.solverDriver.usage(),
-    updaterUsage: context.updaterDriver.usage(),
+    updaterUsage: updaterUsage(context),
   })
 
   await diagnostics.persist({ state, runRoot,
-    solverUsage: context.solverDriver.usage(), updaterUsage: context.updaterDriver.usage() })
+    solverUsage: context.solverDriver.usage(), updaterUsage: updaterUsage(context) })
 
   onEvent({ stage: 'completed', message: `进化完成，Champion=${champion.id}` })
   return { runId, runRoot, championId: champion.id, state }
@@ -2764,6 +2801,7 @@ export async function runPopulationEvolution({
   onEvent = () => {},
   baselineOnly = false,
   forkProvenance = null,
+  roundLimit = 0,
 }) {
   safeRunId(runId)
   const controllerRevision = await trustedControllerRevision(repositoryRoot)
@@ -2841,7 +2879,7 @@ export async function runPopulationEvolution({
     const baselineResult = baselineOnly && initialized.status !== 'PAUSED_INFRASTRUCTURE'
       ? await orchestrator.freezeBaseline()
       : null
-    const state = baselineResult === null ? await orchestrator.run() : baselineResult.state
+    const state = baselineResult === null ? await orchestrator.run({ roundLimit }) : baselineResult.state
     if (state.status === 'PAUSED_INFRASTRUCTURE') {
       throw new ProtocolError('Population 因基础设施故障暂停，拒绝把本次运行报告为成功', [
         `runRoot=${orchestrator.store.root}`,
@@ -3034,6 +3072,9 @@ export async function resumePopulationEvolution({
 /** 旧 Experiment 保持原单 Champion 目录格式；显式 Recipe 进入通用 Population。 */
 export async function runConfiguredEvolution(options) {
   const experiment = await loadExperimentBundle(resolve(options.experimentPath), options.repositoryRoot)
+  if (experiment.experiment.recipePath === null && options.roundLimit) {
+    throw new ProtocolError('round-limit 需要显式 Population Recipe')
+  }
   return experiment.experiment.recipePath === null
     ? await runEvolution(options)
     : await runPopulationEvolution(options)

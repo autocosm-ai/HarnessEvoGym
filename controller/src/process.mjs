@@ -18,6 +18,7 @@ export async function runProcess(command, args, options = {}) {
     allowExitCodes = [0],
     input,
     secretValues = [],
+    signal: abortSignal,
   } = options
   if (typeof command !== 'string' || command.trim().length === 0) throw new ProtocolError('进程命令不能为空')
   if (!Array.isArray(args) || args.some((value) => typeof value !== 'string')) {
@@ -37,6 +38,14 @@ export async function runProcess(command, args, options = {}) {
     let stderrBytes = 0
     let overflow = false
     let timedOut = false
+    let forceTimer
+    const stop = () => {
+      child.kill('SIGTERM')
+      forceTimer ??= setTimeout(() => child.kill('SIGKILL'), 5_000)
+      forceTimer.unref()
+    }
+    abortSignal?.addEventListener('abort', stop, { once: true })
+    if (abortSignal?.aborted) stop()
     const startedAt = Date.now()
 
     function collect(chunks, chunk, currentBytes) {
@@ -60,25 +69,27 @@ export async function runProcess(command, args, options = {}) {
 
     const timer = setTimeout(() => {
       timedOut = true
-      child.kill('SIGTERM')
-      setTimeout(() => child.kill('SIGKILL'), 5_000).unref()
+      stop()
     }, timeoutMs)
     timer.unref()
 
     child.on('close', (code, signal) => {
       clearTimeout(timer)
+      clearTimeout(forceTimer)
+      abortSignal?.removeEventListener('abort', stop)
       const result = {
         command,
         args,
         exitCode: code,
         signal,
         timedOut,
+        aborted: abortSignal?.aborted === true,
         outputTruncated: overflow,
         durationMs: Date.now() - startedAt,
         stdout: redact(Buffer.concat(stdoutChunks).toString('utf8'), secretValues),
         stderr: redact(Buffer.concat(stderrChunks).toString('utf8'), secretValues),
       }
-      if (timedOut || !allowExitCodes.includes(code)) {
+      if (timedOut || result.aborted || !allowExitCodes.includes(code)) {
         const reason = timedOut ? `命令超时（${timeoutMs}ms）` : `命令退出码 ${code}`
         const error = new ProtocolError(`${reason}：${command}`, [result.stderr.slice(-4000), result.stdout.slice(-2000)].filter(Boolean))
         // 结构化退出观测供可信 Driver 使用，禁止调用方根据异常消息猜测退出码。

@@ -11,6 +11,8 @@
     "harness-rsi": "./controller/src/cli.mjs"
   },
   "scripts": {
+    "demo": "node ./scripts/run-demo.mjs",
+    "test:acceptance": "node ./scripts/run-acceptance.mjs",
     "rsi": "node ./controller/src/cli.mjs",
     "check": "find controller/src controller/test server/src server/test docker benchmarks/hle-text-math scripts strategies -name '*.mjs' -print0 | xargs -0 -n1 node --check && python3 -c \"compile(open('scripts/download-hle-text-math.py', encoding='utf-8').read(), 'scripts/download-hle-text-math.py', 'exec'); compile(open('docker/omegause-officeval/run-verifier.py', encoding='utf-8').read(), 'docker/omegause-officeval/run-verifier.py', 'exec')\" && bash -n ./scripts/setup-putnambench-runtime.sh ./scripts/setup-hle-runtime.sh && npm run check:paths",
     "check:paths": "node ./scripts/check-portable-paths.mjs",

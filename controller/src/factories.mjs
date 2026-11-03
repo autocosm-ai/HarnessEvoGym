@@ -1,5 +1,6 @@
 import { OmegaUseOfficeValEnvironment } from './environments/omegause-officeval.mjs'
 import { TextReasoningEnvironment } from './environments/text-reasoning.mjs'
+import { HleTextMathEnvironment } from './environments/hle-text-math.mjs'
 import { HarborEnvironment } from './environments/harbor.mjs'
 import { KernelBenchEnvironment } from './environments/kernelbench.mjs'
 import { diffModelUsage } from './cowork-model-gateway.mjs'
@@ -7,6 +8,7 @@ import { assertPathKind } from './config.mjs'
 import { ProtocolError } from './protocol.mjs'
 import { environmentCapabilities } from './environment-capabilities.mjs'
 import { resolve } from 'node:path'
+import { superviseUpdater } from './updater-watchdog.mjs'
 import {
   ensureDshRuntime,
   runDshSolver,
@@ -243,8 +245,13 @@ function createDshUpdaterDriver({
           'updater',
           modelRolePolicy(options.model, provider),
         )
+        await modelGateway.updaterProgress?.(true)
         result = await runWithUsage(modelGateway, measuredUsage, 'updater', async () =>
-          await runDshUpdater({ ...options, docker, runtime: updater.runtime, provider, modelAccess }))
+          await superviseUpdater({
+            idleTimeoutMs: (updater.supervision?.idleTimeoutSeconds ?? 600) * 1000,
+            sample: modelGateway.updaterProgress ? () => modelGateway.updaterProgress() : undefined,
+            execute: ({ signal }) => runDshUpdater({ ...options, signal, docker, runtime: updater.runtime, provider, modelAccess }),
+          }))
       } catch (error) {
         operationError = error
       }
@@ -270,6 +277,7 @@ function createDshUpdaterDriver({
 
 registerEnvironmentDriver('omegause-officeval-docker-v1', (options) => new OmegaUseOfficeValEnvironment(options))
 registerEnvironmentDriver('text-reasoning-deterministic-v1', (options) => new TextReasoningEnvironment(options))
+registerEnvironmentDriver('hle-text-math-docker-v1', (options) => new HleTextMathEnvironment(options))
 registerEnvironmentDriver('harbor-task-v1', (options) => new HarborEnvironment(options))
 registerEnvironmentDriver('kernelbench-gpu-v1', (options) => new KernelBenchEnvironment(options))
 registerSolverDriver('dsh-headless-docker-v1', createDshSolverDriver)

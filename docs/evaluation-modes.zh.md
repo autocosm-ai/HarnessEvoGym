@@ -14,9 +14,9 @@ HarnessEvoGym 把“能否复用旧结果”单独建模，避免把探索性实
 `evaluationMode` 和 `evaluationIdentityDigest`。
 
 当前版本已经把身份校验接入通用 `Evaluator`。因此同一个 Run 的 `resume` 和正式
-`sealed-final` 会继续保持严格 fail-closed；`fork` 与 `exploratory` 已有统一的过期标记
-协议，但完整的“从 Checkpoint 创建新 Run”的 CLI 操作仍属于下一步工作。它不会修改旧 Run，
-也不会把新参数下的分数覆盖到旧报告里。
+`sealed-final` 会继续保持严格 fail-closed。`experiment fork` 已支持从提交的预算检查点创建新 Run；
+`evaluate run` 支持单独创建探索性评测并覆盖模型参数，详见[统一评测入口](evaluation-jobs.zh.md)。
+它们不会修改旧 Run，也不会把新参数下的分数覆盖到旧报告里。
 
 ## 代码示例
 

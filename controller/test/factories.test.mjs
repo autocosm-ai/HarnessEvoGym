@@ -20,6 +20,7 @@ test('Driver Registry 暴露带版本的内置协议', () => {
   const protocols = registeredDriverProtocols()
   assert.deepEqual(protocols.environment, [
     'harbor-task-v1',
+    'hle-text-math-docker-v1',
     'kernelbench-gpu-v1',
     'omegause-officeval-docker-v1',
     'text-reasoning-deterministic-v1',

@@ -13,13 +13,15 @@ ARG DSH_SOURCE_PATH
 ARG DSH_SOURCE_REVISION
 ENV CI=1
 ENV DSH_CLIENT_COMMIT_HASH=${DSH_SOURCE_REVISION}
+# pnpm run 会校验依赖布局；子命令也必须使用同一布局，避免安装后再次重装。
+ENV npm_config_node_linker=hoisted
 WORKDIR /opt/dsh
 RUN corepack enable && corepack prepare pnpm@11.7.0 --activate
 COPY ${DSH_SOURCE_PATH}/ ./
 # DSH 的动态 Loader 从安装根解析插件；生产运行时必须使用扁平依赖布局。
 RUN --mount=type=cache,id=harness-rsi-pnpm-store,target=/pnpm/store \
     pnpm config set store-dir /pnpm/store \
-    && pnpm install --frozen-lockfile --config.node-linker=hoisted \
+    && pnpm install --frozen-lockfile \
     && pnpm run build \
     # pnpm 只把工作区包链接到各消费包和 .pnpm/node_modules。Cordis Loader 从
     # /opt/dsh/vendor/loader 动态 import，因此还需要根 node_modules 下的可见链接。

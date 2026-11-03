@@ -36,6 +36,11 @@ jobs:
       - name: Install Node dependencies
         run: npm ci
 
+      - name: Install Linux sandbox dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y bubblewrap util-linux
+
       - name: Check source syntax and scripts
         run: npm run check
 
@@ -44,6 +49,9 @@ jobs:
 
       - name: Run standalone evaluator offline tests
         run: npm run test:eval
+
+      - name: Exercise offline evolution, cross-process resume, and champion evaluation
+        run: npm run demo
 
       - name: Generate test coverage report
         run: |

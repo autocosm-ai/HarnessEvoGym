@@ -13,7 +13,7 @@ Adapter 把“通用进化算法”与“某个 Agent/Benchmark 的目录和命�
 | `SearchStrategyAdapter` | 本轮从哪个父 Candidate 开始、搜哪些 Target Region         |
 | `EvolutionExperiment` | 本次把哪个 Target/Updater/Provider/Environment/Benchmark/Policy 组合起来 |
 
-Provider Adapter 只声明连接元数据和“环境变量名”，永远不写字面 Key。Experiment 分别声明 Solver/Updater 的 `provider`、`model` 与 `maxTokens`；当前低成本 POC 两个角色都用 `gpt-5.6-terra`，并共用 `zcloud-openai` 连接。
+Provider Adapter 只声明连接元数据和“环境变量名”，永远不写字面 Key。Experiment 分别声明 Solver/Updater 的 `provider`、`model` 与 `maxTokens`；当前入门 smoke 配置两个角色都用 `gpt-6.1-sol`、`reasoningEffort: medium`，并共用 `zcloud-openai` 连接。历史实验仍保留固定配置。本机可通过被忽略的 `.local/provider.json` 选择 Codex Provider，由 Controller 在执行时读取 URL 和 Key。
 
 DSH Runtime 把 `openai-chat-completions` 协议翻译为它内置的 `llm-pi-ai` Profile，不再把非 DeepSeek 模型冒充成 `deepseek-official`。换 PI Agent 时，对应 Runtime Driver 应读取同一 Provider Adapter 并生成 PI 自己需要的环境或配置。
 当前已完整支持 DSH Overlay Target 和 `repository-tree + CandidateSeed` 形式的

@@ -1,9 +1,12 @@
-import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
+import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
 import http from 'node:http'
 import https from 'node:https'
 import { pipeline, Transform } from 'node:stream'
 import { StringDecoder } from 'node:string_decoder'
 import { createTrialDiagnostics, responseObserver } from './diagnostics.mjs'
+import { StreamWatch } from './stream-watch.mjs'
+
+const updaterWatch = new StreamWatch()
 
 const listenPort = Number(process.env.GATEWAY_PORT ?? '8080')
 const legacyToken = process.env.GATEWAY_TOKEN ?? ''
@@ -399,6 +402,20 @@ const server = http.createServer((request, response) => {
     return
   }
   const principal = authorizedPrincipal(request.headers.authorization)
+  if (requestUrl.pathname === '/rsi/updater-progress' && requestUrl.search === '') {
+    if (principal?.role !== 'control') {
+      send(response, 401, { error: 'unauthorized' })
+    } else if (request.method === 'GET') {
+      send(response, 200, updaterWatch.snapshot())
+    } else if (request.method === 'POST' && roleUsage.get('updater').activeRequests === 0) {
+      updaterWatch.reset()
+      send(response, 200, updaterWatch.snapshot())
+    } else {
+      send(response, 409, { error: 'updater_active_or_invalid_method' })
+    }
+    request.resume()
+    return
+  }
   if (requestUrl.pathname === '/rsi/trials') {
     if (principal?.role !== 'control') {
       send(response, 401, { error: 'unauthorized' })
@@ -531,6 +548,8 @@ const server = http.createServer((request, response) => {
     counter.acceptedRequests += 1
     counter.activeRequests += 1
   }
+  const watchId = principal.role === 'updater' ? randomUUID() : null
+  if (watchId) updaterWatch.start(watchId)
   let released = false
   let usageDelegated = false
   let unknownRecorded = false
@@ -543,6 +562,7 @@ const server = http.createServer((request, response) => {
     if (released) return
     released = true
     for (const counter of counters) counter.activeRequests -= 1
+    if (watchId) updaterWatch.end(watchId)
   }
   response.once('finish', release)
   response.once('close', release)
@@ -648,6 +668,7 @@ const server = http.createServer((request, response) => {
           return
         }
         usageDelegated = true
+        if (watchId) upstreamResponse.on('data', (chunk) => updaterWatch.chunk(watchId, chunk))
         if (diagnostic) {
           const observer = responseObserver(diagnostic, { secretValues: [apiKey, principal.trial?.token] })
           observer.headers(status, upstreamResponse.headers)
@@ -670,7 +691,8 @@ const server = http.createServer((request, response) => {
       upstream.on('error', (error) => {
         if (scheduleRetry()) return
         if (diagnostic) {
-          diagnostic.transportError = true
+          // 与响应观察器一致：合法 DONE 后的连接清理不算上游断流。
+          if (!diagnostic.done) diagnostic.transportError = true
           diagnostic.httpStatus ??= 502
         }
         recordUnknownUsage()

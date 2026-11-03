@@ -14,6 +14,8 @@ import { validateModelGatewayEnvironment } from '../cowork-model-gateway.mjs'
 import { MODEL_GATEWAY_RELAY_URL } from '../model-gateway-relay.mjs'
 import { ProtocolError } from '../protocol.mjs'
 import { runProcess } from '../subprocess.mjs'
+import { superviseUpdater } from '../updater-watchdog.mjs'
+import { StreamWatch } from '../../../docker/model-gateway/stream-watch.mjs'
 import {
   UPDATER_SANDBOX_PATHS,
   buildUpdaterInvocation,
@@ -118,6 +120,7 @@ export function createCodexUpdaterDriver({
 
       let gateway
       let result
+      const streamWatch = new StreamWatch()
       try {
         // Feedback 可能包含 Solver 曾见过的短期令牌；进入 Updater 前先撤销。
         await modelGateway.rotateRoleToken('solver')
@@ -135,6 +138,7 @@ export function createCodexUpdaterDriver({
           socketUid: uid,
           socketGid: gid,
           audit: async (record) => recordCliUsageAudit(measuredUsage, record),
+          streamWatch,
         })
         const invocation = buildUpdaterInvocation({
           backend: 'codex-cli',
@@ -177,11 +181,16 @@ export function createCodexUpdaterDriver({
             TZ: 'UTC',
           },
         })
-        result = await execute({
+        result = await superviseUpdater({
+          idleTimeoutMs: (updater.supervision?.idleTimeoutSeconds ?? 600) * 1000,
+          sample: () => streamWatch.snapshot(),
+          execute: ({ signal }) => execute({
           ...invocation,
+          signal,
           timeoutMs: options.timeoutMs,
           outputLimitBytes: 16 * 1024 * 1024,
           secretValues: [apiKey, dummyKey],
+          }),
         })
         if (!result.ok) {
           const error = new ProtocolError('Codex Updater 执行失败', [
@@ -190,6 +199,8 @@ export function createCodexUpdaterDriver({
             result.stdout.slice(-2_000),
           ].filter(Boolean))
           error.kind = result.timedOut || result.aborted ? 'infrastructure' : 'updater_failure'
+          error.retryable = true
+          error.code = result.timedOut ? 'updater-timeout' : 'updater-process-failed'
           throw error
         }
         const report = await readCliMutationReport(

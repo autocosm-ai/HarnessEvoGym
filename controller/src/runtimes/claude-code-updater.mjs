@@ -15,6 +15,8 @@ import { MODEL_GATEWAY_RELAY_URL } from '../model-gateway-relay.mjs'
 import { startModelGateway } from '../model-gateway.mjs'
 import { ProtocolError } from '../protocol.mjs'
 import { runProcess } from '../subprocess.mjs'
+import { superviseUpdater } from '../updater-watchdog.mjs'
+import { StreamWatch } from '../../../docker/model-gateway/stream-watch.mjs'
 import {
   UPDATER_SANDBOX_PATHS,
   buildUpdaterInvocation,
@@ -123,6 +125,7 @@ export function createClaudeCodeUpdaterDriver({
 
       let gateway
       let result
+      const streamWatch = new StreamWatch()
       try {
         await modelGateway.rotateRoleToken('solver')
         gateway = await startGateway({
@@ -140,6 +143,7 @@ export function createClaudeCodeUpdaterDriver({
           socketUid: uid,
           socketGid: gid,
           audit: async (record) => recordCliUsageAudit(measuredUsage, record),
+          streamWatch,
         })
         const invocation = buildUpdaterInvocation({
           backend: 'claude-code-cli',
@@ -179,11 +183,16 @@ export function createClaudeCodeUpdaterDriver({
             TZ: 'UTC',
           },
         })
-        result = await execute({
+        result = await superviseUpdater({
+          idleTimeoutMs: (updater.supervision?.idleTimeoutSeconds ?? 600) * 1000,
+          sample: () => streamWatch.snapshot(),
+          execute: ({ signal }) => execute({
           ...invocation,
+          signal,
           timeoutMs: options.timeoutMs,
           outputLimitBytes: 16 * 1024 * 1024,
           secretValues: [apiKey, dummyKey],
+          }),
         })
         if (!result.ok) {
           const error = new ProtocolError('Claude Code Updater 执行失败', [
@@ -192,6 +201,8 @@ export function createClaudeCodeUpdaterDriver({
             result.stdout.slice(-2_000),
           ].filter(Boolean))
           error.kind = result.timedOut || result.aborted ? 'infrastructure' : 'updater_failure'
+          error.retryable = true
+          error.code = result.timedOut ? 'updater-timeout' : 'updater-process-failed'
           throw error
         }
         const report = await readCliMutationReport(

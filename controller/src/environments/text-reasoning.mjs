@@ -2,7 +2,8 @@ import { createHash } from 'node:crypto'
 import { lstat, mkdir, readFile, realpath } from 'node:fs/promises'
 import { isAbsolute, join, relative, resolve } from 'node:path'
 
-import { writeJsonLines } from '../candidate.mjs'
+import { writeJsonLines, snapshotTree, treeDigest } from '../candidate.mjs'
+import { inspectTrialCheckpoint, commitTrialCheckpoint, quarantineTrialTask } from '../trial-checkpoint-store.mjs'
 import { REPOSITORY_ROOT, resolveInside } from '../config.mjs'
 import { safeDockerName } from '../docker.mjs'
 import { withGlobalPermit } from '../global-concurrency.mjs'
@@ -13,7 +14,7 @@ import { validateInfrastructureRetries, withTrialInfrastructureRetries } from '.
 const TASKS_API_VERSION = 'harness-rsi/v1alpha1'
 const TASKS_KIND = 'SyntheticTextReasoningTasks'
 const PARTITIONS = new Set(['feedback', 'selection', 'final'])
-const MAXIMUM_TASK_FILE_BYTES = 1024 * 1024
+const MAXIMUM_TASK_FILE_BYTES = 16 * 1024 * 1024
 const MAXIMUM_TASK_TEXT_BYTES = 64 * 1024
 const RUNTIME_BUILDS = new Map()
 
@@ -73,10 +74,10 @@ function normalizeAnswer(value) {
   return normalized
 }
 
-function validateTaskDocument(input, benchmark) {
+function validateTaskDocument(input, benchmark, taskKind = TASKS_KIND) {
   const document = object(input, 'Synthetic Reasoning Task 文档')
   rejectUnknown(document, new Set(['apiVersion', 'kind', 'metadata', 'instances']), 'Synthetic Reasoning Task 文档')
-  if (document.apiVersion !== TASKS_API_VERSION || document.kind !== TASKS_KIND) {
+  if (document.apiVersion !== TASKS_API_VERSION || document.kind !== taskKind) {
     throw new ProtocolError('Synthetic Reasoning Task 文档协议无效')
   }
   const metadata = object(document.metadata, 'Synthetic Reasoning Task.metadata')
@@ -124,7 +125,7 @@ function validateTaskDocument(input, benchmark) {
   return tasks
 }
 
-async function readTrustedTaskFile(pathValue, expectedDigest, benchmark) {
+async function readTrustedTaskFile(pathValue, expectedDigest, benchmark, taskKind) {
   const info = await lstat(pathValue).catch((error) => {
     throw new ProtocolError(`Synthetic Reasoning Task 文件不存在：${pathValue}`, [error.message])
   })
@@ -148,7 +149,7 @@ async function readTrustedTaskFile(pathValue, expectedDigest, benchmark) {
   } catch (error) {
     throw new ProtocolError('Synthetic Reasoning Task JSON 格式错误', [error.message])
   }
-  return { tasks: validateTaskDocument(document, benchmark), digest: actualDigest }
+  return { tasks: validateTaskDocument(document, benchmark, taskKind), digest: actualDigest }
 }
 
 function trialRecord({ task, partition, trials, runRoot }) {
@@ -181,11 +182,11 @@ function trialRecord({ task, partition, trials, runRoot }) {
     record.feedback = {
       taskInstruction: task.instruction,
       solverAnswer: trials.map((trial) => trial.answer).join('\n\n'),
-      verifierFeedback: trials.map((trial) => trial.error
+      verifierFeedback: trials.map((trial) => trial.verifierFeedback ?? (trial.error
         ? `Solver 运行失败：${trial.error}`
         : trial.reward === 1
           ? '归一化答案匹配可信标准答案。'
-          : `归一化答案不匹配。期望答案：${task.answer}`)
+          : `归一化答案不匹配。期望答案：${task.answer}`))
         .join('\n\n'),
       errors: trials.flatMap((trial) => trial.error ? [trial.error] : []),
     }
@@ -215,6 +216,7 @@ export class TextReasoningEnvironment {
     this.tasks = null
     this.sourceRevision = null
     this.runtimeImage = null
+    this.taskKind = TASKS_KIND
   }
 
   describeCapabilities() {
@@ -224,10 +226,8 @@ export class TextReasoningEnvironment {
       partitions: Object.freeze(['feedback', 'selection', 'final']),
       supportsFeedback: true,
       supportsHiddenFinal: true,
-      // 可以安全重试整个 task；但没有提交式 checkpoint，不能宣称支持
-      // Final 阶段的按题恢复。
       supportsTaskRetry: true,
-      supportsCheckpointResume: false,
+      supportsCheckpointResume: true,
       scoreType: 'scalar',
       artifactType: 'text-answer',
     })
@@ -243,6 +243,7 @@ export class TextReasoningEnvironment {
       tasksPath,
       this.environment.source.digest,
       this.benchmark,
+      this.taskKind,
     )
     if (this.benchmark.source.revision !== trusted.digest) {
       throw new ProtocolError('Benchmark Revision 与 Synthetic Reasoning Task 摘要不一致', [
@@ -286,7 +287,12 @@ export class TextReasoningEnvironment {
     // Population 的多个 Branch 会并行做 Baseline；同一派生镜像只构建一次。
     const runtime = await RUNTIME_BUILDS.get(tag)
     this.runtimeImage = runtime.image
+    this.runtimeRevision = baseImageIdentity
     return this.runtimeImage
+  }
+
+  async gradeAnswer(task, answer) {
+    return { reward: normalizeAnswer(answer) === task.normalizedAnswer ? 1 : 0 }
   }
 
   async runTrial({ candidateId, candidateWorkspace, task, model, partition, seed, trialIndex, executionId }) {
@@ -323,15 +329,17 @@ export class TextReasoningEnvironment {
         containerWorkspace: this.environment.task.workspacePath,
       }))
       const answer = solver.answer ?? ''
-      const reward = normalizeAnswer(answer) === task.normalizedAnswer ? 1 : 0
+      const grade = await this.gradeAnswer(task, answer)
+      const reward = grade.reward
       return {
         seed,
         answer,
         reward,
+        verifierFeedback: grade.feedback ?? null,
         error: null,
         durationMs: solver.durationMs ?? Date.now() - startedAt,
-        inputTokens: solver.modelUsage?.complete ? solver.modelUsage.inputTokens : null,
-        outputTokens: solver.modelUsage?.complete ? solver.modelUsage.outputTokens : null,
+        inputTokens: solver.modelUsage?.complete ? solver.modelUsage.inputTokens + (grade.inputTokens ?? 0) : null,
+        outputTokens: solver.modelUsage?.complete ? solver.modelUsage.outputTokens + (grade.outputTokens ?? 0) : null,
         trialRoot,
       }
     } catch (cause) {
@@ -351,6 +359,7 @@ export class TextReasoningEnvironment {
 
   async runCandidatePartition({
     candidateId,
+    candidateDigest,
     candidateWorkspace,
     model,
     partition,
@@ -368,9 +377,24 @@ export class TextReasoningEnvironment {
       throw new ProtocolError(`Candidate Workspace 不存在：${candidateWorkspace}`, [error.message])
     })
     const executionId = sha256(resolve(outputPath)).slice(0, 12)
+    candidateDigest ??= treeDigest(await snapshotTree(candidate))
+    await this.ensureRuntime()
     const records = []
     for (const instanceId of partitionSpec.instanceIds) {
       const task = this.tasks.get(instanceId)
+      const taskRoot = join(this.runRoot, 'trials', executionId, safeSegment(candidateId, 'Candidate ID'), partition, task.id)
+      const identity = { candidateDigest, sourceRevision: this.sourceRevision, runtimeRevision: this.runtimeRevision,
+        model, seeds, partition, instanceId, judge: this.environment.judge ?? null }
+      const validateRecord = (record) => {
+        validateResultRecords([record], this.benchmark, `${candidateId}/${partition}`)
+        if (record.instance_id !== instanceId || JSON.stringify(record.trial_seeds) !== JSON.stringify(seeds)) {
+          throw new ProtocolError('Reasoning Checkpoint 题目或 seeds 不匹配')
+        }
+        return record
+      }
+      const checkpoint = await inspectTrialCheckpoint({ runRoot: this.runRoot, taskRoot, identity, validateRecord })
+      if (checkpoint.status === 'committed') { records.push(checkpoint.record); continue }
+      if (checkpoint.status !== 'missing') await quarantineTrialTask({ runRoot: this.runRoot, taskRoot, reason: checkpoint.status })
       const trials = await withTrialInfrastructureRetries(async () => {
         const attempts = []
         for (const [trialIndex, seed] of seeds.entries()) {
@@ -390,10 +414,14 @@ export class TextReasoningEnvironment {
         maximumRetries: infrastructureRetries,
         retryReasoningOnly,
         beforeRetry: async ({ error, retry, maximumRetries, delayMs }) => {
+          await quarantineTrialTask({ runRoot: this.runRoot, taskRoot, reason: 'infrastructure-retry' })
           await onInfrastructureRetry({ retry, maximumRetries, delayMs, error })
         },
       })
-      records.push(trialRecord({ task, partition, trials, runRoot: this.runRoot }))
+      const record = trialRecord({ task, partition, trials, runRoot: this.runRoot })
+      validateRecord(record)
+      await commitTrialCheckpoint({ runRoot: this.runRoot, taskRoot, identity, record })
+      records.push(record)
     }
     await writeJsonLines(outputPath, records)
     return validateResultRecords(records, this.benchmark, `${candidateId}/${partition}`)

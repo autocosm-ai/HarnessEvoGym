@@ -51,8 +51,10 @@ test('Synthetic Text Reasoning 五种 Mode 共用同一 Target 与 Environment',
     assert.equal(loaded.recipe.spec.population.mode, mode)
     assert.equal(loaded.environment.protocol, 'text-reasoning-deterministic-v1')
     assert.equal(loaded.target.id, 'msa-minimal-reasoning')
-    assert.equal(loaded.experiment.models.solver.model, 'gpt-5.6-terra')
-    assert.equal(loaded.experiment.models.updater.model, 'gpt-5.6-terra')
+    assert.equal(loaded.experiment.models.solver.model, 'gpt-6.1-sol')
+    assert.equal(loaded.experiment.models.updater.model, 'gpt-6.1-sol')
+    assert.equal(loaded.experiment.models.solver.reasoningEffort, 'medium')
+    assert.equal(loaded.experiment.models.updater.reasoningEffort, 'medium')
     assert.match(loaded.benchmark.name, /not HLE/iu)
   }
 })

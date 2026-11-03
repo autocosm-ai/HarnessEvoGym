@@ -475,6 +475,15 @@ export function validateResultRecords(input, benchmark, label) {
       }
     }
 
+    if (rawRecord.score_details !== undefined) {
+      const detail = rawRecord.score_details
+      if (!detail || detail.metric !== 'officeval-raw-ratio-v1' || !Number.isFinite(detail.value)
+          || !Array.isArray(detail.trial_values) || detail.trial_values.length !== trialRewards.length
+          || detail.trial_values.some((v) => !Number.isFinite(v))
+          || Math.abs(detail.value - detail.trial_values.reduce((a, b) => a + b, 0) / detail.trial_values.length) > 1e-9) {
+        errors.push(`${path}.score_details 无效`)
+      }
+    }
     if (hasText(rawRecord.instance_id) && !records.has(rawRecord.instance_id)) {
       records.set(rawRecord.instance_id, {
         instanceId: rawRecord.instance_id,
@@ -491,6 +500,7 @@ export function validateResultRecords(input, benchmark, label) {
         solverFailures,
         artifacts: rawRecord.artifacts ?? [],
         feedback: rawRecord.feedback,
+        ...(rawRecord.score_details === undefined ? {} : { scoreDetails: rawRecord.score_details }),
       })
     }
   }
