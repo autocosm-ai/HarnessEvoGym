@@ -66,7 +66,7 @@ export function validatePluginManifest(manifest) {
 export function isProtocolCompatible(required, provided) {
   // 简单实现：仅检查主版本号匹配
   // 未来可扩展为 SemVer 语义化版本比较
-  const reqMajor = required.match(/^v(\d+)$/)?.[1]
-  const provMajor = provided.match(/^v(\d+)$/)?.[1]
-  return reqMajor === provMajor
+  const reqMajor = typeof required === 'string' ? required.match(/^v(\d+)$/)?.[1] : null
+  const provMajor = typeof provided === 'string' ? provided.match(/^v(\d+)$/)?.[1] : null
+  return Boolean(reqMajor && provMajor && reqMajor === provMajor)
 }

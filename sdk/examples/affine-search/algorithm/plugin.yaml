@@ -1,0 +1,13 @@
+identity:
+  name: affine-beam-search
+  version: 0.1.0
+protocol:
+  kind: algorithm
+  version: v2
+  implementation: affine-beam-search-v2
+runtime:
+  type: node
+  node:
+    entrypoint: index.mjs
+trust:
+  mode: trusted

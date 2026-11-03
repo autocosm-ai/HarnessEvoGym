@@ -1,5 +1,6 @@
-import { lstat, readFile } from 'node:fs/promises'
+import { lstat, readFile, realpath } from 'node:fs/promises'
 import { resolve, join } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { parse as parseYAML } from 'yaml'
 import { ProtocolError } from './protocol.mjs'
 import { validatePluginManifest, isProtocolCompatible } from '../../sdk/index.mjs'
@@ -35,8 +36,13 @@ export async function loadPluginManifest(pluginPath) {
   if (!pluginInfo.isDirectory() || pluginInfo.isSymbolicLink()) {
     throw new ProtocolError(`插件目录必须是普通目录：${pluginRoot}`)
   }
+  if (await realpath(pluginRoot) !== pluginRoot) throw new ProtocolError('插件目录链不能包含符号链接')
   const manifestPath = join(pluginRoot, 'plugin.yaml')
   try {
+    const info = await lstat(manifestPath)
+    if (!info.isFile() || info.isSymbolicLink() || info.size > 256 * 1024) {
+      throw new ProtocolError('插件清单必须是大小受限的普通文件')
+    }
     const content = await readFile(manifestPath, 'utf-8')
     const manifest = parseYAML(content)
 
@@ -61,9 +67,8 @@ export async function loadPluginManifest(pluginPath) {
  * @param {Function} factory - Driver Factory 函数
  */
 export function registerPlugin(manifest, factory) {
-  if (manifest.trust?.mode !== 'trusted') {
-    throw new ProtocolError('当前插件加载器只允许 trusted 插件；sandbox 需要独立进程执行器')
-  }
+  assertLoadablePlugin(manifest)
+  if (typeof factory !== 'function') throw new ProtocolError('插件 factory 必须是函数')
   const { kind, implementation } = manifest.protocol
   const registry = PLUGIN_REGISTRY[kind]
 
@@ -103,12 +108,6 @@ export function registerPlugin(manifest, factory) {
 }
 
 function buildPluginDriver(manifest, factory, kind, options) {
-  const requiredVersion = manifest.protocol.version
-  if (!isProtocolCompatible(requiredVersion, manifest.protocol.version)) {
-    throw new ProtocolError(
-      `插件协议版本不兼容：要求 ${requiredVersion}，提供 ${manifest.protocol.version}`,
-    )
-  }
   const driver = factory(options)
   if (!driver || typeof driver !== 'object') {
     throw new ProtocolError(`插件 ${manifest.identity.name} Factory 返回值无效`)
@@ -127,6 +126,18 @@ function buildPluginDriver(manifest, factory, kind, options) {
   }
   if (kind === 'environment') adaptEnvironmentCapabilities(driver, manifest)
   return driver
+}
+
+function assertLoadablePlugin(manifest) {
+  if (!validatePluginManifest(manifest)) throw new ProtocolError('插件清单格式无效')
+  if (manifest.trust.mode !== 'trusted') {
+    throw new ProtocolError('当前插件加载器只允许 trusted 插件；sandbox 需要独立进程执行器')
+  }
+  const { kind, version, implementation } = manifest.protocol
+  const supported = kind === 'algorithm' ? ['v2'] : ['v1']
+  if (!supported.includes(version) || (implementation && !implementation.endsWith(`-${version}`))) {
+    throw new ProtocolError(`插件协议版本不兼容：${kind}/${version}`)
+  }
 }
 
 function adaptEnvironmentCapabilities(driver, manifest) {
@@ -166,6 +177,8 @@ function adaptEnvironmentCapabilities(driver, manifest) {
  */
 export async function autoRegisterPlugin(pluginPath) {
   const manifest = await loadPluginManifest(pluginPath)
+  // 动态 import 会立即执行顶层代码，必须先完成信任及版本检查。
+  assertLoadablePlugin(manifest)
 
   // 加载插件入口文件
   let entrypoint
@@ -177,10 +190,11 @@ export async function autoRegisterPlugin(pluginPath) {
     const entrypointInfo = await lstat(entrypointPath).catch((error) => {
       throw new ProtocolError(`插件入口不存在：${entrypointPath}`, [error.message])
     })
-    if (!entrypointInfo.isFile() || entrypointInfo.isSymbolicLink()) {
+    if (!entrypointInfo.isFile() || entrypointInfo.isSymbolicLink()
+        || await realpath(entrypointPath) !== entrypointPath) {
       throw new ProtocolError(`插件入口必须是普通文件：${entrypointPath}`)
     }
-    const module = await import(entrypointPath)
+    const module = await import(pathToFileURL(entrypointPath).href)
     entrypoint = module.default ?? module
   } else {
     throw new ProtocolError(`暂不支持 runtime.type: ${manifest.runtime.type}`)
@@ -191,6 +205,7 @@ export async function autoRegisterPlugin(pluginPath) {
   }
 
   registerPlugin(manifest, entrypoint)
+  return manifest
 }
 
 /**

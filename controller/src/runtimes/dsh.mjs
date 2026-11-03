@@ -216,6 +216,7 @@ export async function runDshSolver({
   name,
   timeoutMs,
   resources,
+  nativeCodeCache = false,
   containerWorkspace = '/workspace',
 }) {
   const environment = runtimeEnvironment('/dsh-home', containerWorkspace)
@@ -241,6 +242,7 @@ export async function runDshSolver({
   await prepareDshHome(dshHome, model, provider, modelAccess)
   Object.assign(environment, modelAccess.environment)
   const result = await docker.run({
+    ...(nativeCodeCache ? { nativeCodeCache: true } : {}),
     image,
     name,
     // Environment 指令可能以 `-` 开头；用 `--` 明确结束参数解析。

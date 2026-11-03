@@ -43,7 +43,17 @@ sdk/
 2. 实现对应协议的接口（继承 SDK 提供的基类或直接实现）
 3. 本地测试：使用 `node controller/src/plugin-loader.mjs` 的加载 API，或运行项目测试
 4. 发布：npm 包或 Git 仓库
-5. 当前版本不自动安装外部插件；请在受审查的启动脚本中显式调用 `autoRegisterPlugin()`，再交给 Controller 使用
+5. 当前版本不自动安装外部插件；可用 `algorithm run --plugin <目录>`，或用 `--plugins <PluginSet.json>` 显式加载多个受信插件。其他运行入口仍使用受审查的启动脚本注册
+
+## 完整独立示例
+
+[`examples/affine-search`](examples/affine-search/README.md) 同时实现任务环境与 Beam Search，
+演示代码修改、评分、私有状态、跨进程恢复和冠军测试。整个目录可复制到主仓之外，
+无需修改 Controller；离线枚举变异器不代表 LLM 能力。源码、依赖文件和任务 Context
+进入恢复身份校验，同一 Run 的并发执行会被拒绝。
+
+插件在 `trusted` 模式下拥有 Controller 的权限。加载器先核对信任声明、协议版本和路径，
+再执行入口；它不是恶意代码沙箱。旧版没有源码身份记录的 Algorithm Run 需要原版 CLI 恢复。
 
 ## 设计原则
 

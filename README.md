@@ -103,6 +103,7 @@ Target × Environment × EvolutionAlgorithm × EvolutionRecipe
 - **OmegaUse-OfficeVal** — 91 Linux-compatible tasks (55 feedback + 18 selection + 18 sealed final). Solver receives only the task description and original Office inputs; scoring runs offline in a separate read-only verifier container.
 - **HLE Text-only Math** — text-only Math subset with a fixed revision, stratified sampling, and sealed test rules. Runtime and sealed broker are independent; see [current boundaries](docs/architecture.md#implemented-paths-and-current-boundary).
 - **KernelBench GPU smoke** — two reproducible L1 operator tasks (ReLU / Sigmoid) with CUDA correctness and speedup scoring. It is an experimental GPU adapter, not the full upstream KernelBench suite; see [`benchmarks/kernelbench-smoke-v1/README.md`](benchmarks/kernelbench-smoke-v1/README.md).
+- **Original KernelBench tasks (experimental)** — import L1/L2 tasks from a fixed upstream commit without changing input shapes. A separate CUDA development image includes NVCC, C++ and Ninja for JIT compilation and multi-seed evaluation. See the [CUDA guide (Chinese)](docs/kernelbench-cuda.zh.md).
 
 **Targets and Updaters**
 
@@ -227,6 +228,10 @@ For example, `combined + linear-hill-climb` and `combined + progressive-risk-exp
 - **Environment** — define task materialization, isolation, verifier, Result protocol, split, and metric.
 - **SearchStrategy** — return Region IDs; never file paths or credentials.
 - **EvolutionAlgorithm** — customize population orchestration. Population Recipes currently accept trusted drivers that preserve the PopulationStore/Branch/Budget contract. Independent algorithms can use the SDK v2 `initialize/step/resume/report` lifecycle with their own RunStore/Checkpoint state through `harness-rsi algorithm run`; this generic path is not yet wired into the standard Experiment Recipe or Server Run API.
+
+Run `npm run demo:plugins` for a complete offline task-plugin and Beam Search example, including candidate code, cross-process resume and champion evaluation.
+The [example directory](sdk/examples/affine-search/README.md) can live outside this repository and be explicitly loaded with `--plugins`.
+Resume verifies plugin sources, dependencies and task configuration; concurrent writes to the same Run are rejected. The example uses deterministic mutations and makes no model calls.
 - **EvolutionRecipe** — recombine an existing population topology, branch count, budget, sharing rule, and search strategy.
 
 Full file map, protocols, extension checklist, and test matrix: [Contributor guide](CONTRIBUTING.md).

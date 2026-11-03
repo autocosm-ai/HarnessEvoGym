@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 
 import { resolve } from 'node:path'
+import { isDeepStrictEqual } from 'node:util'
 import { loadExperimentBundle, validateAnyAdapter } from './adapters.mjs'
 import { assertEvolutionAlgorithmAvailable } from './evolution-algorithm.mjs'
 import { assertPathKind, readConfigFile, REPOSITORY_ROOT, resolveInside } from './config.mjs'
 import { evaluateBenchmark } from './evaluator.mjs'
-import { autoRegisterPlugin } from './plugin-loader.mjs'
+import { autoRegisterPlugin, createPluginDriver } from './plugin-loader.mjs'
+import { inspectPluginInputs } from './plugin-input.mjs'
 import { loadLocalProviderEnvironment } from './local-provider.mjs'
 import { runEvaluationJob } from './evaluation-job.mjs'
 import { runDoctor } from './doctor.mjs'
@@ -52,7 +54,7 @@ const HELP = `HarnessEvoGym Controller
   harness-rsi experiment fork --run <population-run> [--checkpoint <checkpoint.json>] [--config <experiment.json>] [--run-id <id>]
   harness-rsi experiment finalize --run <single-run | population-run> [--recover-infrastructure] [--final-only] [--infrastructure-retries 0..10]
   harness-rsi experiment finalize-suite --config <shared-final.json> [--resume] [--validate-only]
-  harness-rsi algorithm run --plugin <plugin-dir> --algorithm <id> --run-root <relative-dir> [--steps <n>] [--resume] [--resume-checkpoint <name>] [--baseline-only]
+  harness-rsi algorithm run (--plugin <plugin-dir> | --plugins <plugin-set.json>) --algorithm <id> --run-root <relative-dir> [--steps <n>] [--resume] [--resume-checkpoint <name>] [--baseline-only]
   harness-rsi evaluate run --config <evaluation.json> [--resume] [--dry-run]
   harness-rsi doctor --config <experiment.json> [--probe-models] [--output <report.json>]
   harness-rsi benchmark validate --config <benchmark.json> [--output <report.json>]
@@ -363,15 +365,11 @@ function boundedIntegerOption(options, name, fallback, { min = 0, max = 100_000 
 async function genericAlgorithmRunCommand(args) {
   const { options, flags } = parseOptions(args, {
     valueOptions: new Set([
-      'plugin', 'algorithm', 'run-root', 'steps', 'context', 'initial-state',
+      'plugin', 'plugins', 'algorithm', 'run-root', 'steps', 'context', 'initial-state',
       'configuration', 'resume-checkpoint', 'checkpoint-prefix', 'output',
     ]),
     booleanFlags: new Set(['resume', 'baseline-only']),
   })
-  const pluginRoot = resolveInside(REPOSITORY_ROOT, requiredValue(options, 'plugin'), 'Plugin 路径')
-  await assertPathKind(pluginRoot, 'Plugin 目录', 'directory')
-  await autoRegisterPlugin(pluginRoot)
-
   const algorithmId = requiredValue(options, 'algorithm')
   const algorithm = options.has('configuration')
     ? { id: algorithmId, configuration: await readJsonFile(resolveInside(
@@ -387,7 +385,18 @@ async function genericAlgorithmRunCommand(args) {
   // --steps 0 会产出一个没有任何搜索的 steps:0 报告，容易被误读成"已搜索"；下界固定为 1。
   const steps = boundedIntegerOption(options, 'steps', 1, { min: 1 })
   const store = new FileAlgorithmRunStore(runRoot)
-  const driver = createGenericEvolutionAlgorithmDriver({ algorithm, options: { store } })
+  const plugins = await inspectPluginInputs({ repositoryRoot: REPOSITORY_ROOT,
+    plugin: options.get('plugin'), plugins: options.get('plugins'), runRoot })
+  const inputIdentity = { algorithm, context, plugins: plugins.identity }
+  // 先比较源码和任务身份，再 import；改过的插件不能借 Resume 执行新代码。
+  if (flags.has('resume')) {
+    const saved = await store.readMetadata()
+    if (!isDeepStrictEqual(saved.inputIdentity, inputIdentity)) {
+      throw new ProtocolError('Algorithm 插件源码或任务配置已改变，拒绝 Resume；请创建新的 Run')
+    }
+  }
+  for (const root of plugins.roots) await autoRegisterPlugin(root)
+  const driver = createGenericEvolutionAlgorithmDriver({ algorithm, options: { store, createPluginDriver } })
   const result = await runGenericEvolution({
     driver,
     ...(initialState === undefined ? {} : { initialState }),
@@ -399,6 +408,7 @@ async function genericAlgorithmRunCommand(args) {
     ...(options.has('checkpoint-prefix') ? { checkpointPrefix: options.get('checkpoint-prefix') } : {}),
     metadata: {
       algorithm,
+      inputIdentity,
       checkpointCodecVersion: driver.checkpointCodec.version,
     },
   })

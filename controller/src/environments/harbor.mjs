@@ -162,13 +162,13 @@ async function readCtrf(logs, metricNames = []) {
   }
 }
 
-function harborRecord({ task, partition, reward, trials, feedbackLimit }) {
+function harborRecord({ task, partition, reward, trials, feedbackLimit, resolved = reward === 1 }) {
   const usageComplete = trials.every(
     (trial) => Number.isFinite(trial.inputTokens) && Number.isFinite(trial.outputTokens),
   )
   const record = {
     instance_id: task.name,
-    status: reward === 1 ? 'resolved' : 'unresolved',
+    status: resolved ? 'resolved' : 'unresolved',
     reward,
     trial_rewards: trials.map((trial) => trial.reward),
     trial_seeds: trials.map((trial) => trial.seed),
@@ -393,6 +393,7 @@ export class HarborEnvironment {
       image: verifierImage,
       name,
       command: ['/bin/bash', '/tests/test.sh'],
+      ...(this.nativeCodeCache ? { nativeCodeCache: true } : {}),
       mounts: [
         { source: submission, target: this.environment.task.workspacePath, readOnly: true },
         { source: verifierLogs, target: '/logs/verifier', readOnly: false },
@@ -402,7 +403,7 @@ export class HarborEnvironment {
       environment: {
         HOME: '/tmp/home',
         TMPDIR: '/tmp',
-        PATH: '/opt/conda/bin:/usr/local/bin:/usr/bin:/bin',
+        PATH: '/opt/conda/bin:/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin',
       },
       inheritEnvironment: [],
       network: 'none',
@@ -447,6 +448,7 @@ export class HarborEnvironment {
     try {
       solver = await withGlobalPermit('solver', () => this.solverDriver.run({
         image: runtime.solverImage,
+        ...(this.nativeCodeCache ? { nativeCodeCache: true } : {}),
         model,
         candidateWorkspace,
         taskWorkspace: workspace,
@@ -652,6 +654,7 @@ export class HarborEnvironment {
       assertInside(this.runRoot, taskRoot, 'Harbor Task Trial')
       const identity = {
         executionId,
+        ...(this.resultSemantics ? { resultSemantics: this.resultSemantics } : {}),
         ...(infrastructureRetries > 0 ? { infrastructureRetries } : {}),
         ...(retryReasoningOnly ? { retryReasoningOnly: true } : {}),
         ...(strictFinalCheckpoints ? { strictFinalCheckpoints: true } : {}),
@@ -778,6 +781,7 @@ export class HarborEnvironment {
             partition,
             reward: trials.reduce((sum, trial) => sum + trial.reward, 0) / trials.length,
             trials,
+            ...(this.trialsResolved ? { resolved: this.trialsResolved(trials) } : {}),
             feedbackLimit: this.environment.feedback.maximumTextBytesPerCase,
           })
           await validateCheckpointRecord(record)

@@ -318,6 +318,7 @@ export class DockerClient {
       runAsCurrentUser = this.runAsCurrentUser,
       readOnlyRoot = true,
       hostGateway = false,
+      nativeCodeCache = false,
       tmpfs = ['/tmp:rw,nosuid,nodev,size=1g', '/run:rw,nosuid,nodev,size=64m'],
       capabilities = [],
       timeoutMs = this.resources.timeoutSeconds * 1000,
@@ -328,6 +329,14 @@ export class DockerClient {
     } = options
     if (network === 'host') throw new ProtocolError('安全策略禁止 Docker host 网络')
     if (typeof hostGateway !== 'boolean') throw new ProtocolError('Docker hostGateway 必须是布尔值')
+    if (typeof nativeCodeCache !== 'boolean') throw new ProtocolError('Docker nativeCodeCache 必须是布尔值')
+    if (nativeCodeCache && !(resources.gpus > 0)) throw new ProtocolError('可执行编译缓存只对 GPU 任务开放')
+    const nativeCacheEnvironment = { TORCH_EXTENSIONS_DIR: '/kernel-cache/torch', TRITON_CACHE_DIR: '/kernel-cache/triton' }
+    if (nativeCodeCache && (mounts.some(({ target }) => target === '/kernel-cache' || target.startsWith('/kernel-cache/'))
+        || tmpfs.some((value) => value.split(':')[0] === '/kernel-cache')
+        || Object.keys(nativeCacheEnvironment).some((key) => key in environment || key in secretEnvironment || inheritEnvironment.includes(key)))) {
+      throw new ProtocolError('可执行编译缓存路径和环境变量由 Controller 管理，不能覆盖')
+    }
     if (typeof captureExecutionEvidence !== 'boolean') throw new ProtocolError('Docker captureExecutionEvidence 必须是布尔值')
     if (
       entrypoint !== null &&
@@ -372,6 +381,11 @@ export class DockerClient {
       args.push('--user', `${process.getuid()}:${process.getgid()}`)
     }
     for (const value of tmpfs) args.push('--tmpfs', value)
+    if (nativeCodeCache) {
+      // 只给编译产物一个限容量的可执行内存盘，普通 /tmp 继续保持原隔离策略。
+      args.push('--tmpfs', '/kernel-cache:rw,exec,nosuid,nodev,size=1g,mode=1777')
+      for (const [key, value] of Object.entries(nativeCacheEnvironment)) args.push('--env', `${key}=${value}`)
+    }
     for (const mount of mounts) args.push('--mount', mountArgument(mount))
     for (const [nameValue, value] of Object.entries(environment)) {
       if (!/^[A-Za-z_][A-Za-z0-9_]*$/u.test(nameValue)) throw new ProtocolError(`非法环境变量名：${nameValue}`)

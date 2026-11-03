@@ -97,7 +97,7 @@ test('通用 Algorithm Runner Resume 不会覆盖前一次 Run 的不可变 Chec
 
 test('通用 Algorithm Runner 拒绝不受限的步数和非法 Checkpoint Codec', async () => {
   const root = await mkdtemp(join(tmpdir(), 'harness-generic-invalid-'))
-  assert.rejects(
+  await assert.rejects(
     () => runGenericEvolution({ driver: driver(join(root, 'run')), maxSteps: 100_001 }),
     /maxSteps/u,
   )
@@ -114,4 +114,31 @@ test('FileAlgorithmRunStore 并发追加事件仍保持唯一序号并限制事�
   assert.deepEqual(records.map((record) => record.sequence).sort((a, b) => a - b),
     Array.from({ length: 20 }, (_, index) => index + 1))
   await assert.rejects(() => store.appendEvent({ value: 'x'.repeat(10_000) }), /字节上限/u)
+  const last = await store.appendEvent({ type: 'step', sequence: -10 })
+  assert.equal(last.sequence, 21)
+})
+
+test('同一 Algorithm Run 只能由一个进程持有，失败后会释放锁', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'harness-generic-lease-'))
+  const first = driver(join(root, 'run'))
+  const release = await first.store.acquireLease()
+  try {
+    await assert.rejects(() => runGenericEvolution({ driver: driver(join(root, 'run')) }), /已有活动/u)
+  } finally { await release() }
+  await assert.rejects(() => runGenericEvolution({ driver: first, checkpointPrefix: '../escape' }), /安全文件名/u)
+  const result = await runGenericEvolution({ driver: first, maxSteps: 1 })
+  assert.equal(result.steps, 1)
+})
+
+test('插件返回 done 就持久化完成状态，恢复后不能多做一个搜索步骤', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'harness-generic-done-'))
+  let calls = 0
+  const makeDriver = () => ({ ...driver(join(root, 'run')),
+    async step({ state }) { calls += 1; return { state: { ...state, tree: [1, 2] }, done: true } } })
+  const result = await runGenericEvolution({ driver: makeDriver(), maxSteps: 10 })
+  assert.equal(result.complete, true)
+  assert.equal(result.state.status, 'completed')
+  const resumed = await runGenericEvolution({ driver: makeDriver(), resume: true, maxSteps: 10 })
+  assert.equal(resumed.complete, true)
+  assert.equal(calls, 1)
 })

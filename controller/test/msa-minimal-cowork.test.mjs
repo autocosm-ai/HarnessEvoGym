@@ -111,13 +111,14 @@ test('MSA Cowork Runtime 派生镜像绑定 Task Image、Source 与定义摘要'
 
 test('MSA Cowork Solver 只读挂 Candidate/Skill，只写任务与独立输出目录', async () => {
   const fixture = await trialFixture('rsi-msa-cowork-run-')
+  let activeSessionRoot = fixture.sessionRoot
   const task = 'Create result.xlsx.\n\nRequirements:\n- Preserve the source data.\n- Add a pivot table.'
   let invocation
   const docker = {
     async run(options) {
       invocation = options
-      await writeFile(join(fixture.sessionRoot, 'answer.txt'), `done ${modelAccess.secretEnvironment.RSI_PROVIDER_API_KEY}\n`)
-      await writeFile(join(fixture.sessionRoot, 'agent.jsonl'), `${JSON.stringify({
+      await writeFile(join(activeSessionRoot, 'answer.txt'), `done ${modelAccess.secretEnvironment.RSI_PROVIDER_API_KEY}\n`)
+      await writeFile(join(activeSessionRoot, 'agent.jsonl'), `${JSON.stringify({
         type: 'model',
         content: modelAccess.secretEnvironment.RSI_PROVIDER_API_KEY,
       })}\n`)
@@ -164,6 +165,13 @@ test('MSA Cowork Solver 只读挂 Candidate/Skill，只写任务与独立输出�
   assert.equal(result.answer, 'done [REDACTED]')
   assert.doesNotMatch(result.trace, /fixture-dummy-token/u)
   assert.doesNotMatch(await readFile(join(fixture.sessionRoot, 'answer.txt'), 'utf8'), /fixture-dummy-token/u)
+  assert.equal(invocation.nativeCodeCache, undefined)
+  const nativeFixture = await trialFixture('rsi-msa-native-cache-')
+  activeSessionRoot = nativeFixture.sessionRoot
+  await runMsaMinimalCoworkSolver({ docker, runtime, image: 'kernel-task:fixture', model, provider,
+    ...nativeFixture, modelAccess, task, name: 'msa-native-cache', timeoutMs: 1000,
+    nativeCodeCache: true, resources: { cpus: 1, memory: '2g', pids: 64, gpus: 1 } })
+  assert.equal(invocation.nativeCodeCache, true)
 })
 
 test('MSA Cowork Solver 在进入 Docker 前拒绝越界的可信步数上限', async () => {
